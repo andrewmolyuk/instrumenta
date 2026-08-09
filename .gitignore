@@ -1,0 +1,22 @@
+# Mac system files
+.DS_Store
+
+# Node.js
+node_modules/
+package-lock.json
+yarn.lock
+
+# turbo
+.turbo/
+
+# Build output
+dist/
+
+# Test coverage
+coverage/
+
+# VSCode
+.vscode/
+
+# Personal Claude Code overrides
+.claude/settings.local.json
