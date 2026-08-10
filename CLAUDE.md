@@ -57,3 +57,4 @@ a line — never inlined. This file loads into every session; keep it under 60 l
 - [ADR-013](docs/decisions/013-knowledge-entry-dedup.md) — same key, no new file, recurrence logged
 - [ADR-014](docs/decisions/014-session-end-doc-mining.md) — SessionEnd hook mines transcript into docs/todo/
 - [ADR-015](docs/decisions/015-shared-knowledge-write-path.md) — orchestrator never writes shared knowledge directly
+- [ADR-016](docs/decisions/016-shared-scope-evidence-corrected.md) — shared-scope evidence is n=1; project scope takes `tool:rule` keys
