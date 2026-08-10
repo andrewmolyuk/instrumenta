@@ -263,9 +263,11 @@ the way conflicts are normally resolved.
 - **Second project** (ADR-003's trigger). The first real test of the promotion bar, of
   shared-candidate events, and of `docs/knowledge/` as a fixed relative path. All three
   are unverifiable with one project in play.
-- **No second cross-project recurrence by the time a second project has run thirty
-  tasks.** The single observation behind the shared scope was then a coincidence, and the
-  split should collapse while it still costs one entry to undo.
+- **No second cross-project recurrence by the time a second project has completed twenty
+  tasks** — the same horizon ADR-001 set and ADR-006 and `../vision.md` already read
+  against, rather than a number of this ADR's own. The single observation behind the
+  shared scope was then a coincidence, and the split should collapse while it still costs
+  one entry to undo.
 - **Shared entries needing project-specific exceptions.** The split was drawn on the wrong
   axis — something other than project-boundedness.
 - **Recurrence events piling up against a stale entry.** A human should have revised it
