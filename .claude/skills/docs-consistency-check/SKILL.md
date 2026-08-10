@@ -25,7 +25,10 @@ Everything that states policy, not just `docs/decisions/`:
   with its successor is what supersession means, not a finding. `docs/decisions/README.md`
   lists which are in force.
 - `docs/vision.md` — the metrics and thesis every ADR should still serve.
-- `CLAUDE.md` — the standing rules; confirm its `## Decisions` links resolve to files that still
+- `docs/decisions/README.md` — the index. Confirm every link resolves, that each ADR is filed
+  under the right heading (a superseded one still listed as in force is a finding), and that
+  nothing on disk is missing from it.
+- `CLAUDE.md` — the standing rules; confirm its links resolve to files that still
   exist, and that its own text (stack, workflow, don'ts) isn't contradicted by any ADR.
 - `README.md`, if present, for anything maintainer-facing that an ADR has since changed underneath.
 

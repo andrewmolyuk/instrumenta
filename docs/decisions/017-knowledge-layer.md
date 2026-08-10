@@ -184,7 +184,7 @@ can be audited.
 **The evidence for having a shared scope at all is one observation.** ADR-004 justified
 the scope with `../vision.md`'s "seven corrective commits, all one class ... spans two
 separate codebases." Checked against the real repositories, that count was wrong in the
-direction that mattered: those seven commits span six distinct `tool:rule` keys, and under
+direction that mattered: those seven commits span six distinct `tool-rule` keys, and under
 the old count **no single key crossed the repository boundary** — each repo had its own
 rules. The corrected sweep contains exactly one that does, `eslint:xss/no-mixed-html`. So
 "measured rather than assumed" here means _n = 1_, and nothing downstream should quote it
@@ -216,11 +216,29 @@ accumulate against. The shared scope softens that — cross-project findings and
 conventions are useful from the first task — without removing it, since project-scoped
 knowledge still starts empty.
 
-## What this ADR does not touch
+## What this ADR does and does not touch in ADR-001
 
-ADR-001's thesis and its "thin" scope guard; ADR-003's ports; ADR-005's event store;
-ADR-006's state machine and retry cap; ADR-009's read-only Review session; ADR-012's
-pinned build. Each is referenced above and none is restated or changed.
+ADR-001's scope guard reads: "entries are written only from confirmed review findings and
+failed gates, **each scoped to a path** and carrying the commit that produced it, never
+written by the Coding agent about its own work." ADR-004 amended it — that was the first
+line of ADR-004 — and this ADR inherits that amendment rather than reverting it:
+
+- **In force, unchanged:** entries come only from a confirmed review finding or a failed
+  gate; never from the Coding agent about its own work; each carries the commit that
+  produced it. Same for ADR-001's thesis, its knowledge-rot risk, and its cold-start
+  acceptance.
+- **Amended:** "each scoped to a path" and the retrieval note's "path/module scoping" — a
+  `tool-rule` key is equally valid, at either scope. ADR-001's actual concern there was
+  that selection stay deterministic rather than embedding-driven, and a literal rule key
+  satisfies it exactly as a path prefix does.
+
+Spelled out because ADR-004 carried this amendment and ADR-004 is now superseded: without
+it here, the live set would say both that every entry is path-scoped and that entries may
+be rule-scoped, with the reconciliation only in a retired file.
+
+Untouched entirely: ADR-003's ports; ADR-005's event store; ADR-006's state machine and
+retry cap; ADR-009's read-only Review session; ADR-012's pinned build. Each is referenced
+above and none is restated or changed.
 
 ## Provenance
 
