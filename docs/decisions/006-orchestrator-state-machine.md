@@ -41,7 +41,7 @@ increment the same per-task counter. On the third, the task moves to
 
 - **Why capped at all:** an uncapped loop can spend unbounded time and tokens re-failing
   the same class of problem — exactly the failure mode the knowledge layer exists to
-  prevent recurring, not to loop through indefinitely (ADR-001, ADR-004).
+  prevent recurring, not to loop through indefinitely (ADR-001, ADR-017).
 - **Why 3:** enough room for an agent to correct itself without the task silently
   consuming the maintainer's time budget — the same time budget the north-star metric in
   `docs/vision.md` measures.

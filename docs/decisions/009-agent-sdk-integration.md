@@ -22,10 +22,10 @@ cannot write code cannot approve its own fix by construction.
 **A fresh SDK session per `Coding` attempt, not one dialogue spanning the retry cap.**
 Each entry into `Coding` (ADR-006) starts a new session with context assembled by the
 orchestrator: the issue, the current diff, the specific gate failure or review finding
-that sent it back, and whatever knowledge entries retrieval selected (ADR-007). This is
+that sent it back, and whatever knowledge entries retrieval selected (ADR-017). This is
 the same choice already made everywhere else in the design — SQLite over conversation
 memory for state (ADR-005), path/finding-class retrieval over embedding recall
-(ADR-004) — applied to the agent loop itself. A persistent dialogue would let context grow
+(ADR-017) — applied to the agent loop itself. A persistent dialogue would let context grow
 with every retry, which is exactly what the Context guardrail in `docs/vision.md` exists
 to catch. Selecting what a session needs and handing it over is "retrieval without
 recall," this project's second thesis component, not just the knowledge layer's.

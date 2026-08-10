@@ -75,7 +75,9 @@ Three categories, one destination (docs/todo/), distinguished by frontmatter \`t
 
 Before writing ANYTHING:
 - Grep docs/todo/ and docs/decisions/ for existing content covering the same topic. If
-  something close already exists, do not create a duplicate — skip it.
+  something close already exists, do not create a duplicate — skip it. Ignore any ADR
+  carrying a "Superseded by" banner under its title: it is kept for the reasoning that
+  produced it, not as a live claim, so it cannot be what already covers a topic.
 - If nothing in the conversation clears these bars, do nothing and say so.
 
 One file per distinct item, kebab-case slug, frontmatter:
