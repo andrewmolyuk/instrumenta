@@ -1,5 +1,9 @@
 # 004 — Knowledge has two scopes, retrieved by different keys
 
+> **Superseded by [ADR-017](017-knowledge-layer.md)**, which restates this decision together with
+> the rest of the knowledge layer. Nothing here was reversed — kept on record for the
+> reasoning that produced it. Read ADR-017 for what currently holds.
+
 Date: 2026-08-10. Amends the knowledge design in ADR-001; follows from ADR-003.
 
 ## Context

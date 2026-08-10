@@ -1,5 +1,9 @@
 # 016 — Shared-scope evidence corrected; a project home for `tool:rule` findings
 
+> **Superseded by [ADR-017](017-knowledge-layer.md)**, which restates this decision together with
+> the rest of the knowledge layer. Nothing here was reversed — kept on record for the
+> reasoning that produced it. Read ADR-017 for what currently holds.
+
 Date: 2026-08-10. Amends the evidence and the hand-seeded corpus in ADR-004, and the
 key/scope binding, promotion bar, and key notation in ADR-007. The decision ADR-004
 made — two scopes, retrieved by different triggers — stands unchanged.
