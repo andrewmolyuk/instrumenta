@@ -40,4 +40,20 @@ Deterministic gates are the product's thesis — hold this repo to the same bar.
 ## Decisions
 
 Non-trivial decisions live in `docs/decisions/`, one topic per file, linked from here in
-a line — never inlined. This file loads into every session; keep it under 45 lines.
+a line — never inlined. This file loads into every session; keep it under 60 lines.
+
+- [ADR-001](docs/decisions/001-mvp-shape.md) — knowledge-first MVP, self-hosted, no graph
+- [ADR-002](docs/decisions/002-toolchain-and-task-entry.md) — task entry, layout, toolchain
+- [ADR-003](docs/decisions/003-project-ports.md) — three ports, one implementation each
+- [ADR-004](docs/decisions/004-knowledge-scopes.md) — shared vs project knowledge scopes
+- [ADR-005](docs/decisions/005-event-store.md) — SQLite event store, WAL mode
+- [ADR-006](docs/decisions/006-orchestrator-state-machine.md) — states, shared retry cap of 3
+- [ADR-007](docs/decisions/007-knowledge-entry-format.md) — Markdown entries, project vs shared dirs
+- [ADR-008](docs/decisions/008-cockpit-stack.md) — server-rendered Bun app, SSE, one write path
+- [ADR-009](docs/decisions/009-agent-sdk-integration.md) — fresh sessions, permission-scoped roles, both Sonnet 5
+- [ADR-010](docs/decisions/010-knowledge-entry-authorship.md) — orchestrator writes entries, not an agent
+- [ADR-011](docs/decisions/011-task-queue.md) — `ready` label, one task at a time
+- [ADR-012](docs/decisions/012-pinned-build.md) — Docker image tagged per merge, compose pins it
+- [ADR-013](docs/decisions/013-knowledge-entry-dedup.md) — same key, no new file, recurrence logged
+- [ADR-014](docs/decisions/014-session-end-doc-mining.md) — SessionEnd hook mines transcript into docs/todo/
+- [ADR-015](docs/decisions/015-shared-knowledge-write-path.md) — orchestrator never writes shared knowledge directly
