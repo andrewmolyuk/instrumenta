@@ -90,24 +90,29 @@ Every other correction was gate-driven, which is the gates doing their job — a
 the class of correction Instrumenta's loop should absorb with no human turn at all.
 
 **Direct evidence for the thesis.** The thesis test below asks that a finding of the same
-class never recur. It is recurring now, at a measurable rate. Seven corrective commits
-across six of the seventy PRs are all one class — security-scanner false positives and
-HTML-taint warnings:
+class never recur. It is recurring now, at a measurable rate. Ten corrective commits
+across nine of the seventy PRs answer a security-scanner finding. They are not one class —
+six distinct `tool:rule` keys — but two of those keys recur across separate PRs, which is
+the case the thesis is actually about:
 
-| Repo | Correction                                              |
-| ---- | ------------------------------------------------------- |
-| A    | XSS false positive on a generated content page          |
-| A    | XSS false positive on a changed file                    |
-| A    | close a pwn-request vector in a release workflow        |
-| B    | suppress a false-positive XSS finding on a rendered SVG |
-| B    | suppress a false-positive XSS finding on an email body  |
-| B    | suppress remaining false-positive HTML-taint warnings   |
-| B    | avoid an object-injection flag on a registry lookup     |
+| Rule key                           | Recurrences                                    |
+| ---------------------------------- | ---------------------------------------------- |
+| `security/detect-object-injection` | B #94, B #97, B #118 — bracket index → `Map`   |
+| `xss/no-mixed-html`                | A #118, A #123, B #132 — **across both repos** |
 
-The same problem was solved from scratch six times in three weeks across two codebases —
-8.6% of every PR in the sample. Each recurrence costs a human turn, which is where the
-north star and the thesis meet: knowledge does not have to make the code better, it has
-to stop a solved finding being re-solved.
+Six of the seventy PRs (8.6%) carry a corrective commit re-solving one of those two rules.
+The rest are singletons under their own keys: `raw-html-format` (B #100, three commits
+iterating on one finding), `avoid-v-html` (B #101), `node-ssrf` (B #118), and an Opengrep
+pwn-request finding in a release workflow (A #100) that was a real vulnerability, not a
+false positive.
+
+`xss/no-mixed-html` is the sharper evidence: it crosses the repository boundary, which is
+what ADR-004's shared scope exists for. And the third `detect-object-injection` fix names
+its own precedent — "what ADR-0018 already settled on the two previous times this came
+up." A human wrote that decision down and an agent found it. The thesis is that neither
+step should depend on someone remembering. Each recurrence costs a human turn, which is
+where the north star and the thesis meet: knowledge does not have to make the code better,
+it has to stop a solved finding being re-solved.
 
 **Consequence for the build:** attribution lives in the event store, not in git. Commits
 carry no `Co-Authored-By` trailer — a repository rule, enforced by a hook — so git alone
