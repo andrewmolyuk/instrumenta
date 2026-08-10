@@ -67,8 +67,9 @@ cannot bootstrap against TypeScript 7 — at that point pin back to `^6`.
 ## Consequence: the hooks are now tested
 
 The two `.claude/hooks` guards were previously verified with an ad-hoc shell harness that
-lived nowhere. They now have 26 Vitest cases covering the shell-parsing helpers and both
-hooks end to end, including the regression that started it: `git rev-parse --abbrev-ref
+lived nowhere. They gained 26 Vitest cases covering the shell-parsing helpers and both
+hooks end to end — the suite has grown since, with the hooks, as ADR-014 added a third —
+including the regression that started it: `git rev-parse --abbrev-ref
 HEAD` fails in a repository with no commits, which would have silently disabled the
 main-branch guard at exactly the moment of the first commit. The end-to-end cases run
 against throwaway `git init` repositories, so the branch-dependent behaviour is

@@ -65,7 +65,10 @@ that applies to its own tooling too.
 This hook's actual output — what it decides is worth writing — is not something a
 deterministic gate can check, unlike `block-main-commit.mts` and
 `block-co-authored-by.mts`. What _is_ tested: the deterministic logic before the
-detached call (reason filtering, marker dedup, transcript-length gate). The content
+detached call — reason filtering, marker dedup, the recursion guard, and the
+transcript-length gate. Note what the recursion guard's test does _not_ reach: it proves
+the hook bails out when the flag is set, not that the spawn sets it. That half was checked
+by running the hook for real and counting spawns, and no gate covers it. The content
 decision itself is explicitly outside gate coverage, and `CLAUDE.md` already asks to "say
 plainly when no gate covers what changed" — this is that case, named up front rather than
 discovered later.
