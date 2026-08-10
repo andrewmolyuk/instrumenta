@@ -10,7 +10,9 @@ set grows, a later ADR can silently assume something an earlier one decided diff
 constraint that actually lives elsewhere and has drifted out of sync with it. This isn't caught by
 reading any one ADR on its own — only by holding several at once. In this repo, ADR-010 exists
 because ADR-009 made ADR-001's knowledge-entry requirement impossible to satisfy; ADR-013 exists
-because ADR-010 reintroduced the exact "noise within weeks" problem ADR-001 warned against. Both were
+because ADR-010 reintroduced the exact "noise within weeks" problem ADR-001 warned against. (Both
+are now superseded by ADR-017, which folded that whole chain into one document — precisely because
+four separate ADRs had been spent patching it.) Both were
 found by re-reading the full set together, not by reading the ADR that later broke.
 
 ## What to read

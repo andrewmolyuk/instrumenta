@@ -40,13 +40,12 @@ thin knowledge layer · a read-only Cockpit with an intervene control.
 
 - comes only from a confirmed review finding or a failed gate — never from the Coding
   agent describing its own work;
-- is **project-scoped** or **shared across projects**
-  ([ADR-004](decisions/004-knowledge-scopes.md)), and is retrieved either by **path** —
-  the agent touches matching files — or by **finding class**, a `tool:rule` key a gate
-  reports. Scope and retrieval key are independent
-  ([ADR-016](decisions/016-shared-scope-evidence-corrected.md)); a project entry may carry
-  either key, a shared one only `tool:rule`. Both keys are literal matches, so retrieval
-  stays close to deterministic instead of leaning on embedding similarity;
+- is **project-scoped** or **shared across projects**, and is retrieved either by **path** —
+  the agent touches matching files — or by **finding class**, an `engine:rule-id` key a
+  gate reports. Scope and retrieval key are independent: a project entry may carry either,
+  a shared one only a rule key ([ADR-017](decisions/017-knowledge-layer.md)). Both keys are
+  literal matches, so retrieval stays close to deterministic instead of leaning on
+  embedding similarity;
 - carries the commit that produced it, so it can be invalidated when the code moves;
 - may carry a `supersedes` pointer to an entry it replaces.
 
@@ -100,26 +99,27 @@ say the loop can finish alone, which is what `AwaitingIntervention`
 **Direct evidence for the thesis.** The thesis test below asks that a finding of the same
 class never recur. It is recurring now, at a measurable rate. Ten corrective commits
 across nine of the seventy PRs answer a security-scanner finding. They are not one class —
-six distinct `tool:rule` keys — but two of those keys recur across separate PRs, which is
-the case the thesis is actually about:
+six distinct rule keys — but two of those keys recur across separate PRs, which is the
+case the thesis is actually about:
 
-| Rule key                           | Recurrences                                    |
-| ---------------------------------- | ---------------------------------------------- |
-| `security/detect-object-injection` | B #94, B #97, B #118 — bracket index → `Map`   |
-| `xss/no-mixed-html`                | A #118, A #123, B #132 — **across both repos** |
+| Rule key                                  | Recurrences                                    |
+| ----------------------------------------- | ---------------------------------------------- |
+| `eslint:security/detect-object-injection` | B #94, B #97, B #118 — bracket index → `Map`   |
+| `eslint:xss/no-mixed-html`                | A #118, A #123, B #132 — **across both repos** |
 
 Six of the seventy PRs (8.6%) carry a corrective commit re-solving one of those two rules.
-The rest are singletons under their own keys: `raw-html-format` (B #100, three commits
-iterating on one finding), `avoid-v-html` (B #101), `node-ssrf` (B #118), and an Opengrep
-pwn-request finding in a release workflow (A #100) that was a real vulnerability, not a
-false positive.
+The rest are singletons under their own keys: Semgrep's `raw-html-format` (B #100, three
+commits iterating on one finding), `avoid-v-html` (B #101) and `node-ssrf` (B #118), and
+an Opengrep pwn-request finding in a release workflow (A #100) that was a real
+vulnerability, not a false positive.
 
 `xss/no-mixed-html` is the sharper evidence: it crosses the repository boundary, which is
-what ADR-004's shared scope exists for. And the third `detect-object-injection` fix names
-its own precedent — "what ADR-0018 already settled on the two previous times this came
-up," citing that repository's own decision log, not one of these ADRs. A human wrote that
-decision down and an agent found it. The thesis is that neither
-step should depend on someone remembering. Each recurrence costs a human turn, which is
+what the shared scope ([ADR-017](decisions/017-knowledge-layer.md)) exists for — and it is
+the whole of that scope's evidence, so the ADR records it as _n = 1_. The third
+`detect-object-injection` fix names its own precedent — "what ADR-0018 already settled on
+the two previous times this came up," citing that repository's own decision log, not one
+of these ADRs. A human wrote that decision down and an agent found it. The thesis is that
+neither step should depend on someone remembering. Each recurrence costs a human turn, which is
 where the north star and the thesis meet: knowledge does not have to make the code better,
 it has to stop a solved finding being re-solved.
 

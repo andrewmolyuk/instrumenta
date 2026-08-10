@@ -1,5 +1,9 @@
 # 013 — Knowledge entry dedup: same `key`, no new file, recurrence logged instead
 
+> **Superseded by [ADR-017](017-knowledge-layer.md)**, which restates this decision together with
+> the rest of the knowledge layer. Nothing here was reversed — kept on record for the
+> reasoning that produced it. Read ADR-017 for what currently holds.
+
 Date: 2026-08-10. Closes a gap between ADR-001's "thin" scope guard and ADR-010's write
 mechanism, found on a re-read of all prior ADRs together.
 
