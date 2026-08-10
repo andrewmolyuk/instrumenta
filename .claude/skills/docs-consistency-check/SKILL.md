@@ -20,6 +20,10 @@ found by re-reading the full set together, not by reading the ADR that later bro
 Everything that states policy, not just `docs/decisions/`:
 
 - `docs/decisions/*.md`, in number order — each one is a claim about how the system works.
+  **Skip any file carrying a `> **Superseded by ...**` banner under its title.** Those are
+  kept for the reasoning that produced them, not as live claims; a retired ADR disagreeing
+  with its successor is what supersession means, not a finding. `docs/decisions/README.md`
+  lists which are in force.
 - `docs/vision.md` — the metrics and thesis every ADR should still serve.
 - `CLAUDE.md` — the standing rules; confirm its `## Decisions` links resolve to files that still
   exist, and that its own text (stack, workflow, don'ts) isn't contradicted by any ADR.
