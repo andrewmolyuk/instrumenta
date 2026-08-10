@@ -22,7 +22,9 @@ import { existsSync, mkdirSync, openSync, readFileSync, writeFileSync } from 'no
 import { dirname, join } from 'node:path'
 import {
   buildPrompt,
+  CHILD_ENV_FLAG,
   extractTranscriptText,
+  isChildRun,
   MIN_TRANSCRIPT_CHARS,
   scopedSettings,
   shouldRun,
@@ -72,6 +74,11 @@ function parseInput(raw: string): SessionEndInput {
   }
 }
 
+// Before anything else, including reading stdin: a mining sub-call ending must
+// never start another one. Checked first because it is the only failure here
+// that compounds — every other exit path costs one no-op.
+if (isChildRun(process.env)) process.exit(0)
+
 const input = parseInput(await readStdin())
 const sessionId = input.session_id || 'unknown'
 const reason = input.reason || ''
@@ -119,7 +126,14 @@ const logFd = openSync(LOG_FILE, 'a')
 const child = spawn(
   'claude',
   ['-p', '--model', MODEL, '--settings', scopedSettings(), prompt, '--add-dir', projectDir],
-  { cwd: projectDir, detached: true, stdio: ['ignore', logFd, logFd] },
+  {
+    cwd: projectDir,
+    detached: true,
+    stdio: ['ignore', logFd, logFd],
+    // Inherited by the sub-call and anything it spawns, so the whole subtree is
+    // inert to this hook. Without it the sub-call's own SessionEnd fires here.
+    env: { ...process.env, [CHILD_ENV_FLAG]: '1' },
+  },
 )
 child.on('error', (err) => log(sessionId, `failed to spawn claude: ${err.message}`))
 child.unref()

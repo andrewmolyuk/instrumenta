@@ -47,7 +47,12 @@ detached, permission-scoped `claude -p` sub-call (`--settings` allow-listing
 content-authorship pass, not string matching. `async: true` and a background-detached
 process (Node/Bun `spawn(..., { detached: true }).unref()`, the JS equivalent of the
 reference's `setsid`/`disown`) so `SessionEnd`'s short timeout never blocks the session
-tearing down. A marker file guards against a duplicate spawn. The sub-call is instructed
+tearing down. Two guards, not one: a marker file stops the _same_ session spawning twice,
+and an environment flag set on the sub-call stops it spawning _recursively_. The second
+was added after the first proved insufficient in practice — the sub-call runs in the
+project directory under the project's settings, so its own `SessionEnd` re-entered this
+hook with a fresh session id no marker could match, and generations accelerated rather
+than converged. The sub-call is instructed
 to grep `docs/todo/` and `docs/decisions/` first and skip anything already covered —
 dedup lives in the prompt, not in code, same as the reference.
 
