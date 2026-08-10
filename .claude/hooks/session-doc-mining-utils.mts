@@ -10,6 +10,21 @@ export function shouldRun(reason: string): boolean {
   return reason !== 'logout'
 }
 
+/**
+ * Set on the detached `claude -p` sub-call so its own SessionEnd can't fire this
+ * hook again. The sub-call runs in the project directory under the project's
+ * settings, so without this it ends, triggers the hook, and spawns a third
+ * generation — observed accelerating to 12 spawns in 2.5 minutes and not
+ * self-limiting. The marker file cannot catch this: it is keyed by session id,
+ * and every sub-call gets a fresh one.
+ */
+export const CHILD_ENV_FLAG = 'DOCUMENT_SESSION_CHILD'
+
+/** True when we are running inside a mining sub-call (or anything it spawned — env is inherited by the whole subtree). */
+export function isChildRun(env: Record<string, string | undefined>): boolean {
+  return Boolean(env[CHILD_ENV_FLAG])
+}
+
 type TranscriptEntry = {
   type?: string
   message?: { content?: string | Array<{ type?: string; text?: string }> }
