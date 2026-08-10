@@ -40,9 +40,13 @@ thin knowledge layer · a read-only Cockpit with an intervene control.
 
 - comes only from a confirmed review finding or a failed gate — never from the Coding
   agent describing its own work;
-- is either **project-scoped by path** or **shared across projects by finding class**, the
-  two retrieved with different keys ([ADR-004](decisions/004-knowledge-scopes.md)) — so
-  retrieval stays close to deterministic instead of leaning on embedding similarity;
+- is **project-scoped** or **shared across projects**
+  ([ADR-004](decisions/004-knowledge-scopes.md)), and is retrieved either by **path** —
+  the agent touches matching files — or by **finding class**, a `tool:rule` key a gate
+  reports. Scope and retrieval key are independent
+  ([ADR-016](decisions/016-shared-scope-evidence-corrected.md)); a project entry may carry
+  either key, a shared one only `tool:rule`. Both keys are literal matches, so retrieval
+  stays close to deterministic instead of leaning on embedding similarity;
 - carries the commit that produced it, so it can be invalidated when the code moves;
 - may carry a `supersedes` pointer to an entry it replaces.
 
@@ -86,8 +90,12 @@ flagged. That is roughly nine points of headroom — and the two repositories di
 eight of them, so treat it as a floor to defend rather than a target to chase.
 Instrumenta has to win on effort, because output quality has little left to give.
 
-Every other correction was gate-driven, which is the gates doing their job — and exactly
-the class of correction Instrumenta's loop should absorb with no human turn at all.
+Every other correction was gate-driven, which is the gates doing their job. Most of that
+class is what Instrumenta's loop should absorb with no human turn at all — but not all of
+it. One of the corrections below was a gate flagging a real vulnerability whose fix took
+design judgment, not a suppression. A gate firing says the loop should run; it does not
+say the loop can finish alone, which is what `AwaitingIntervention`
+([ADR-006](decisions/006-orchestrator-state-machine.md)) is for.
 
 **Direct evidence for the thesis.** The thesis test below asks that a finding of the same
 class never recur. It is recurring now, at a measurable rate. Ten corrective commits
@@ -109,7 +117,8 @@ false positive.
 `xss/no-mixed-html` is the sharper evidence: it crosses the repository boundary, which is
 what ADR-004's shared scope exists for. And the third `detect-object-injection` fix names
 its own precedent — "what ADR-0018 already settled on the two previous times this came
-up." A human wrote that decision down and an agent found it. The thesis is that neither
+up," citing that repository's own decision log, not one of these ADRs. A human wrote that
+decision down and an agent found it. The thesis is that neither
 step should depend on someone remembering. Each recurrence costs a human turn, which is
 where the north star and the thesis meet: knowledge does not have to make the code better,
 it has to stop a solved finding being re-solved.
