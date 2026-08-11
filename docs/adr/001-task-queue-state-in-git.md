@@ -1,5 +1,8 @@
 # 001 — Git/GitHub state stands in for the task queue, no separate store
 
+> **Superseded by [ADR-003](003-pick-excludes-given-up-tasks.md)** — kept on record for the
+> reasoning that produced it. Read ADR-003 for what currently holds.
+
 Date: 2026-08-12
 
 ## Context

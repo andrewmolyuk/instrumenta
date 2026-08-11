@@ -6,11 +6,12 @@ and dated.
 
 ## In force
 
-- [ADR-001](001-task-queue-state-in-git.md) — git/GitHub state stands in for the task
-  queue, no separate store
 - [ADR-002](002-solve-gates-verify-and-give-up.md) — solve requires a project verify
   skill and gives up after 3 closed PRs
+- [ADR-003](003-pick-excludes-given-up-tasks.md) — pick excludes tasks that hit the
+  give-up threshold, superseding ADR-001's claimed/free mechanics
 
 ## Superseded
 
-None yet.
+- [ADR-001](001-task-queue-state-in-git.md) — superseded by
+  [ADR-003](003-pick-excludes-given-up-tasks.md)
