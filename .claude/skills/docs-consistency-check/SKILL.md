@@ -8,12 +8,12 @@ description: 'Cross-checks docs/decisions/*.md, docs/vision.md, and CLAUDE.md ag
 Why this exists: each ADR is written in isolation, arguing from decisions already on record. As the
 set grows, a later ADR can silently assume something an earlier one decided differently, or restate a
 constraint that actually lives elsewhere and has drifted out of sync with it. This isn't caught by
-reading any one ADR on its own — only by holding several at once. In this repo, ADR-010 exists
-because ADR-009 made ADR-001's knowledge-entry requirement impossible to satisfy; ADR-013 exists
-because ADR-010 reintroduced the exact "noise within weeks" problem ADR-001 warned against. (Both
-are now superseded by ADR-017, which folded that whole chain into one document — precisely because
-four separate ADRs had been spent patching it.) Both were
-found by re-reading the full set together, not by reading the ADR that later broke.
+reading any one ADR on its own — only by holding several at once.
+
+The failure has a shape worth recognising early: a decision gets patched by a follow-up ADR, that
+patch conflicts with a third, and soon several documents exist only to reconcile the others. When
+that pattern appears, the fix is not another patch — it is one document restating the whole subject,
+with the superseded ones kept on record for the reasoning that produced them.
 
 ## What to read
 
@@ -24,7 +24,8 @@ Everything that states policy, not just `docs/decisions/`:
   kept for the reasoning that produced them, not as live claims; a retired ADR disagreeing
   with its successor is what supersession means, not a finding. `docs/decisions/README.md`
   lists which are in force.
-- `docs/vision.md` — the metrics and thesis every ADR should still serve.
+- Whatever states the project's goal and metrics (`docs/vision.md` or equivalent) — every ADR
+  should still serve it.
 - `docs/decisions/README.md` — the index. Confirm every link resolves, that each ADR is filed
   under the right heading (a superseded one still listed as in force is a finding), and that
   nothing on disk is missing from it.
@@ -38,8 +39,8 @@ Everything that states policy, not just `docs/decisions/`:
   access; another requires that same role to write something).
 - **Silent narrowing/reversal** — a later ADR treats an earlier one's open question as settled,
   differently from how it was actually settled elsewhere — or not settled at all.
-- **Attribution drift** — a rule stated as global that's actually scoped elsewhere (a per-project
-  port's behavior described as a fixed rule; a decision credited to the wrong document).
+- **Attribution drift** — a rule stated as global that's actually scoped elsewhere (one component's
+  local behavior described as a system-wide rule; a decision credited to the wrong document).
 - **Stale reference** — a path, command, field name, or file a doc names that a later decision
   renamed, moved, or dropped.
 - **Unresolved thread** — a "not decided here" or "revisit trigger" that a later doc's design quietly
@@ -53,11 +54,10 @@ incomplete.
 ## Process
 
 1. Build an index of each ADR's concrete claims — state names, field names, file paths, directory
-   locations, numeric constants, who does what. `vision.md`'s metrics and horizons count as claims
-   too.
+   locations, numeric constants, who does what. The goal document's metrics and horizons count as
+   claims too.
 2. For each claim, check every other document that touches the same subject. Two ADRs about the same
-   component (the event store, knowledge entries, agent sessions) are the highest-yield pairs to
-   check line by line against each other.
+   component or subsystem are the highest-yield pairs to check line by line against each other.
 3. For anything a doc says isn't decided yet, check whether a _later_ doc silently assumed an answer
    anyway.
 4. Grep the repo for paths, commands, and filenames the docs claim exist (`.claude/hooks/`,
@@ -65,8 +65,8 @@ incomplete.
    doc following.
 5. Report each finding: which two documents conflict (a short quote or line reference from each),
    what the conflict actually is, and why it matters — not just "these differ" but what breaks if it
-   ships unresolved. Rank findings touching `docs/vision.md`'s metrics or the thesis test highest —
-   those are silent failures of the thing the whole project measures itself against.
+   ships unresolved. Rank findings touching the goal document's metrics highest — those are
+   silent failures of the thing the whole project measures itself against.
 
 ## What this skill does not do
 

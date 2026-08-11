@@ -1,11 +1,11 @@
 /**
  * Pure helpers for document-session-learnings.mts, split out so the logic that
  * decides *whether* and *what* to mine is unit-testable without actually
- * spawning the detached `claude -p` sub-call (ADR-014: that call's output is
- * explicitly outside gate coverage — this is the part that isn't).
+ * spawning the detached `claude -p` sub-call (that call's output is content, so
+ * no test can assert on it — this is the part that isn't).
  */
 
-/** `logout` ends the whole account session, not work on this project — everything else (`clear`, `other`, `prompt_input_exit`, and any future reason) is in scope, per ADR-014. */
+/** `logout` ends the whole account session, not work on this project — everything else (`clear`, `other`, `prompt_input_exit`, and any future reason) is in scope. */
 export function shouldRun(reason: string): boolean {
   return reason !== 'logout'
 }
@@ -74,7 +74,7 @@ writing nothing is better than writing something wrong, speculative, or duplicat
 
 Your file-write permission is path-scoped (enforced, not just requested) to
 docs/todo/** — a write anywhere else, including docs/decisions/, will be rejected, so
-don't attempt it. Per ADR-014, this hook never writes decisions directly, even for
+don't attempt it. This hook never writes decisions directly, even for
 something that looks like a settled architectural choice: write it as a docs/todo/ entry
 with \`type: adr-candidate\` instead, and include the real alternatives that were
 discussed so a human can turn it into a proper ADR later without re-deriving them from

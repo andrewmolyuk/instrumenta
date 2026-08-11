@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
  * SessionEnd hook — mines the transcript for anything worth a permanent
- * docs/todo/ entry before the session disappears (ADR-014).
+ * docs/todo/ entry before the session disappears.
  *
  * SessionEnd hooks can't block anything and get a small time budget, and the
  * real content-authorship call (`claude -p`) takes far longer than any sane
@@ -13,9 +13,9 @@
  *
  * Deliberately fire-and-forget and conservative: cheaper and safer to miss
  * something than to write a wrong/noisy doc nobody can review before the
- * session ends. Per ADR-014, the sub-call's write permission is scoped to
- * docs/todo/** only — it can never reach docs/decisions/, so there's no
- * immutable-record risk to reason about here.
+ * session ends. The sub-call's write permission is scoped to docs/todo/**
+ * only — it can never reach docs/decisions/, so there's no immutable-record
+ * risk to reason about here.
  */
 import { spawn } from 'node:child_process'
 import { existsSync, mkdirSync, openSync, readFileSync, writeFileSync } from 'node:fs'
