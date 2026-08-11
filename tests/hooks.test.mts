@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
-import { isGitCommit, segments, stripQuotes } from '../.claude/hooks/utils/shell.mts'
+import { isGhPrMerge, isGitCommit, isGitMerge, segments, stripQuotes } from '../.claude/hooks/utils/shell.mts'
 
 const HOOKS = join(import.meta.dirname, '..', '.claude', 'hooks')
 
@@ -69,6 +69,38 @@ describe('isGitCommit', () => {
   })
 })
 
+describe('isGitMerge', () => {
+  it.each(['git merge foo', 'git merge --ff-only foo', 'git  merge --squash foo'])(
+    'recognises %j',
+    (cmd) => expect(isGitMerge(cmd)).toBe(true),
+  )
+
+  // Trailing (\s|$) guard — these are real, unrelated subcommands.
+  it.each(['git merge-base a b', 'git merge-tree a b', 'git merge-file a b c', 'git status'])(
+    'does not flag %j',
+    (cmd) => expect(isGitMerge(cmd)).toBe(false),
+  )
+
+  it('ignores the phrase inside a quoted string', () => {
+    expect(isGitMerge('grep -rn "git merge" docs/')).toBe(false)
+  })
+})
+
+describe('isGhPrMerge', () => {
+  it.each(['gh pr merge 6 --merge', 'gh pr merge --squash', 'gh  pr  merge --rebase'])(
+    'recognises %j',
+    (cmd) => expect(isGhPrMerge(cmd)).toBe(true),
+  )
+
+  it.each(['gh pr list', 'gh pr view 6', 'gh issue list'])('does not flag %j', (cmd) =>
+    expect(isGhPrMerge(cmd)).toBe(false),
+  )
+
+  it('ignores the phrase inside a quoted string', () => {
+    expect(isGhPrMerge('grep -rn "gh pr merge" docs/')).toBe(false)
+  })
+})
+
 describe('block-main-commit hook', () => {
   it('blocks a commit on main, including inside an && chain', () => {
     const repo = tempRepo('main')
@@ -122,9 +154,39 @@ describe('block-co-authored-by hook', () => {
   })
 })
 
-describe('both hooks tolerate malformed input', () => {
-  it.each(['block-main-commit.mts', 'block-co-authored-by.mts'])('%s exits 0', (hook) => {
-    const res = spawnSync(join(HOOKS, hook), { input: 'not json at all', encoding: 'utf8' })
-    expect(res.status).toBe(0)
+describe('block-merge-commit hook', () => {
+  it.each([
+    'git merge feature/x',
+    'git merge --no-ff feature/x',
+    'git merge --squash feature/x',
+    'gh pr merge 6',
+    'gh pr merge 6 --merge',
+    'gh pr merge 6 --squash',
+  ])('blocks %j', (cmd) => expect(runHook('block-merge-commit.mts', cmd)).toBe(2))
+
+  it('blocks --merge and --squash even alongside other flags', () => {
+    expect(runHook('block-merge-commit.mts', 'gh pr merge 6 --merge --delete-branch')).toBe(2)
+    expect(runHook('block-merge-commit.mts', 'gh pr merge 6 --squash --delete-branch')).toBe(2)
   })
+
+  it.each([
+    'git merge --ff-only feature/x',
+    'gh pr merge 6 --rebase',
+    'gh pr merge 6 --rebase --delete-branch',
+    'git status',
+    'gh pr list',
+    'grep -rn "gh pr merge 6" .',
+  ])('allows %j', (cmd) => {
+    expect(runHook('block-merge-commit.mts', cmd)).toBe(0)
+  })
+})
+
+describe('all hooks tolerate malformed input', () => {
+  it.each(['block-main-commit.mts', 'block-co-authored-by.mts', 'block-merge-commit.mts'])(
+    '%s exits 0',
+    (hook) => {
+      const res = spawnSync(join(HOOKS, hook), { input: 'not json at all', encoding: 'utf8' })
+      expect(res.status).toBe(0)
+    },
+  )
 })

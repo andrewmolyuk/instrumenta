@@ -85,14 +85,17 @@ describe('buildPrompt', () => {
     expect(prompt).toContain('TRANSCRIPT_MARKER')
     expect(prompt).toContain('docs/todo/')
     expect(prompt).toContain('docs/adr/, will be rejected')
+    expect(prompt).toContain('CONTEXT.md')
+    expect(prompt).toContain('Domain Glossary')
     expect(prompt).toContain('RESULT:')
   })
 })
 
 describe('scopedSettings', () => {
-  it('is valid JSON that allows Edit only under docs/todo/ and denies Bash', () => {
+  it('is valid JSON that allows Edit only under docs/todo/ and CONTEXT.md, and denies Bash', () => {
     const parsed = JSON.parse(scopedSettings())
     expect(parsed.permissions.allow).toContain('Edit(docs/todo/**)')
+    expect(parsed.permissions.allow).toContain('Edit(CONTEXT.md)')
     expect(parsed.permissions.deny).toContain('Bash')
   })
 })
