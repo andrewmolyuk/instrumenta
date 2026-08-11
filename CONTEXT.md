@@ -21,3 +21,9 @@ closed, non-merged PR does not keep a task claimed.
 **Done**:
 A task whose file has been removed from `main`. This happens the moment the PR solving
 it is merged — merging, not committing, is what finalizes "done."
+
+**Given up**:
+A task with 3 or more closed (non-merged) PRs whose branch name matches its slug
+([ADR-003](docs/adr/003-pick-excludes-given-up-tasks.md)). A given-up task is not
+`free` — the **Free** entry above predates this term and only checks for an open
+branch/PR; a task must also have fewer than 3 closed PRs to count as free.
