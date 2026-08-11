@@ -14,7 +14,7 @@
  * Deliberately fire-and-forget and conservative: cheaper and safer to miss
  * something than to write a wrong/noisy doc nobody can review before the
  * session ends. The sub-call's write permission is scoped to docs/todo/**
- * only — it can never reach docs/decisions/, so there's no immutable-record
+ * only — it can never reach docs/adr/, so there's no immutable-record
  * risk to reason about here.
  */
 import { spawn } from 'node:child_process'

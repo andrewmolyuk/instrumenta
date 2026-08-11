@@ -96,7 +96,7 @@ runs unattended with no one to review your output before the session disappears,
 writing nothing is better than writing something wrong, speculative, or duplicate.
 
 Your file-write permission is path-scoped (enforced, not just requested) to
-docs/todo/** — a write anywhere else, including docs/decisions/, will be rejected, so
+docs/todo/** — a write anywhere else, including docs/adr/, will be rejected, so
 don't attempt it. This hook never writes decisions directly, even for
 something that looks like a settled architectural choice: write it as a docs/todo/ entry
 with \`type: adr-candidate\` instead, and include the real alternatives that were
@@ -112,7 +112,7 @@ Three categories, one destination (docs/todo/), distinguished by frontmatter \`t
 3. **todo** — a concrete, actionable gap or follow-up that isn't a bug.
 
 Before writing ANYTHING:
-- Grep docs/todo/ and docs/decisions/ for existing content covering the same topic. If
+- Grep docs/todo/ and docs/adr/ for existing content covering the same topic. If
   something close already exists, do not create a duplicate — skip it. Ignore any ADR
   carrying a "Superseded by" banner under its title: it is kept for the reasoning that
   produced it, not as a live claim, so it cannot be what already covers a topic.

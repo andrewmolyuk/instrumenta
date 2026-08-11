@@ -84,7 +84,7 @@ describe('buildPrompt', () => {
     expect(prompt).toContain('sess-1')
     expect(prompt).toContain('TRANSCRIPT_MARKER')
     expect(prompt).toContain('docs/todo/')
-    expect(prompt).toContain('docs/decisions/, will be rejected')
+    expect(prompt).toContain('docs/adr/, will be rejected')
     expect(prompt).toContain('RESULT:')
   })
 })

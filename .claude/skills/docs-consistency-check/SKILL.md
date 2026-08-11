@@ -1,6 +1,6 @@
 ---
 name: docs-consistency-check
-description: 'Cross-checks docs/decisions/*.md, docs/vision.md, and CLAUDE.md against each other for contradictions and stale references — one ADR assuming something another ADR later decided differently, a claim attributed to the wrong document, or a path/command that no longer matches the repo. Use when asked to review documentation or ADRs for consistency, after adding a new ADR that touches ground an earlier one already covered, or before starting a new batch of decisions.'
+description: 'Cross-checks docs/adr/*.md, docs/vision.md, and CLAUDE.md against each other for contradictions and stale references — one ADR assuming something another ADR later decided differently, a claim attributed to the wrong document, or a path/command that no longer matches the repo. Use when asked to review documentation or ADRs for consistency, after adding a new ADR that touches ground an earlier one already covered, or before starting a new batch of decisions.'
 ---
 
 # docs-consistency-check: finding contradictions and stale claims across the docs
@@ -17,16 +17,16 @@ with the superseded ones kept on record for the reasoning that produced them.
 
 ## What to read
 
-Everything that states policy, not just `docs/decisions/`:
+Everything that states policy, not just `docs/adr/`:
 
-- `docs/decisions/*.md`, in number order — each one is a claim about how the system works.
+- `docs/adr/*.md`, in number order — each one is a claim about how the system works.
   **Skip any file carrying a `> **Superseded by ...**` banner under its title.** Those are
   kept for the reasoning that produced them, not as live claims; a retired ADR disagreeing
-  with its successor is what supersession means, not a finding. `docs/decisions/README.md`
+  with its successor is what supersession means, not a finding. `docs/adr/INDEX.md`
   lists which are in force.
 - Whatever states the project's goal and metrics (`docs/vision.md` or equivalent) — every ADR
   should still serve it.
-- `docs/decisions/README.md` — the index. Confirm every link resolves, that each ADR is filed
+- `docs/adr/INDEX.md` — the index. Confirm every link resolves, that each ADR is filed
   under the right heading (a superseded one still listed as in force is a finding), and that
   nothing on disk is missing from it.
 - `CLAUDE.md` — the standing rules; confirm its links resolve to files that still
