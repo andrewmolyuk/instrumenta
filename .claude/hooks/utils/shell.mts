@@ -26,6 +26,20 @@ export function isGitCommit(segment: string): boolean {
   return GIT_COMMIT.test(stripQuotes(segment))
 }
 
+// Trailing (\s|$) so `git merge-base`/`merge-tree`/`merge-file` don't match.
+const GIT_MERGE = /(^|\s)git\s+merge(\s|$)/
+const GH_PR_MERGE = /(^|\s)gh\s+pr\s+merge(\s|$)/
+
+/** True when a segment really invokes `git merge`, not `merge-base`/`merge-tree`/`merge-file`. */
+export function isGitMerge(segment: string): boolean {
+  return GIT_MERGE.test(stripQuotes(segment))
+}
+
+/** True when a segment really invokes `gh pr merge`. */
+export function isGhPrMerge(segment: string): boolean {
+  return GH_PR_MERGE.test(stripQuotes(segment))
+}
+
 /** Split into logical command segments on ; && || | and newlines outside quotes, returning each segment's original unblanked text. */
 export function segments(command: string): string[] {
   const marked = stripQuotes(command)
