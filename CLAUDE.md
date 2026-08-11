@@ -20,7 +20,10 @@ decisions already made — check there before treating a design question as stil
 - `docs/adr/` — one decision per numbered file, indexed in `INDEX.md`.
 - `docs/todo/` — the task backlog (`type: adr-candidate | bug | todo`).
 - `CONTEXT.md` — domain glossary; appended to by the `SessionEnd` hook.
-- `tests/` — one Vitest file per hook/util module.
+- `tests/` — one Vitest file per hook, covering that hook and the utils it uses (e.g.
+  `hooks.test.mts` covers the three `PreToolUse` guards and `utils/shell.mts`;
+  `session-doc-mining.test.mts` covers `document-session-learnings.mts` and
+  `utils/session-doc-mining.mts`).
 
 ## Workflow
 
