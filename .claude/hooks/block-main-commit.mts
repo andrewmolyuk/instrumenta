@@ -4,14 +4,14 @@
  *
  * Enforces CLAUDE.md's Workflow rule: never commit on local main, branch first.
  * Matches per command segment with quote-aware parsing so unrelated commands
- * run while sitting on main are never blocked — see shell-utils.mts.
+ * run while sitting on main are never blocked — see utils/shell.mts.
  *
  * Runs under Bun (~29ms) — also verified working under Node >= 23.6 (~60ms),
  * which strips TypeScript types natively. The .mts extension pins ESM
  * regardless of what a future root package.json declares.
  */
 import { execFileSync } from 'node:child_process'
-import { isGitCommit, segments } from './shell-utils.mts'
+import { isGitCommit, segments } from './utils/shell.mts'
 
 /**
  * `git branch --show-current`, not `git rev-parse --abbrev-ref HEAD`: rev-parse

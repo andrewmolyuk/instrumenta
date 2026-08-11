@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
-import { isGitCommit, segments, stripQuotes } from '../.claude/hooks/shell-utils.mts'
+import { isGitCommit, segments, stripQuotes } from '../.claude/hooks/utils/shell.mts'
 
 const HOOKS = join(import.meta.dirname, '..', '.claude', 'hooks')
 

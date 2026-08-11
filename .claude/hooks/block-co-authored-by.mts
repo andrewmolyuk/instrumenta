@@ -14,7 +14,7 @@
  * Not covered: `git commit -F file` / `--file`, where the message never appears
  * in the command line.
  */
-import { isGitCommit, segments } from './shell-utils.mts'
+import { isGitCommit, segments } from './utils/shell.mts'
 
 const CO_AUTHORED = /co-authored-by\s*:/i
 

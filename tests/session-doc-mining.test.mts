@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { spawnSync } from 'node:child_process'
@@ -6,12 +6,14 @@ import { afterAll, describe, expect, it } from 'vitest'
 import {
   buildPrompt,
   CHILD_ENV_FLAG,
+  expiredLogFiles,
   extractTranscriptText,
   isChildRun,
+  logFileName,
   MIN_TRANSCRIPT_CHARS,
   scopedSettings,
   shouldRun,
-} from '../.claude/hooks/session-doc-mining-utils.mts'
+} from '../.claude/hooks/utils/session-doc-mining.mts'
 
 const HOOK = join(import.meta.dirname, '..', '.claude', 'hooks', 'document-session-learnings.mts')
 const HOOK_DIR = dirname(HOOK)
@@ -95,15 +97,62 @@ describe('scopedSettings', () => {
   })
 })
 
+describe('logFileName', () => {
+  it('names one file per calendar month', () => {
+    expect(logFileName(new Date('2026-08-11T22:00:00Z'))).toBe(
+      'document-session-learnings-2026-08.log',
+    )
+  })
+
+  it('is UTC-based, so a late-evening local run cannot land in the previous month', () => {
+    expect(logFileName(new Date('2026-09-01T00:30:00Z'))).toBe(
+      'document-session-learnings-2026-09.log',
+    )
+  })
+})
+
+describe('expiredLogFiles', () => {
+  const now = new Date('2026-08-11T22:00:00Z')
+  const name = (month: string) => `document-session-learnings-${month}.log`
+
+  it('keeps the current month and the three before it', () => {
+    const kept = ['2026-08', '2026-07', '2026-06', '2026-05'].map(name)
+    expect(expiredLogFiles(kept, now)).toEqual([])
+  })
+
+  it('drops anything older than that', () => {
+    expect(expiredLogFiles([name('2026-04'), name('2025-12')], now)).toEqual([
+      name('2026-04'),
+      name('2025-12'),
+    ])
+  })
+
+  it('crosses a year boundary correctly', () => {
+    const january = new Date('2026-01-15T00:00:00Z')
+    expect(expiredLogFiles([name('2025-10'), name('2025-09')], january)).toEqual([name('2025-09')])
+  })
+
+  it('ignores files it did not write, including the pre-rotation log', () => {
+    const strangers = ['document-session-learnings.log', 'markers', 'notes-2020-01.log', '.DS_Store']
+    expect(expiredLogFiles(strangers, now)).toEqual([])
+  })
+})
+
 describe('document-session-learnings hook — deterministic exit-early paths', () => {
   const tempDirs: string[] = []
   afterAll(() => tempDirs.forEach((d) => rmSync(d, { recursive: true, force: true })))
+
+  // Every run in this suite writes its log and markers here. Without it the
+  // hook resolves both from its own on-disk location, so `bun run test` left
+  // real entries in the repo's `.claude/logs/`.
+  const logDir = mkdtempSync(join(tmpdir(), 'instrumenta-sessionend-logs-'))
+  tempDirs.push(logDir)
 
   function runHook(input: Record<string, unknown>, env?: NodeJS.ProcessEnv): number {
     const res = spawnSync(HOOK, {
       input: JSON.stringify(input),
       encoding: 'utf8',
-      ...(env ? { env: { ...process.env, ...env } } : {}),
+      env: { ...process.env, DOCUMENT_SESSION_LOG_DIR: logDir, ...env },
     })
     return res.status ?? -1
   }
@@ -126,7 +175,7 @@ describe('document-session-learnings hook — deterministic exit-early paths', (
     expect(runHook(input, { [CHILD_ENV_FLAG]: '1' })).toBe(0)
     // The marker is written immediately before the spawn, so its absence is
     // proof the hook bailed out rather than launching a sub-call.
-    expect(existsSync(join(HOOK_DIR, '.summarized-child-session'))).toBe(false)
+    expect(existsSync(join(logDir, 'markers', 'child-session'))).toBe(false)
   })
 
   it('exits 0 immediately on a logout, before touching the transcript', () => {
@@ -154,7 +203,21 @@ describe('document-session-learnings hook — deterministic exit-early paths', (
   })
 
   it('tolerates malformed input', () => {
-    const res = spawnSync(HOOK, { input: 'not json at all', encoding: 'utf8' })
+    const res = spawnSync(HOOK, {
+      input: 'not json at all',
+      encoding: 'utf8',
+      env: { ...process.env, DOCUMENT_SESSION_LOG_DIR: logDir },
+    })
     expect(res.status).toBe(0)
+  })
+
+  it('logs to the month file under the configured dir, leaving the repo log untouched', () => {
+    const realLog = join(HOOK_DIR, '..', 'logs', logFileName(new Date()))
+    const before = existsSync(realLog) ? readFileSync(realLog, 'utf8') : null
+
+    runHook({ reason: 'clear', session_id: 'log-dir-check' })
+
+    expect(readFileSync(join(logDir, logFileName(new Date())), 'utf8')).toContain('log-dir-check')
+    expect(existsSync(realLog) ? readFileSync(realLog, 'utf8') : null).toBe(before)
   })
 })

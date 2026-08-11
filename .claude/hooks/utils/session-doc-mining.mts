@@ -25,6 +25,29 @@ export function isChildRun(env: Record<string, string | undefined>): boolean {
   return Boolean(env[CHILD_ENV_FLAG])
 }
 
+const LOG_PREFIX = 'document-session-learnings-'
+const LOG_NAME_RE = /^document-session-learnings-\d{4}-\d{2}\.log$/
+/** Current month plus this many previous ones stay on disk. */
+export const LOG_RETENTION_MONTHS = 3
+
+/** The log file a run on `date` appends to — one per calendar month, UTC so a run never straddles two names. */
+export function logFileName(date: Date): string {
+  return `${LOG_PREFIX}${date.toISOString().slice(0, 7)}.log`
+}
+
+/**
+ * Which of `names` are month logs old enough to drop. Months are compared as
+ * `YYYY-MM` strings, which sort chronologically, so no date parsing is involved
+ * beyond deriving the cutoff. Anything not matching the month-log pattern is
+ * left alone — this only ever deletes files it can prove it wrote.
+ */
+export function expiredLogFiles(names: string[], now: Date): string[] {
+  const cutoff = logFileName(
+    new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - LOG_RETENTION_MONTHS, 1)),
+  )
+  return names.filter((name) => LOG_NAME_RE.test(name) && name < cutoff)
+}
+
 type TranscriptEntry = {
   type?: string
   message?: { content?: string | Array<{ type?: string; text?: string }> }

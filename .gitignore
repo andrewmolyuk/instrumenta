@@ -21,6 +21,5 @@ coverage/
 # Personal Claude Code overrides
 .claude/settings.local.json
 
-# document-session-learnings.mts artifacts
-.claude/hooks/.summarized-*
+# document-session-learnings.mts artifacts (log + per-session markers)
 .claude/logs/
