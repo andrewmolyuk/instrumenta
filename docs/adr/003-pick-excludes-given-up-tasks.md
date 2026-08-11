@@ -60,8 +60,8 @@ the provider defined here — not duplicated into every caller that happens to a
   currently un-sticks it. A human resolving the bug entry ADR-002 writes is what allows the work
   to be picked up again, since a fresh task file gets a fresh slug with a zero closed-PR count.
 - `CONTEXT.md`'s existing "Free" glossary entry (added under ADR-001) no longer states the full
-  rule. `CONTEXT.md` is append-only and can't be corrected in place — a `docs/todo/` entry flags
-  the gap per `CLAUDE.md`'s conflict-flagging rule.
+  rule. `CONTEXT.md` is append-only and can't be corrected in place — a `Given up` entry is
+  added alongside it instead, noting that `Free` predates this decision.
 
 ## Reversibility
 
