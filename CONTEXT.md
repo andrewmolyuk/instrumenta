@@ -24,6 +24,6 @@ it is merged — merging, not committing, is what finalizes "done."
 
 **Given up**:
 A task with 3 or more closed (non-merged) PRs whose branch name matches its slug
-([ADR-003](docs/adr/003-pick-excludes-given-up-tasks.md)). A given-up task is not
+([ADR-001](docs/adr/001-task-queue-state-in-git.md)). A given-up task is not
 `free` — the **Free** entry above predates this term and only checks for an open
 branch/PR; a task must also have fewer than 3 closed PRs to count as free.
