@@ -51,6 +51,42 @@ Two separate channels, not one:
   to redesign when a human wants to add a gate or a piece of knowledge, because it was
   never instrumenta's to own in the first place.
 
+## Success signal
+
+Checked once, 30 days after the loop is running in production against a real
+backlog — not before, and not left unchecked indefinitely:
+
+- **% of tasks reaching a merged PR** — throughput baseline from the target project's
+  own history (direct-to-git commits, no PR step yet): 1,260 distinct tickets closed
+  over Jan 2020–Jun 2025 (66 months), ~19/month, 97% of them 1–2 commits — the task
+  shape the MVP can realistically attempt. Completion/abandonment rate itself isn't
+  in git history (a ticket a human started and dropped leaves no commit) — that
+  baseline still needs Jira's own status history, not just commits.
+- **Hours saved** — rough floor from the same history, across all 3,546 commits
+  (not just ticket-linked ones — untagged commits made the same day as ticket work
+  are still plausibly part of it): summing gaps between commits made on the same
+  calendar day (ignoring overnight gaps) over Jan 2020–Jun 2025 and dividing by the
+  1,260 tickets gives **~1.8–2.7h/ticket**, depending on whether same-day gaps over
+  4h are trimmed as context-switches rather than continuous work. Still a lower
+  bound, not a real average — a ticket closed in a single commit that day with no
+  other commits around it contributes zero measured time even though work clearly
+  happened.
+- **Cost vs. a human doing the same work** — baseline: ~30,000 ILS/month average
+  senior developer salary in Israel across 2020–2025 (extrapolated from ~25–28k in
+  2020–2022 to ~35k+ by 2024 — public sources give the trend, not a clean
+  year-by-year series) over 186h = 161 ILS/h, × the 1.8–2.7h/ticket estimate above
+  → **~290–435 ILS/ticket** human cost. Compared against Claude API cost per
+  ticket, which is still TBD — no real runs yet to measure it from.
+
+Baselines above are final — the full 66-month history available from the target
+project, not to be recomputed on a narrower window. Only the Claude-side cost per
+ticket stays open, pending real runs.
+
+Guardrails — must not get worse even if the above look good: give-up rate (the % of
+tasks hitting the 3-attempt threshold in [ADR-001](adr/001-task-state-three-sources.md))
+staying low, and the post-merge revert/hotfix rate on instrumenta's PRs staying
+comparable to human-authored ones.
+
 ## Scope now (MVP)
 
 - **One target project, one agent, no parallelism.** A single agent instance works a
