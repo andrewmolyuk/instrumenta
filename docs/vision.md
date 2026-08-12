@@ -84,8 +84,10 @@ ticket stays open, pending real runs.
 
 Guardrails — must not get worse even if the above look good: give-up rate (the % of
 tasks hitting the 3-attempt threshold in [ADR-001](adr/001-task-state-three-sources.md))
-staying low, and the post-merge revert/hotfix rate on instrumenta's PRs staying
-comparable to human-authored ones.
+staying low, and the revert/hotfix rate on instrumenta's merged PRs staying
+comparable to the target project's own historical revert/hotfix rate on direct
+commits — there's no PR-specific human baseline to compare against, since PR review
+is new to this project, not an existing practice (see Scope, below).
 
 ## Scope now (MVP)
 
@@ -95,7 +97,11 @@ comparable to human-authored ones.
 - **One task source.** Jira is the only task provider for the MVP; the provider
   abstraction exists so more sources can be added later without changing the loop.
 - **PR is the endpoint.** The agent opens the PR; merging into the target project's
-  branch stays a human action. Autonomy stops at the PR, for now.
+  branch stays a human action. Autonomy stops at the PR, for now. This is a new
+  practice for the target project, not a continuation of one — its own history is
+  direct-to-git commits with no PR step (see Success signal, above), so PR review
+  is being introduced alongside instrumenta itself, not something instrumenta is
+  slotting into.
 - **The target project supplies its own gate.** Before anything is committed, solve
   looks for a verify mechanism already defined in the target project. If there isn't
   one, instrumenta does not invent its own definition of "done" — it stops and says so.
