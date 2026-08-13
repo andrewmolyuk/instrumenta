@@ -1,7 +1,7 @@
 import type { Database } from 'bun:sqlite'
 import type { TaskRow } from '../db/index.mts'
 import { getBudget, getStartTicket, isStopped, recordAttempt, setBudget, setStartTicket, setStopped } from '../db/queries.mts'
-import type { GitHubConfig } from '../github/closed-prs.mts'
+import type { BitbucketConfig } from '../bitbucket/closed-prs.mts'
 import type { MinionRunner } from '../minion/types.mts'
 import type { TaskProvider } from '../task-provider/types.mts'
 import { dispatch } from './dispatch.mts'
@@ -26,7 +26,7 @@ export const noopStatusMirror: StatusMirror = {
 export interface LoopDeps {
   db: Database
   taskProvider: TaskProvider
-  github: GitHubConfig
+  bitbucket: BitbucketConfig
   runner: MinionRunner
   statusMirror: StatusMirror
   timeoutMs: number
@@ -51,7 +51,7 @@ export interface LoopDeps {
  * queue one at any point during a long-running loop.
  *
  * Every iteration is wrapped in try/catch: a transient failure anywhere in
- * pick/dispatch (Jira, GitHub, or Minion itself being unreachable) backs off
+ * pick/dispatch (Jira, Bitbucket, or Minion itself being unreachable) backs off
  * like an empty queue instead of throwing out of the loop entirely. Found by
  * actually running Foreman's container against an unreachable Jira URL — an
  * uncaught fetch error there crashed the whole process, taking the control
@@ -69,10 +69,10 @@ export async function runLoop(deps: LoopDeps): Promise<void> {
       const startTicket = getStartTicket(deps.db)
       if (startTicket) {
         setStartTicket(deps.db, null)
-        task = await pickSpecific(deps.db, deps.taskProvider, deps.github, startTicket, deps.fetchImpl)
+        task = await pickSpecific(deps.db, deps.taskProvider, deps.bitbucket, startTicket, deps.fetchImpl)
       }
       if (!task) {
-        task = await pick(deps.db, deps.taskProvider, deps.github, deps.fetchImpl)
+        task = await pick(deps.db, deps.taskProvider, deps.bitbucket, deps.fetchImpl)
       }
 
       if (!task) {

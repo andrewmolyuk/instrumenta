@@ -133,7 +133,7 @@ design was checked against, and Foreman doesn't need it: a single result at exit
 enough to record the outcome and decide the next Pick. Foreman enforces a timeout and
 kills Minion if it's exceeded, recording the run as a failed attempt directly — see
 [ADR-001](adr/001-task-state-three-sources.md) for why this specific case (a crash or
-hang with no PR ever opened) needed something beyond git/GitHub state to catch.
+hang with no PR ever opened) needed something beyond git/Bitbucket state to catch.
 
 ### Target project (external repository, human-owned)
 
@@ -141,7 +141,7 @@ Carries everything about the target project that isn't Foreman's own operational
 bookkeeping: the code, the accumulated knowledge (ADRs, glossary, and the notes Minion
 writes at the project's configured notes path — `docs/todo/` by default, arriving as
 ordinary PRs, reviewed like any other change), the gate the project defines for itself
-(the `verify` mechanism), and the git/GitHub state (branches, PRs) that backstops
+(the `verify` mechanism), and the git/Bitbucket state (branches, PRs) that backstops
 give-up detection. Nothing here is instrumenta-specific infrastructure;
 a human could delete every trace of instrumenta having worked here and the project
 would still make complete sense on its own.
@@ -166,7 +166,7 @@ on the same fact. Full reasoning and the exact combination rule for give-up is
 |---|---|
 | Jira (live query) | Is this task still wanted at all? |
 | SQLite (Foreman's own) | What has Foreman itself observed about its attempts — including a crash or timeout with no PR to show for it? |
-| GitHub (target repo PR history) | Checked alongside SQLite on every Pick; give-up triggers the moment either source crosses the attempt threshold first, so it also catches give-up if SQLite is ever lost or diverges from reality. |
+| Bitbucket (target repo PR history) | Checked alongside SQLite on every Pick; give-up triggers the moment either source crosses the attempt threshold first, so it also catches give-up if SQLite is ever lost or diverges from reality. |
 
 ## Known, accepted gaps
 

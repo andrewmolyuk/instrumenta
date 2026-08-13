@@ -1,23 +1,23 @@
 import type { Database } from 'bun:sqlite'
+import { closedPrCountForBranch, type BitbucketConfig } from '../bitbucket/closed-prs.mts'
 import { giveUpAttemptCount } from '../db/queries.mts'
-import { closedPrCountForBranch, type GitHubConfig } from '../github/closed-prs.mts'
 import type { BacklogItem, TaskProvider } from '../task-provider/types.mts'
 
 /** ADR-001: given up the moment either source crosses this, whichever happens first. */
 const GIVE_UP_THRESHOLD = 3
 
 /**
- * Both sources are checked on every call — GitHub isn't a fallback used only
- * when SQLite is empty, it can independently trigger give-up (ADR-001).
+ * Both sources are checked on every call — Bitbucket isn't a fallback used
+ * only when SQLite is empty, it can independently trigger give-up (ADR-001).
  */
 export async function isGivenUp(
   db: Database,
-  github: GitHubConfig,
+  bitbucket: BitbucketConfig,
   jiraKey: string,
   fetchImpl?: typeof fetch,
 ): Promise<boolean> {
   const sqliteCount = giveUpAttemptCount(db, jiraKey)
-  const closedPrCount = await closedPrCountForBranch(github, jiraKey, fetchImpl)
+  const closedPrCount = await closedPrCountForBranch(bitbucket, jiraKey, fetchImpl)
   return sqliteCount >= GIVE_UP_THRESHOLD || closedPrCount >= GIVE_UP_THRESHOLD
 }
 
@@ -29,12 +29,12 @@ export async function isGivenUp(
 export async function pick(
   db: Database,
   taskProvider: TaskProvider,
-  github: GitHubConfig,
+  bitbucket: BitbucketConfig,
   fetchImpl?: typeof fetch,
 ): Promise<BacklogItem | null> {
   const backlog = await taskProvider.listBacklog()
   for (const item of backlog) {
-    if (!(await isGivenUp(db, github, item.jira_key, fetchImpl))) {
+    if (!(await isGivenUp(db, bitbucket, item.jira_key, fetchImpl))) {
       return item
     }
   }
@@ -50,13 +50,13 @@ export async function pick(
 export async function pickSpecific(
   db: Database,
   taskProvider: TaskProvider,
-  github: GitHubConfig,
+  bitbucket: BitbucketConfig,
   jiraKey: string,
   fetchImpl?: typeof fetch,
 ): Promise<BacklogItem | null> {
   const backlog = await taskProvider.listBacklog()
   const item = backlog.find((candidate) => candidate.jira_key === jiraKey)
   if (!item) return null
-  if (await isGivenUp(db, github, item.jira_key, fetchImpl)) return null
+  if (await isGivenUp(db, bitbucket, item.jira_key, fetchImpl)) return null
   return item
 }

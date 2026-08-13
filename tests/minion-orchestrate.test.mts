@@ -21,7 +21,7 @@ function fakeDeps(overrides: Partial<MinionDeps> = {}): MinionDeps {
     runVerify: vi.fn(async () => true),
     writeNote: vi.fn(async () => {}),
     commitAndPush: vi.fn(async () => {}),
-    createPullRequest: vi.fn(async () => 'https://github.com/o/r/pull/1'),
+    createPullRequest: vi.fn(async () => 'https://bitbucket.org/o/r/pull-requests/1'),
     ...overrides,
   }
 }
@@ -39,7 +39,7 @@ describe('runMinion', () => {
     const deps = fakeDeps()
     const result = await runMinion(input(), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
 
-    expect(result).toEqual({ status: 'success', pr_url: 'https://github.com/o/r/pull/1' })
+    expect(result).toEqual({ status: 'success', pr_url: 'https://bitbucket.org/o/r/pull-requests/1' })
     expect(deps.commitAndPush).toHaveBeenCalledWith('/tmp/wd', 'KAZ-1', expect.stringContaining('KAZ-1'))
     expect(deps.createPullRequest).toHaveBeenCalledWith('KAZ-1', expect.objectContaining({ jira_key: 'KAZ-1' }))
   })

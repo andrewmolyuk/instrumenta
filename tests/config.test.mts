@@ -6,10 +6,10 @@ const BASE_ENV = {
   JIRA_EMAIL: 'bot@example.com',
   JIRA_API_TOKEN: 'jira-token',
   JIRA_JQL: 'project = KAZ AND statusCategory != Done',
-  GITHUB_OWNER: 'andrewmolyuk',
-  GITHUB_REPO: 'target-project',
-  GITHUB_TOKEN: 'gh-token',
-  TARGET_REPO_URL: 'https://x-access-token:gh-token@github.com/andrewmolyuk/target-project.git',
+  BITBUCKET_WORKSPACE: 'andrewmolyuk',
+  BITBUCKET_REPO_SLUG: 'target-project',
+  BITBUCKET_TOKEN: 'bb-token',
+  TARGET_REPO_URL: 'https://x-token-auth:bb-token@bitbucket.org/andrewmolyuk/target-project.git',
   MINION_COMMAND: '["docker","run","--rm","-i","minion:latest"]',
 }
 
@@ -27,8 +27,8 @@ describe('parseConfig', () => {
       email: 'bot@example.com',
       apiToken: 'jira-token',
     })
-    expect(config.github).toEqual({ owner: 'andrewmolyuk', repo: 'target-project', token: 'gh-token' })
-    expect(config.targetRepoUrl).toBe('https://x-access-token:gh-token@github.com/andrewmolyuk/target-project.git')
+    expect(config.bitbucket).toEqual({ workspace: 'andrewmolyuk', repoSlug: 'target-project', token: 'bb-token' })
+    expect(config.targetRepoUrl).toBe('https://x-token-auth:bb-token@bitbucket.org/andrewmolyuk/target-project.git')
     expect(config.minionCommand).toEqual(['docker', 'run', '--rm', '-i', 'minion:latest'])
     expect(config.dbPath).toBe('./foreman.db')
     expect(config.timeoutMs).toBe(600_000)
@@ -61,9 +61,9 @@ describe('parseConfig', () => {
     'JIRA_EMAIL',
     'JIRA_API_TOKEN',
     'JIRA_JQL',
-    'GITHUB_OWNER',
-    'GITHUB_REPO',
-    'GITHUB_TOKEN',
+    'BITBUCKET_WORKSPACE',
+    'BITBUCKET_REPO_SLUG',
+    'BITBUCKET_TOKEN',
     'TARGET_REPO_URL',
     'MINION_COMMAND',
   ])(

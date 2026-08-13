@@ -30,7 +30,7 @@ export async function main(env: NodeJS.ProcessEnv = process.env): Promise<void> 
   const deps: LoopDeps = {
     db,
     taskProvider,
-    github: config.github,
+    bitbucket: config.bitbucket,
     runner: new ProcessMinionRunner(config.minionCommand),
     statusMirror: new JiraStatusMirror(config.jiraAuth),
     timeoutMs: config.timeoutMs,

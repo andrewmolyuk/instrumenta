@@ -33,7 +33,7 @@ _Decided in_: [architecture.md](docs/architecture.md#task-provider-module-inside
 
 **Target project**:
 The external, human-owned repository Instrumenta works against — its code, ADRs, glossary,
-notes, `verify` gate, and git/GitHub state. Nothing about it is Instrumenta-specific
+notes, `verify` gate, and git/Bitbucket state. Nothing about it is Instrumenta-specific
 infrastructure; it makes complete sense with every trace of Instrumenta's involvement removed.
 _Decided in_: [architecture.md](docs/architecture.md#target-project-external-repository-human-owned).
 
@@ -65,7 +65,7 @@ _Decided in_: [ADR-001](docs/adr/001-task-state-three-sources.md).
 True the moment either of two independent counts reaches 3 for a `jira_key`, whichever
 happens first: SQLite attempts with `status` in (`failed_verify`, `crashed`, `timeout`), or
 closed (non-merged) PRs on the target repo whose branch name matches the `jira_key`. Both are
-checked on every Pick — the GitHub count isn't a fallback used only when SQLite is
+checked on every Pick — the Bitbucket count isn't a fallback used only when SQLite is
 unavailable, it can independently trigger give-up.
 _Decided in_: [ADR-001](docs/adr/001-task-state-three-sources.md).
 
