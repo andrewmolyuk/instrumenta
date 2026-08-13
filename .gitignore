@@ -18,6 +18,9 @@ coverage/
 # VSCode
 .vscode/
 
+# MCP server config (contains API credentials)
+.mcp.json
+
 # Personal Claude Code overrides
 .claude/settings.local.json
 
