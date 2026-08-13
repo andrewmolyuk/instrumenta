@@ -17,11 +17,15 @@ CREATE TABLE IF NOT EXISTS tasks (
   finished_at TEXT
 );
 
--- Single-row table: the `stopped` flag gates Foreman's own loop, not any one task
--- (ADR-001, ADR-003). The CHECK on id enforces exactly one row.
+-- Single-row table: Foreman's own control-surface state (ADR-003), not any one
+-- task's. The CHECK on id enforces exactly one row. `budget` is the remaining
+-- max-tasks-this-run counter (NULL = unlimited); `start_ticket` is a jira_key
+-- queued via start[ticket], consumed (cleared) the next time Pick reads it.
 CREATE TABLE IF NOT EXISTS foreman_state (
   id INTEGER PRIMARY KEY CHECK (id = 1),
-  stopped INTEGER NOT NULL DEFAULT 0
+  stopped INTEGER NOT NULL DEFAULT 0,
+  budget INTEGER,
+  start_ticket TEXT
 );
 
-INSERT OR IGNORE INTO foreman_state (id, stopped) VALUES (1, 0);
+INSERT OR IGNORE INTO foreman_state (id, stopped, budget, start_ticket) VALUES (1, 0, NULL, NULL);

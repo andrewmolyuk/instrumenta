@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Database } from 'bun:sqlite'
 import { openDb, type TaskRow } from '../src/db/index.mts'
-import { setStopped } from '../src/db/queries.mts'
+import { getBudget, getStartTicket, isStopped, setBudget, setStartTicket, setStopped } from '../src/db/queries.mts'
 import { noopStatusMirror, runLoop, type StatusMirror } from '../src/foreman/loop.mts'
 import type { GitHubConfig } from '../src/github/closed-prs.mts'
 import type { MinionRunner } from '../src/minion/types.mts'
@@ -51,6 +51,7 @@ describe('runLoop', () => {
   })
 
   it('sleeps the poll interval and retries when the backlog is empty', async () => {
+    setBudget(db, 1)
     let calls = 0
     const taskProvider: TaskProvider = {
       listBacklog: async () => {
@@ -60,28 +61,26 @@ describe('runLoop', () => {
     }
     const sleepCalls: number[] = []
 
-    await runLoop(
-      {
-        db,
-        taskProvider,
-        github: GITHUB,
-        runner: fakeRunner(),
-        statusMirror: noopStatusMirror,
-        timeoutMs: 1000,
-        pollIntervalMs: 5000,
-        fetchImpl: fakeFetch(),
-        sleep: async (ms) => {
-          sleepCalls.push(ms)
-        },
+    await runLoop({
+      db,
+      taskProvider,
+      github: GITHUB,
+      runner: fakeRunner(),
+      statusMirror: noopStatusMirror,
+      timeoutMs: 1000,
+      pollIntervalMs: 5000,
+      fetchImpl: fakeFetch(),
+      sleep: async (ms) => {
+        sleepCalls.push(ms)
       },
-      1,
-    )
+    })
 
     expect(sleepCalls).toEqual([5000])
     expect(calls).toBe(2)
   })
 
   it('dispatches until budget reaches zero, recording each attempt and mirroring status', async () => {
+    setBudget(db, 2)
     const backlog: BacklogItem[] = [
       { jira_key: 'KAZ-1', summary: 's1', description: '' },
       { jira_key: 'KAZ-2', summary: 's2', description: '' },
@@ -102,20 +101,17 @@ describe('runLoop', () => {
       },
     }
 
-    await runLoop(
-      {
-        db,
-        taskProvider,
-        github: GITHUB,
-        runner: fakeRunner('success'),
-        statusMirror,
-        timeoutMs: 1000,
-        pollIntervalMs: 1000,
-        fetchImpl: fakeFetch(),
-        sleep: noSleep,
-      },
-      2,
-    )
+    await runLoop({
+      db,
+      taskProvider,
+      github: GITHUB,
+      runner: fakeRunner('success'),
+      statusMirror,
+      timeoutMs: 1000,
+      pollIntervalMs: 1000,
+      fetchImpl: fakeFetch(),
+      sleep: noSleep,
+    })
 
     expect(dispatched).toEqual(['KAZ-1', 'KAZ-2'])
     expect(completed.map((r) => r.jira_key)).toEqual(['KAZ-1', 'KAZ-2'])
@@ -126,7 +122,62 @@ describe('runLoop', () => {
     ])
   })
 
+  it('persists remaining budget after each dispatch and sets stopped at zero', async () => {
+    setBudget(db, 2)
+    const backlog: BacklogItem[] = [{ jira_key: 'KAZ-1', summary: 's', description: '' }]
+    const seenBudgets: Array<number | null> = []
+    const taskProvider: TaskProvider = {
+      listBacklog: async () => {
+        seenBudgets.push(getBudget(db))
+        return backlog
+      },
+    }
+
+    await runLoop({
+      db,
+      taskProvider,
+      github: GITHUB,
+      runner: fakeRunner('success'),
+      statusMirror: noopStatusMirror,
+      timeoutMs: 1000,
+      pollIntervalMs: 1000,
+      fetchImpl: fakeFetch(),
+      sleep: noSleep,
+    })
+
+    expect(seenBudgets).toEqual([2, 1])
+    expect(getBudget(db)).toBe(0)
+    expect(isStopped(db)).toBe(true)
+  })
+
+  it('runs unlimited when no budget is set, stopping only via the stopped flag', async () => {
+    let calls = 0
+    const taskProvider: TaskProvider = {
+      listBacklog: async () => {
+        calls += 1
+        if (calls >= 3) setStopped(db, true)
+        return [{ jira_key: `KAZ-${calls}`, summary: 's', description: '' }]
+      },
+    }
+
+    await runLoop({
+      db,
+      taskProvider,
+      github: GITHUB,
+      runner: fakeRunner('success'),
+      statusMirror: noopStatusMirror,
+      timeoutMs: 1000,
+      pollIntervalMs: 1000,
+      fetchImpl: fakeFetch(),
+      sleep: noSleep,
+    })
+
+    expect(calls).toBe(3)
+    expect(getBudget(db)).toBeNull()
+  })
+
   it('idle iterations do not count against budget', async () => {
+    setBudget(db, 1)
     let calls = 0
     const taskProvider: TaskProvider = {
       listBacklog: async () => {
@@ -135,25 +186,23 @@ describe('runLoop', () => {
       },
     }
 
-    await runLoop(
-      {
-        db,
-        taskProvider,
-        github: GITHUB,
-        runner: fakeRunner(),
-        statusMirror: noopStatusMirror,
-        timeoutMs: 1000,
-        pollIntervalMs: 1,
-        fetchImpl: fakeFetch(),
-        sleep: noSleep,
-      },
-      1,
-    )
+    await runLoop({
+      db,
+      taskProvider,
+      github: GITHUB,
+      runner: fakeRunner(),
+      statusMirror: noopStatusMirror,
+      timeoutMs: 1000,
+      pollIntervalMs: 1,
+      fetchImpl: fakeFetch(),
+      sleep: noSleep,
+    })
 
     expect(db.query('SELECT * FROM tasks').all()).toHaveLength(1)
   })
 
   it('calls onDispatch before onComplete for the same task', async () => {
+    setBudget(db, 1)
     const events: string[] = []
     const statusMirror: StatusMirror = {
       onDispatch: async (jiraKey) => {
@@ -164,25 +213,24 @@ describe('runLoop', () => {
       },
     }
 
-    await runLoop(
-      {
-        db,
-        taskProvider: { listBacklog: async () => [{ jira_key: 'KAZ-1', summary: 's', description: '' }] },
-        github: GITHUB,
-        runner: fakeRunner('success'),
-        statusMirror,
-        timeoutMs: 1000,
-        pollIntervalMs: 1000,
-        fetchImpl: fakeFetch(),
-        sleep: noSleep,
-      },
-      1,
-    )
+    await runLoop({
+      db,
+      taskProvider: { listBacklog: async () => [{ jira_key: 'KAZ-1', summary: 's', description: '' }] },
+      github: GITHUB,
+      runner: fakeRunner('success'),
+      statusMirror,
+      timeoutMs: 1000,
+      pollIntervalMs: 1000,
+      fetchImpl: fakeFetch(),
+      sleep: noSleep,
+    })
 
     expect(events).toEqual(['dispatch:KAZ-1', 'complete:KAZ-1:success'])
   })
 
-  it('applies startTicket only on the first eligible iteration', async () => {
+  it('consumes start_ticket on the next iteration, bypassing normal ordering', async () => {
+    setBudget(db, 2)
+    setStartTicket(db, 'KAZ-2')
     const backlog: BacklogItem[] = [
       { jira_key: 'KAZ-1', summary: 'normal order first', description: '' },
       { jira_key: 'KAZ-2', summary: 'requested via start[ticket]', description: '' },
@@ -195,22 +243,40 @@ describe('runLoop', () => {
       },
     }
 
-    await runLoop(
-      {
-        db,
-        taskProvider: { listBacklog: async () => backlog },
-        github: GITHUB,
-        runner: fakeRunner('success'),
-        statusMirror,
-        timeoutMs: 1000,
-        pollIntervalMs: 1000,
-        fetchImpl: fakeFetch(),
-        sleep: noSleep,
-      },
-      2,
-      'KAZ-2',
-    )
+    await runLoop({
+      db,
+      taskProvider: { listBacklog: async () => backlog },
+      github: GITHUB,
+      runner: fakeRunner('success'),
+      statusMirror,
+      timeoutMs: 1000,
+      pollIntervalMs: 1000,
+      fetchImpl: fakeFetch(),
+      sleep: noSleep,
+    })
 
     expect(completed).toEqual(['KAZ-2', 'KAZ-1'])
+    expect(getStartTicket(db)).toBeNull()
+  })
+
+  it('clears start_ticket even if the requested task turns out ineligible', async () => {
+    setBudget(db, 1)
+    setStartTicket(db, 'KAZ-999')
+    const backlog: BacklogItem[] = [{ jira_key: 'KAZ-1', summary: 's', description: '' }]
+
+    await runLoop({
+      db,
+      taskProvider: { listBacklog: async () => backlog },
+      github: GITHUB,
+      runner: fakeRunner('success'),
+      statusMirror: noopStatusMirror,
+      timeoutMs: 1000,
+      pollIntervalMs: 1000,
+      fetchImpl: fakeFetch(),
+      sleep: noSleep,
+    })
+
+    expect(getStartTicket(db)).toBeNull()
+    expect(db.query('SELECT jira_key FROM tasks').all()).toEqual([{ jira_key: 'KAZ-1' }])
   })
 })

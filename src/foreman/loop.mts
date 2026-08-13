@@ -1,6 +1,6 @@
 import type { Database } from 'bun:sqlite'
 import type { TaskRow } from '../db/index.mts'
-import { isStopped, recordAttempt } from '../db/queries.mts'
+import { getBudget, getStartTicket, isStopped, recordAttempt, setBudget, setStartTicket, setStopped } from '../db/queries.mts'
 import type { GitHubConfig } from '../github/closed-prs.mts'
 import type { MinionRunner } from '../minion/types.mts'
 import type { TaskProvider } from '../task-provider/types.mts'
@@ -36,22 +36,29 @@ export interface LoopDeps {
 }
 
 /**
- * Foreman's loop (architecture.md, ADR-003):
- *   while not stopped: pick -> (sleep if empty) -> dispatch -> record -> mirror
- * `budget`, if set, decrements per completed dispatch and stops the loop at
- * zero, same as the `stopped` flag (ADR-003) — idle iterations don't count
- * against it. `startTicket` applies to the first eligible iteration only.
+ * Foreman's loop (architecture.md, ADR-003): pick -> (sleep if empty) ->
+ * dispatch -> record -> mirror, until the `stopped` flag in `foreman_state` is
+ * set. `budget` and `start_ticket` live in the same table (ADR-003's control
+ * surface, exposed over the API — see api.mts) rather than being fixed
+ * arguments here, since a human can change either while this is already
+ * running. `budget` is read once per call (a "max-tasks-*this run*" counter,
+ * per ADR-003's own wording) and persisted back on each decrement so the API
+ * can show live remaining budget; hitting zero sets `stopped` — "the same way
+ * the stopped flag does" (ADR-003) — rather than exiting the process, since
+ * Foreman's API/UI needs to keep running regardless. `start_ticket` is
+ * re-read and consumed every iteration, not just the first, so a human can
+ * queue one at any point during a long-running loop.
  */
-export async function runLoop(deps: LoopDeps, budget?: number, startTicket?: string): Promise<void> {
+export async function runLoop(deps: LoopDeps): Promise<void> {
   const sleep = deps.sleep ?? ((ms: number) => Bun.sleep(ms))
-  let remainingBudget = budget
-  let pendingStartTicket = startTicket
+  let remainingBudget = getBudget(deps.db)
 
   while (!isStopped(deps.db)) {
     let task = null
-    if (pendingStartTicket) {
-      task = await pickSpecific(deps.db, deps.taskProvider, deps.github, pendingStartTicket, deps.fetchImpl)
-      pendingStartTicket = undefined
+    const startTicket = getStartTicket(deps.db)
+    if (startTicket) {
+      setStartTicket(deps.db, null)
+      task = await pickSpecific(deps.db, deps.taskProvider, deps.github, startTicket, deps.fetchImpl)
     }
     if (!task) {
       task = await pick(deps.db, deps.taskProvider, deps.github, deps.fetchImpl)
@@ -67,9 +74,13 @@ export async function runLoop(deps: LoopDeps, budget?: number, startTicket?: str
     recordAttempt(deps.db, row)
     await deps.statusMirror.onComplete(row)
 
-    if (remainingBudget !== undefined) {
+    if (remainingBudget !== null) {
       remainingBudget -= 1
-      if (remainingBudget <= 0) break
+      setBudget(deps.db, remainingBudget)
+      if (remainingBudget <= 0) {
+        setStopped(deps.db, true)
+        break
+      }
     }
   }
 }
