@@ -21,6 +21,9 @@ coverage/
 # MCP server config (contains API credentials)
 .mcp.json
 
+# Local Foreman run config (contains API credentials) — see .env.example
+.env
+
 # Personal Claude Code overrides
 .claude/settings.local.json
 
