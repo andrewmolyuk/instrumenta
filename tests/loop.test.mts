@@ -91,10 +91,14 @@ describe('runLoop', () => {
       // Simulate KAZ-1 leaving the live backlog once it's been dispatched.
       listBacklog: async () => (call++ === 0 ? backlog : [backlog[1] as BacklogItem]),
     }
-    const mirrored: TaskRow[] = []
+    const dispatched: string[] = []
+    const completed: TaskRow[] = []
     const statusMirror: StatusMirror = {
-      mirror: async (row) => {
-        mirrored.push(row)
+      onDispatch: async (jiraKey) => {
+        dispatched.push(jiraKey)
+      },
+      onComplete: async (row) => {
+        completed.push(row)
       },
     }
 
@@ -113,7 +117,8 @@ describe('runLoop', () => {
       2,
     )
 
-    expect(mirrored.map((r) => r.jira_key)).toEqual(['KAZ-1', 'KAZ-2'])
+    expect(dispatched).toEqual(['KAZ-1', 'KAZ-2'])
+    expect(completed.map((r) => r.jira_key)).toEqual(['KAZ-1', 'KAZ-2'])
     const rows = db.query('SELECT jira_key, status FROM tasks').all()
     expect(rows).toEqual([
       { jira_key: 'KAZ-1', status: 'success' },
@@ -148,15 +153,45 @@ describe('runLoop', () => {
     expect(db.query('SELECT * FROM tasks').all()).toHaveLength(1)
   })
 
+  it('calls onDispatch before onComplete for the same task', async () => {
+    const events: string[] = []
+    const statusMirror: StatusMirror = {
+      onDispatch: async (jiraKey) => {
+        events.push(`dispatch:${jiraKey}`)
+      },
+      onComplete: async (row) => {
+        events.push(`complete:${row.jira_key}:${row.status}`)
+      },
+    }
+
+    await runLoop(
+      {
+        db,
+        taskProvider: { listBacklog: async () => [{ jira_key: 'KAZ-1', summary: 's', description: '' }] },
+        github: GITHUB,
+        runner: fakeRunner('success'),
+        statusMirror,
+        timeoutMs: 1000,
+        pollIntervalMs: 1000,
+        fetchImpl: fakeFetch(),
+        sleep: noSleep,
+      },
+      1,
+    )
+
+    expect(events).toEqual(['dispatch:KAZ-1', 'complete:KAZ-1:success'])
+  })
+
   it('applies startTicket only on the first eligible iteration', async () => {
     const backlog: BacklogItem[] = [
       { jira_key: 'KAZ-1', summary: 'normal order first', description: '' },
       { jira_key: 'KAZ-2', summary: 'requested via start[ticket]', description: '' },
     ]
-    const mirrored: string[] = []
+    const completed: string[] = []
     const statusMirror: StatusMirror = {
-      mirror: async (row) => {
-        mirrored.push(row.jira_key)
+      onDispatch: async () => {},
+      onComplete: async (row) => {
+        completed.push(row.jira_key)
       },
     }
 
@@ -176,6 +211,6 @@ describe('runLoop', () => {
       'KAZ-2',
     )
 
-    expect(mirrored).toEqual(['KAZ-2', 'KAZ-1'])
+    expect(completed).toEqual(['KAZ-2', 'KAZ-1'])
   })
 })
