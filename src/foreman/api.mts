@@ -1,6 +1,11 @@
 import type { Database } from 'bun:sqlite'
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { getBudget, getStartTicket, isStopped, listAttempts, setBudget, setStartTicket, setStopped } from '../db/queries.mts'
 import type { TaskProvider } from '../task-provider/types.mts'
+
+const UI_HTML = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'ui.html'), 'utf-8')
 
 export interface ApiDeps {
   db: Database
@@ -13,17 +18,23 @@ function json(body: unknown, status = 200): Response {
 }
 
 /**
- * The thin API architecture.md describes: current status, the live queue,
- * an attempt history, and the four controls ADR-003 names — stop, continue,
- * start[ticket], budget. A plain fetch handler, not bound to a port, so it's
- * testable directly with constructed Request objects; startApiServer wraps
- * it with Bun.serve. No separate CLI artifact (architecture.md) — this JSON
- * API is the only scriptable surface, same thing the (not yet built) Web UI
- * would call.
+ * The thin API and minimal Web UI architecture.md describes, served from the
+ * same container: `GET /` serves ui.html, a single static page (no build
+ * step) that calls the JSON endpoints below — current status, the live
+ * queue, an attempt history, and the four controls ADR-003 names: stop,
+ * continue, start[ticket], budget. A plain fetch handler, not bound to a
+ * port, so it's testable directly with constructed Request objects;
+ * startApiServer wraps it with Bun.serve. No separate CLI artifact
+ * (architecture.md) — this JSON API is the only scriptable surface, and the
+ * only thing the UI itself calls.
  */
 export function createApiHandler(deps: ApiDeps): (req: Request) => Promise<Response> {
   return async (req: Request): Promise<Response> => {
     const url = new URL(req.url)
+
+    if (req.method === 'GET' && url.pathname === '/') {
+      return new Response(UI_HTML, { headers: { 'Content-Type': 'text/html; charset=utf-8' } })
+    }
 
     if (req.method === 'GET' && url.pathname === '/api/status') {
       const [queue, history] = await Promise.all([
