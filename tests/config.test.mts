@@ -31,6 +31,7 @@ describe('parseConfig', () => {
     expect(config.dbPath).toBe('./foreman.db')
     expect(config.timeoutMs).toBe(600_000)
     expect(config.pollIntervalMs).toBe(60_000)
+    expect(config.apiPort).toBe(3000)
     expect(config.budget).toBeUndefined()
     expect(config.startTicket).toBeUndefined()
   })
@@ -41,12 +42,14 @@ describe('parseConfig', () => {
       FOREMAN_DB_PATH: '/data/foreman.db',
       MINION_TIMEOUT_MS: '120000',
       FOREMAN_POLL_INTERVAL_MS: '5000',
+      FOREMAN_API_PORT: '8080',
       FOREMAN_BUDGET: '3',
       FOREMAN_START_TICKET: 'KAZ-42',
     })
     expect(config.dbPath).toBe('/data/foreman.db')
     expect(config.timeoutMs).toBe(120_000)
     expect(config.pollIntervalMs).toBe(5_000)
+    expect(config.apiPort).toBe(8080)
     expect(config.budget).toBe(3)
     expect(config.startTicket).toBe('KAZ-42')
   })
