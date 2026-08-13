@@ -40,3 +40,23 @@ export async function pick(
   }
   return null
 }
+
+/**
+ * ADR-003's start[ticket]: `jiraKey` on the next iteration, bypassing normal
+ * priority ordering. Give-up eligibility still applies — ADR-003 only says
+ * ordering is bypassed, not the give-up check, so a human forcing a task back
+ * that's already hit the threshold isn't something this implements.
+ */
+export async function pickSpecific(
+  db: Database,
+  taskProvider: TaskProvider,
+  github: GitHubConfig,
+  jiraKey: string,
+  fetchImpl?: typeof fetch,
+): Promise<BacklogItem | null> {
+  const backlog = await taskProvider.listBacklog()
+  const item = backlog.find((candidate) => candidate.jira_key === jiraKey)
+  if (!item) return null
+  if (await isGivenUp(db, github, item.jira_key, fetchImpl)) return null
+  return item
+}
