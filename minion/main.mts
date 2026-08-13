@@ -1,5 +1,5 @@
 import type { MinionInput } from '../src/minion/types.mts'
-import { createPullRequest, type BitbucketPrConfig } from './bitbucket-pr.mts'
+import { buildCloneUrl, createPullRequest, type BitbucketPrConfig } from './bitbucket-pr.mts'
 import { cloneAndBranch, commitAndPush, writeNote } from './git.mts'
 import { implementTask } from './implement-task.mts'
 import type { MinionDeps } from './orchestrate.mts'
@@ -18,11 +18,12 @@ function requiredEnv(key: string): string {
  * (inherited from Foreman's own env — ProcessMinionRunner doesn't override
  * `env`, so whatever Foreman's container has is what Minion sees too), and
  * writes exactly one MinionResult as JSON to stdout — the structured result
- * ProcessMinionRunner parses.
+ * ProcessMinionRunner parses. The clone URL is derived from the Bitbucket
+ * config (see buildCloneUrl) rather than its own env var, so there's one
+ * source of truth for which repo this is.
  */
 async function main(): Promise<void> {
   const input = JSON.parse(await Bun.stdin.text()) as MinionInput
-  const repoUrl = requiredEnv('TARGET_REPO_URL')
   const notesPath = process.env.NOTES_PATH ?? 'docs/todo/'
   const workDir = `/tmp/minion-${input.task_id}`
 
@@ -32,6 +33,7 @@ async function main(): Promise<void> {
     token: requiredEnv('BITBUCKET_TOKEN'),
     base: process.env.BITBUCKET_BASE_BRANCH,
   }
+  const repoUrl = buildCloneUrl(bitbucket)
 
   const deps: MinionDeps = {
     cloneAndBranch,

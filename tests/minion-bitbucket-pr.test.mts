@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { MinionInput } from '../src/minion/types.mts'
-import { createPullRequest, type BitbucketPrConfig } from '../minion/bitbucket-pr.mts'
+import { buildCloneUrl, createPullRequest, type BitbucketPrConfig } from '../minion/bitbucket-pr.mts'
 
 const CONFIG: BitbucketPrConfig = { workspace: 'andrewmolyuk', repoSlug: 'target-project', token: 'bb-token' }
 const INPUT: MinionInput = { task_id: 't1', jira_key: 'KAZ-1', description: 'Fix the thing', attempt_number: 1 }
@@ -13,6 +13,12 @@ function fakeFetch(body: unknown, ok = true, status = 201) {
     json: async () => body,
   }))
 }
+
+describe('buildCloneUrl', () => {
+  it('builds an x-token-auth HTTPS clone URL from workspace/repoSlug/token', () => {
+    expect(buildCloneUrl(CONFIG)).toBe('https://x-token-auth:bb-token@bitbucket.org/andrewmolyuk/target-project.git')
+  })
+})
 
 describe('createPullRequest', () => {
   it('posts to the repo pullrequests endpoint with source/destination/title/description', async () => {

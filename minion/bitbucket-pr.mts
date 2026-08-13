@@ -11,6 +11,18 @@ interface CreatePrResponse {
   links: { html: { href: string } }
 }
 
+/**
+ * The git clone URL for this config's repo. Derived rather than taken as its
+ * own `TARGET_REPO_URL` env var — workspace/repoSlug/token already fully
+ * determine it, and keeping both meant a human could change one without the
+ * other, silently pointing Minion's git clone and its Bitbucket API calls at
+ * different repos. `x-token-auth` is Bitbucket's fixed username for HTTPS
+ * access-token auth (not a placeholder — write it literally).
+ */
+export function buildCloneUrl(config: BitbucketPrConfig): string {
+  return `https://x-token-auth:${config.token}@bitbucket.org/${config.workspace}/${config.repoSlug}.git`
+}
+
 /** Opens the PR a passing verify run earns (architecture.md's Minion contract). */
 export async function createPullRequest(
   config: BitbucketPrConfig,
