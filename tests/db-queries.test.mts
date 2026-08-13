@@ -2,11 +2,16 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import type { Database } from 'bun:sqlite'
 import { openDb, type TaskRow } from '../src/db/index.mts'
 import {
+  getBudget,
+  getStartTicket,
   giveUpAttemptCount,
   isStopped,
+  listAttempts,
   newTaskId,
   nextAttemptNumber,
   recordAttempt,
+  setBudget,
+  setStartTicket,
   setStopped,
 } from '../src/db/queries.mts'
 
@@ -80,5 +85,45 @@ describe('stopped flag', () => {
     expect(isStopped(db)).toBe(true)
     setStopped(db, false)
     expect(isStopped(db)).toBe(false)
+  })
+})
+
+describe('budget', () => {
+  it('starts unlimited (null)', () => {
+    expect(getBudget(db)).toBeNull()
+  })
+
+  it('round-trips a numeric value, including back to null', () => {
+    setBudget(db, 5)
+    expect(getBudget(db)).toBe(5)
+    setBudget(db, null)
+    expect(getBudget(db)).toBeNull()
+  })
+})
+
+describe('start_ticket', () => {
+  it('starts unset (null)', () => {
+    expect(getStartTicket(db)).toBeNull()
+  })
+
+  it('round-trips a jira_key, including back to null', () => {
+    setStartTicket(db, 'KAZ-42')
+    expect(getStartTicket(db)).toBe('KAZ-42')
+    setStartTicket(db, null)
+    expect(getStartTicket(db)).toBeNull()
+  })
+})
+
+describe('listAttempts', () => {
+  it('returns most recent first, capped at the limit', () => {
+    recordAttempt(db, attempt({ task_id: 't1', dispatched_at: '2026-08-13T00:00:00Z' }))
+    recordAttempt(db, attempt({ task_id: 't2', dispatched_at: '2026-08-13T00:01:00Z' }))
+    recordAttempt(db, attempt({ task_id: 't3', dispatched_at: '2026-08-13T00:02:00Z' }))
+
+    expect(listAttempts(db, 2).map((r) => r.task_id)).toEqual(['t3', 't2'])
+  })
+
+  it('returns an empty list when there are no attempts', () => {
+    expect(listAttempts(db, 10)).toEqual([])
   })
 })
