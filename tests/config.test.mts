@@ -9,6 +9,7 @@ const BASE_ENV = {
   GITHUB_OWNER: 'andrewmolyuk',
   GITHUB_REPO: 'target-project',
   GITHUB_TOKEN: 'gh-token',
+  TARGET_REPO_URL: 'https://x-access-token:gh-token@github.com/andrewmolyuk/target-project.git',
   MINION_COMMAND: '["docker","run","--rm","-i","minion:latest"]',
 }
 
@@ -27,6 +28,7 @@ describe('parseConfig', () => {
       apiToken: 'jira-token',
     })
     expect(config.github).toEqual({ owner: 'andrewmolyuk', repo: 'target-project', token: 'gh-token' })
+    expect(config.targetRepoUrl).toBe('https://x-access-token:gh-token@github.com/andrewmolyuk/target-project.git')
     expect(config.minionCommand).toEqual(['docker', 'run', '--rm', '-i', 'minion:latest'])
     expect(config.dbPath).toBe('./foreman.db')
     expect(config.timeoutMs).toBe(600_000)
@@ -54,7 +56,17 @@ describe('parseConfig', () => {
     expect(config.startTicket).toBe('KAZ-42')
   })
 
-  it.each(['JIRA_BASE_URL', 'JIRA_EMAIL', 'JIRA_API_TOKEN', 'JIRA_JQL', 'GITHUB_OWNER', 'GITHUB_REPO', 'GITHUB_TOKEN', 'MINION_COMMAND'])(
+  it.each([
+    'JIRA_BASE_URL',
+    'JIRA_EMAIL',
+    'JIRA_API_TOKEN',
+    'JIRA_JQL',
+    'GITHUB_OWNER',
+    'GITHUB_REPO',
+    'GITHUB_TOKEN',
+    'TARGET_REPO_URL',
+    'MINION_COMMAND',
+  ])(
     'throws when %s is missing',
     (key) => {
       const env = { ...BASE_ENV }

@@ -37,16 +37,27 @@ export function createApiHandler(deps: ApiDeps): (req: Request) => Promise<Respo
     }
 
     if (req.method === 'GET' && url.pathname === '/api/status') {
-      const [queue, history] = await Promise.all([
-        deps.taskProvider.listBacklog(),
-        Promise.resolve(listAttempts(deps.db, deps.historyLimit ?? 50)),
-      ])
+      // The queue read hits Jira live — if it's unreachable, that's still a
+      // status worth showing (stopped/budget/history are all local), not a
+      // reason to fail the whole request. Found the same way as runLoop's
+      // per-iteration try/catch: running Foreman's container against an
+      // unreachable Jira URL, this endpoint returned Bun's raw error page
+      // instead of JSON before this was added.
+      let queue: Awaited<ReturnType<TaskProvider['listBacklog']>> = []
+      let queueError: string | undefined
+      try {
+        queue = await deps.taskProvider.listBacklog()
+      } catch (err) {
+        queueError = err instanceof Error ? err.message : String(err)
+      }
+
       return json({
         stopped: isStopped(deps.db),
         budget: getBudget(deps.db),
         startTicket: getStartTicket(deps.db),
         queue,
-        history,
+        queueError,
+        history: listAttempts(deps.db, deps.historyLimit ?? 50),
       })
     }
 

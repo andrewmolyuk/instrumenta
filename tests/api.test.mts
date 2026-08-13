@@ -70,6 +70,20 @@ describe('GET /api/status', () => {
     expect(body.history).toHaveLength(1)
     expect(body.history[0]?.jira_key).toBe('KAZ-1')
   })
+
+  it('returns the rest of the status with an empty queue when the Task Provider fails', async () => {
+    const failingHandler = createApiHandler({
+      db,
+      taskProvider: { listBacklog: () => Promise.reject(new Error('Jira unreachable')) },
+    })
+
+    const res = await failingHandler(req('GET', '/api/status'))
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as { stopped: boolean; queue: unknown[]; queueError?: string }
+    expect(body.stopped).toBe(false)
+    expect(body.queue).toEqual([])
+    expect(body.queueError).toBe('Jira unreachable')
+  })
 })
 
 describe('POST /api/stop', () => {
