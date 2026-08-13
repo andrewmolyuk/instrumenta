@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Foreman</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 2rem; color: #1a1a1a; }
+  table { border-collapse: collapse; width: 100%; margin-bottom: 1.5rem; }
+  th, td { border: 1px solid #ccc; padding: 4px 8px; text-align: left; font-size: 0.9rem; }
+  form { display: inline-block; margin-right: 1rem; }
+  #status { margin-bottom: 1rem; font-weight: 600; }
+</style>
+</head>
+<body>
+<h1>Foreman</h1>
+
+<div id="status">Loading…</div>
+
+<div>
+  <button id="stop">Stop</button>
+  <button id="continue">Continue</button>
+  <form id="start-form">
+    <input id="start-ticket" placeholder="JIRA-123" required />
+    <button type="submit">Start ticket</button>
+  </form>
+  <form id="budget-form">
+    <input id="budget-value" type="number" placeholder="budget (blank = unlimited)" />
+    <button type="submit">Set budget</button>
+  </form>
+</div>
+
+<h2>Queue</h2>
+<table id="queue"><thead><tr><th>Key</th><th>Summary</th></tr></thead><tbody></tbody></table>
+
+<h2>History</h2>
+<table id="history">
+  <thead><tr><th>Jira key</th><th>Attempt</th><th>Status</th><th>PR</th><th>Dispatched</th></tr></thead>
+  <tbody></tbody>
+</table>
+
+<script>
+  // Queue summaries and PR urls come from Jira/GitHub — not fully trusted
+  // input (same reasoning as ADR-002's Minion sandboxing). Built via DOM APIs
+  // (textContent, not innerHTML) so nothing here can inject markup.
+  function td(text) {
+    const el = document.createElement('td')
+    el.textContent = text
+    return el
+  }
+
+  function renderQueue(queue) {
+    const tbody = document.querySelector('#queue tbody')
+    tbody.replaceChildren()
+    for (const item of queue) {
+      const tr = document.createElement('tr')
+      tr.append(td(item.jira_key), td(item.summary))
+      tbody.append(tr)
+    }
+  }
+
+  function renderHistory(history) {
+    const tbody = document.querySelector('#history tbody')
+    tbody.replaceChildren()
+    for (const row of history) {
+      const tr = document.createElement('tr')
+      const prTd = document.createElement('td')
+      if (typeof row.pr_url === 'string' && /^https?:\/\//.test(row.pr_url)) {
+        const a = document.createElement('a')
+        a.href = row.pr_url
+        a.textContent = 'PR'
+        prTd.append(a)
+      }
+      tr.append(td(row.jira_key), td(String(row.attempt_number)), td(row.status), prTd, td(row.dispatched_at))
+      tbody.append(tr)
+    }
+  }
+
+  async function refresh() {
+    const res = await fetch('/api/status')
+    const s = await res.json()
+    document.getElementById('status').textContent =
+      `Stopped: ${s.stopped} | Budget: ${s.budget ?? 'unlimited'} | Start ticket queued: ${s.startTicket ?? 'none'}`
+    renderQueue(s.queue)
+    renderHistory(s.history)
+  }
+
+  document.getElementById('stop').addEventListener('click', async () => {
+    await fetch('/api/stop', { method: 'POST' })
+    refresh()
+  })
+
+  document.getElementById('continue').addEventListener('click', async () => {
+    await fetch('/api/continue', { method: 'POST' })
+    refresh()
+  })
+
+  document.getElementById('start-form').addEventListener('submit', async (e) => {
+    e.preventDefault()
+    const input = document.getElementById('start-ticket')
+    await fetch('/api/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jiraKey: input.value }),
+    })
+    input.value = ''
+    refresh()
+  })
+
+  document.getElementById('budget-form').addEventListener('submit', async (e) => {
+    e.preventDefault()
+    const input = document.getElementById('budget-value')
+    const budget = input.value === '' ? null : Number(input.value)
+    await fetch('/api/budget', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ budget }),
+    })
+    refresh()
+  })
+
+  refresh()
+  setInterval(refresh, 5000)
+</script>
+</body>
+</html>

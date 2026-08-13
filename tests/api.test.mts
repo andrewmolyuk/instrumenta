@@ -25,6 +25,21 @@ function req(method: string, path: string, body?: unknown): Request {
   })
 }
 
+describe('GET /', () => {
+  it('serves the Web UI as HTML', async () => {
+    const res = await handler(req('GET', '/'))
+    expect(res.status).toBe(200)
+    expect(res.headers.get('Content-Type')).toBe('text/html; charset=utf-8')
+    const body = await res.text()
+    expect(body).toContain('<title>Foreman</title>')
+    expect(body).toContain('/api/status')
+    expect(body).toContain('/api/stop')
+    expect(body).toContain('/api/continue')
+    expect(body).toContain('/api/start')
+    expect(body).toContain('/api/budget')
+  })
+})
+
 describe('GET /api/status', () => {
   it('reports stopped, budget, startTicket, the live queue, and history', async () => {
     setBudget(db, 5)
