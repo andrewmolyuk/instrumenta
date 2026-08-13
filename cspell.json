@@ -1,0 +1,8 @@
+{
+  // "words" entries: always lowercase — cSpell matches case-insensitively by
+  // default, so one lowercase entry also covers the capitalized form.
+  "version": "0.2",
+  "language": "en",
+  "words": ["instrumenta", "foreman", "minion"],
+  "ignorePaths": ["node_modules", "bun.lock", "bun.lockb"]
+}
