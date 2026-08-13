@@ -59,9 +59,17 @@ backlog — not before, and not left unchecked indefinitely:
 - **% of tasks reaching a merged PR** — throughput baseline from the target project's
   own history (direct-to-git commits, no PR step yet): 1,260 distinct tickets closed
   over Jan 2020–Jun 2025 (66 months), ~19/month, 97% of them 1–2 commits — the task
-  shape the MVP can realistically attempt. Completion/abandonment rate itself isn't
-  in git history (a ticket a human started and dropped leaves no commit) — that
-  baseline still needs Jira's own status history, not just commits.
+  shape the MVP can realistically attempt. Completion/abandonment rate isn't in git
+  history (a ticket a human started and dropped leaves no commit), so this comes from
+  Jira's own status history instead, same window, `Task`/`Bug`/`Story`/`User Story`
+  only (excluding Sub-tasks, Epics, Zephyr Tests), combined across the two Jira
+  projects that track this one target project's backlog: **67.5%/57.2% completed
+  per project (63.9% combined)**, 15.1%/16.4% abandoned (Won't Do / Cannot
+  Reproduce / Duplicate / Works As Designed / Defer; 15.5% combined), 17.4%/26.5%
+  still open (20.6% combined), across 6,635 tickets total.
+  Note the ticket volume here (6,635) is ~5x the 1,260 git-linked count above even
+  after excluding non-code issue types — most Jira tickets in this window never
+  got a matching commit, confirming git log alone understates this rate.
 - **Hours saved** — rough floor from the same history, across all 3,546 commits
   (not just ticket-linked ones — untagged commits made the same day as ticket work
   are still plausibly part of it): summing gaps between commits made on the same
