@@ -50,6 +50,42 @@ describe('runLoop', () => {
     expect(listBacklog).not.toHaveBeenCalled()
   })
 
+  it('backs off and continues instead of crashing when an iteration throws', async () => {
+    setBudget(db, 1)
+    let calls = 0
+    const taskProvider: TaskProvider = {
+      listBacklog: async () => {
+        calls += 1
+        if (calls <= 2) throw new Error('Jira unreachable')
+        return [{ jira_key: 'KAZ-1', summary: 's', description: '' }]
+      },
+    }
+    const errors: unknown[] = []
+    const sleepCalls: number[] = []
+
+    await runLoop({
+      db,
+      taskProvider,
+      github: GITHUB,
+      runner: fakeRunner('success'),
+      statusMirror: noopStatusMirror,
+      timeoutMs: 1000,
+      pollIntervalMs: 250,
+      fetchImpl: fakeFetch(),
+      sleep: async (ms) => {
+        sleepCalls.push(ms)
+      },
+      onIterationError: (err) => {
+        errors.push(err)
+      },
+    })
+
+    expect(errors).toHaveLength(2)
+    expect(sleepCalls).toEqual([250, 250])
+    expect(getBudget(db)).toBe(0)
+    expect(isStopped(db)).toBe(true)
+  })
+
   it('sleeps the poll interval and retries when the backlog is empty', async () => {
     setBudget(db, 1)
     let calls = 0

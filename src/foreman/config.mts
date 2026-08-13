@@ -7,6 +7,12 @@ export interface ForemanConfig {
   jira: JiraConfig
   jiraAuth: JiraAuthConfig
   github: GitHubConfig
+  /** Not read by Foreman itself — validated here so a missing value fails fast
+   *  at startup instead of deep inside a Minion run. Minion reads it from the
+   *  same environment (ProcessMinionRunner inherits Foreman's env; a
+   *  Docker-based MINION_COMMAND needs its own `-e TARGET_REPO_URL` to forward
+   *  it into the container — see README). */
+  targetRepoUrl: string
   minionCommand: string[]
   timeoutMs: number
   pollIntervalMs: number
@@ -49,6 +55,7 @@ export function parseConfig(env: NodeJS.ProcessEnv): ForemanConfig {
       repo: required(env, 'GITHUB_REPO'),
       token: required(env, 'GITHUB_TOKEN'),
     },
+    targetRepoUrl: required(env, 'TARGET_REPO_URL'),
     minionCommand: JSON.parse(required(env, 'MINION_COMMAND')) as string[],
     timeoutMs: optionalInt(env, 'MINION_TIMEOUT_MS') ?? 600_000,
     pollIntervalMs: optionalInt(env, 'FOREMAN_POLL_INTERVAL_MS') ?? 60_000,

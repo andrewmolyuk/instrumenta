@@ -79,7 +79,8 @@
     const res = await fetch('/api/status')
     const s = await res.json()
     document.getElementById('status').textContent =
-      `Stopped: ${s.stopped} | Budget: ${s.budget ?? 'unlimited'} | Start ticket queued: ${s.startTicket ?? 'none'}`
+      `Stopped: ${s.stopped} | Budget: ${s.budget ?? 'unlimited'} | Start ticket queued: ${s.startTicket ?? 'none'}` +
+      (s.queueError ? ` | Queue read failed: ${s.queueError}` : '')
     renderQueue(s.queue)
     renderHistory(s.history)
   }
