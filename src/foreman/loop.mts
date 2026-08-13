@@ -7,18 +7,20 @@ import type { TaskProvider } from '../task-provider/types.mts'
 import { dispatch } from './dispatch.mts'
 import { pick, pickSpecific } from './pick.mts'
 
+/**
+ * ADR-001 names two mirrored events, at two different points in the loop:
+ * "In Progress" the moment a task is dispatched, "Done" once it succeeds.
+ * The other four attempt statuses aren't given a Jira mapping by the ADR, so
+ * onComplete is free to no-op for them rather than guess one.
+ */
 export interface StatusMirror {
-  mirror(row: TaskRow): Promise<void>
+  onDispatch(jiraKey: string): Promise<void>
+  onComplete(row: TaskRow): Promise<void>
 }
 
-/**
- * Ships with the loop so its shape is complete and testable now. ADR-001 only
- * names two concrete cases ("In Progress" on dispatch, "Done" on success) —
- * a real Jira-writing mirror, and what the other four statuses map to, is
- * separate, later work rather than something to guess here.
- */
 export const noopStatusMirror: StatusMirror = {
-  async mirror() {},
+  async onDispatch() {},
+  async onComplete() {},
 }
 
 export interface LoopDeps {
@@ -60,9 +62,10 @@ export async function runLoop(deps: LoopDeps, budget?: number, startTicket?: str
       continue
     }
 
+    await deps.statusMirror.onDispatch(task.jira_key)
     const row = await dispatch(deps.db, deps.runner, task, deps.timeoutMs)
     recordAttempt(deps.db, row)
-    await deps.statusMirror.mirror(row)
+    await deps.statusMirror.onComplete(row)
 
     if (remainingBudget !== undefined) {
       remainingBudget -= 1
