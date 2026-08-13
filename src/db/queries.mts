@@ -23,15 +23,18 @@ export function recordAttempt(db: Database, row: TaskRow): void {
 
 /**
  * SQLite half of ADR-001's give-up check: attempts whose status means the run
- * ended without a PR (failed_verify, crashed, timeout). The GitHub half (closed
- * PRs matching jira_key) lives outside this database — see architecture.md's
- * "Where task/claim state actually lives".
+ * ended without a PR (failed_verify, crashed, timeout), plus given_up itself —
+ * Minion can self-report given_up on its final allowed attempt
+ * (architecture.md's Minion section), and that has to count too, or a task it
+ * already gave up on would look eligible again next Pick. The GitHub half
+ * (closed PRs matching jira_key) lives outside this database — see
+ * architecture.md's "Where task/claim state actually lives".
  */
 export function giveUpAttemptCount(db: Database, jiraKey: string): number {
   const row = db
     .query<{ n: number }, [string]>(
       `SELECT COUNT(*) as n FROM tasks
-       WHERE jira_key = ? AND status IN ('failed_verify', 'crashed', 'timeout')`,
+       WHERE jira_key = ? AND status IN ('failed_verify', 'crashed', 'timeout', 'given_up')`,
     )
     .get(jiraKey)
   return row?.n ?? 0

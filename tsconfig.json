@@ -15,5 +15,5 @@
     "skipLibCheck": true,
     "noUncheckedIndexedAccess": true
   },
-  "include": [".claude/hooks/**/*.mts", "src/**/*.mts", "tests/**/*.mts"]
+  "include": [".claude/hooks/**/*.mts", "minion/**/*.mts", "src/**/*.mts", "tests/**/*.mts"]
 }
