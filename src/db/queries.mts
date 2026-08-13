@@ -26,7 +26,7 @@ export function recordAttempt(db: Database, row: TaskRow): void {
  * ended without a PR (failed_verify, crashed, timeout), plus given_up itself —
  * Minion can self-report given_up on its final allowed attempt
  * (architecture.md's Minion section), and that has to count too, or a task it
- * already gave up on would look eligible again next Pick. The GitHub half
+ * already gave up on would look eligible again next Pick. The Bitbucket half
  * (closed PRs matching jira_key) lives outside this database — see
  * architecture.md's "Where task/claim state actually lives".
  */

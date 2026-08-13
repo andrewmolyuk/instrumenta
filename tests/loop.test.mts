@@ -3,11 +3,11 @@ import type { Database } from 'bun:sqlite'
 import { openDb, type TaskRow } from '../src/db/index.mts'
 import { getBudget, getStartTicket, isStopped, setBudget, setStartTicket, setStopped } from '../src/db/queries.mts'
 import { noopStatusMirror, runLoop, type StatusMirror } from '../src/foreman/loop.mts'
-import type { GitHubConfig } from '../src/github/closed-prs.mts'
+import type { BitbucketConfig } from '../src/bitbucket/closed-prs.mts'
 import type { MinionRunner } from '../src/minion/types.mts'
 import type { BacklogItem, TaskProvider } from '../src/task-provider/types.mts'
 
-const GITHUB: GitHubConfig = { owner: 'andrewmolyuk', repo: 'target-project', token: 'gh-token' }
+const BITBUCKET: BitbucketConfig = { workspace: 'andrewmolyuk', repoSlug: 'target-project', token: 'bb-token' }
 
 let db: Database
 
@@ -38,7 +38,7 @@ describe('runLoop', () => {
     await runLoop({
       db,
       taskProvider: { listBacklog },
-      github: GITHUB,
+      bitbucket: BITBUCKET,
       runner: fakeRunner(),
       statusMirror: noopStatusMirror,
       timeoutMs: 1000,
@@ -66,7 +66,7 @@ describe('runLoop', () => {
     await runLoop({
       db,
       taskProvider,
-      github: GITHUB,
+      bitbucket: BITBUCKET,
       runner: fakeRunner('success'),
       statusMirror: noopStatusMirror,
       timeoutMs: 1000,
@@ -100,7 +100,7 @@ describe('runLoop', () => {
     await runLoop({
       db,
       taskProvider,
-      github: GITHUB,
+      bitbucket: BITBUCKET,
       runner: fakeRunner(),
       statusMirror: noopStatusMirror,
       timeoutMs: 1000,
@@ -140,7 +140,7 @@ describe('runLoop', () => {
     await runLoop({
       db,
       taskProvider,
-      github: GITHUB,
+      bitbucket: BITBUCKET,
       runner: fakeRunner('success'),
       statusMirror,
       timeoutMs: 1000,
@@ -172,7 +172,7 @@ describe('runLoop', () => {
     await runLoop({
       db,
       taskProvider,
-      github: GITHUB,
+      bitbucket: BITBUCKET,
       runner: fakeRunner('success'),
       statusMirror: noopStatusMirror,
       timeoutMs: 1000,
@@ -199,7 +199,7 @@ describe('runLoop', () => {
     await runLoop({
       db,
       taskProvider,
-      github: GITHUB,
+      bitbucket: BITBUCKET,
       runner: fakeRunner('success'),
       statusMirror: noopStatusMirror,
       timeoutMs: 1000,
@@ -225,7 +225,7 @@ describe('runLoop', () => {
     await runLoop({
       db,
       taskProvider,
-      github: GITHUB,
+      bitbucket: BITBUCKET,
       runner: fakeRunner(),
       statusMirror: noopStatusMirror,
       timeoutMs: 1000,
@@ -252,7 +252,7 @@ describe('runLoop', () => {
     await runLoop({
       db,
       taskProvider: { listBacklog: async () => [{ jira_key: 'KAZ-1', summary: 's', description: '' }] },
-      github: GITHUB,
+      bitbucket: BITBUCKET,
       runner: fakeRunner('success'),
       statusMirror,
       timeoutMs: 1000,
@@ -282,7 +282,7 @@ describe('runLoop', () => {
     await runLoop({
       db,
       taskProvider: { listBacklog: async () => backlog },
-      github: GITHUB,
+      bitbucket: BITBUCKET,
       runner: fakeRunner('success'),
       statusMirror,
       timeoutMs: 1000,
@@ -303,7 +303,7 @@ describe('runLoop', () => {
     await runLoop({
       db,
       taskProvider: { listBacklog: async () => backlog },
-      github: GITHUB,
+      bitbucket: BITBUCKET,
       runner: fakeRunner('success'),
       statusMirror: noopStatusMirror,
       timeoutMs: 1000,

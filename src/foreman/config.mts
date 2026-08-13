@@ -1,12 +1,12 @@
 import type { JiraAuthConfig } from './jira-status-mirror.mts'
-import type { GitHubConfig } from '../github/closed-prs.mts'
+import type { BitbucketConfig } from '../bitbucket/closed-prs.mts'
 import type { JiraConfig } from '../task-provider/jira.mts'
 
 export interface ForemanConfig {
   dbPath: string
   jira: JiraConfig
   jiraAuth: JiraAuthConfig
-  github: GitHubConfig
+  bitbucket: BitbucketConfig
   /** Not read by Foreman itself — validated here so a missing value fails fast
    *  at startup instead of deep inside a Minion run. Minion reads it from the
    *  same environment (ProcessMinionRunner inherits Foreman's env; a
@@ -50,10 +50,10 @@ export function parseConfig(env: NodeJS.ProcessEnv): ForemanConfig {
     dbPath: env.FOREMAN_DB_PATH ?? './foreman.db',
     jira: { ...jiraAuth, jql: required(env, 'JIRA_JQL') },
     jiraAuth,
-    github: {
-      owner: required(env, 'GITHUB_OWNER'),
-      repo: required(env, 'GITHUB_REPO'),
-      token: required(env, 'GITHUB_TOKEN'),
+    bitbucket: {
+      workspace: required(env, 'BITBUCKET_WORKSPACE'),
+      repoSlug: required(env, 'BITBUCKET_REPO_SLUG'),
+      token: required(env, 'BITBUCKET_TOKEN'),
     },
     targetRepoUrl: required(env, 'TARGET_REPO_URL'),
     minionCommand: JSON.parse(required(env, 'MINION_COMMAND')) as string[],

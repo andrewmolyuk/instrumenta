@@ -1,6 +1,6 @@
 import type { MinionInput } from '../src/minion/types.mts'
+import { createPullRequest, type BitbucketPrConfig } from './bitbucket-pr.mts'
 import { cloneAndBranch, commitAndPush, writeNote } from './git.mts'
-import { createPullRequest, type GitHubPrConfig } from './github-pr.mts'
 import { implementTask } from './implement-task.mts'
 import type { MinionDeps } from './orchestrate.mts'
 import { runMinion } from './orchestrate.mts'
@@ -26,11 +26,11 @@ async function main(): Promise<void> {
   const notesPath = process.env.NOTES_PATH ?? 'docs/todo/'
   const workDir = `/tmp/minion-${input.task_id}`
 
-  const github: GitHubPrConfig = {
-    owner: requiredEnv('GITHUB_OWNER'),
-    repo: requiredEnv('GITHUB_REPO'),
-    token: requiredEnv('GITHUB_TOKEN'),
-    base: process.env.GITHUB_BASE_BRANCH,
+  const bitbucket: BitbucketPrConfig = {
+    workspace: requiredEnv('BITBUCKET_WORKSPACE'),
+    repoSlug: requiredEnv('BITBUCKET_REPO_SLUG'),
+    token: requiredEnv('BITBUCKET_TOKEN'),
+    base: process.env.BITBUCKET_BASE_BRANCH,
   }
 
   const deps: MinionDeps = {
@@ -40,7 +40,7 @@ async function main(): Promise<void> {
     runVerify,
     writeNote,
     commitAndPush,
-    createPullRequest: (branch, taskInput) => createPullRequest(github, branch, taskInput),
+    createPullRequest: (branch, taskInput) => createPullRequest(bitbucket, branch, taskInput),
   }
 
   const result = await runMinion(input, repoUrl, workDir, notesPath, deps)

@@ -7,11 +7,15 @@ and dated.
 ## In force
 
 - [ADR-001](001-task-state-three-sources.md) — claimed/given-up state comes from three
-  independent sources (Jira, Foreman's SQLite, target-repo GitHub history), not one
+  independent sources (Jira, Foreman's SQLite, target-repo PR history), not one. The
+  third source's identity (originally written as GitHub) is amended by ADR-004 — it's
+  Bitbucket
 - [ADR-002](002-foreman-minion-execution-boundary.md) — Foreman and Minion are separate
   containers; Minion is ephemeral, sandboxed, and runs unattended
 - [ADR-003](003-foreman-daemon-trigger-control.md) — Foreman runs as a self-looping
   daemon, not an externally cron-triggered job
+- [ADR-004](004-target-repo-hosting-is-bitbucket.md) — the target repo's hosting is
+  Bitbucket, not GitHub (amends ADR-001's third source)
 
 ## Superseded
 
