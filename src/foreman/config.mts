@@ -10,6 +10,7 @@ export interface ForemanConfig {
   minionCommand: string[]
   timeoutMs: number
   pollIntervalMs: number
+  apiPort: number
   budget?: number
   startTicket?: string
 }
@@ -51,6 +52,7 @@ export function parseConfig(env: NodeJS.ProcessEnv): ForemanConfig {
     minionCommand: JSON.parse(required(env, 'MINION_COMMAND')) as string[],
     timeoutMs: optionalInt(env, 'MINION_TIMEOUT_MS') ?? 600_000,
     pollIntervalMs: optionalInt(env, 'FOREMAN_POLL_INTERVAL_MS') ?? 60_000,
+    apiPort: optionalInt(env, 'FOREMAN_API_PORT') ?? 3000,
     budget: optionalInt(env, 'FOREMAN_BUDGET'),
     startTicket: env.FOREMAN_START_TICKET,
   }
