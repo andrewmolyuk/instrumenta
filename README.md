@@ -28,8 +28,7 @@ All of these are required unless marked optional — see
 |---|---|
 | `JIRA_BASE_URL`, `JIRA_EMAIL`, `JIRA_API_TOKEN` | Jira auth, shared by the Task Provider and status mirror |
 | `JIRA_JQL` | The live backlog query — ordering and "open" are this query's job, not Foreman's (architecture.md) |
-| `BITBUCKET_WORKSPACE`, `BITBUCKET_REPO_SLUG`, `BITBUCKET_TOKEN` | Target repo, for the give-up check's declined-PR count and for Minion (inherited — see below) |
-| `TARGET_REPO_URL` | Clone URL Minion checks out, e.g. `https://x-token-auth:$BITBUCKET_TOKEN@bitbucket.org/workspace/repo.git`. Not read by Foreman itself — validated at startup so a missing value fails fast instead of deep inside a Minion run |
+| `BITBUCKET_WORKSPACE`, `BITBUCKET_REPO_SLUG`, `BITBUCKET_TOKEN` | Target repo, for the give-up check's declined-PR count and for Minion (inherited — see below). Minion derives its git clone URL from these three (`buildCloneUrl`) rather than taking one of its own — one source of truth for which repo this is |
 | `MINION_COMMAND` | JSON argv array Foreman runs per task — see below |
 | `FOREMAN_DB_PATH` *(optional, default `./foreman.db`)* | SQLite file |
 | `MINION_TIMEOUT_MS` *(optional, default `600000`)* | Kill a Minion run past this |
@@ -42,7 +41,7 @@ All of these are required unless marked optional — see
 without shell-quoting rules — e.g.:
 
 ```json
-["docker","run","--rm","-i","-e","TARGET_REPO_URL","-e","BITBUCKET_WORKSPACE","-e","BITBUCKET_REPO_SLUG","-e","BITBUCKET_TOKEN","minion:latest"]
+["docker","run","--rm","-i","-e","BITBUCKET_WORKSPACE","-e","BITBUCKET_REPO_SLUG","-e","BITBUCKET_TOKEN","minion:latest"]
 ```
 
 `-e VAR` with no `=value` forwards that variable from whatever environment the
@@ -58,7 +57,7 @@ docker run --rm -it \
   -p 3000:3000 \
   -v /var/run/docker.sock:/var/run/docker.sock \
   -e JIRA_BASE_URL -e JIRA_EMAIL -e JIRA_API_TOKEN -e JIRA_JQL \
-  -e BITBUCKET_WORKSPACE -e BITBUCKET_REPO_SLUG -e BITBUCKET_TOKEN -e TARGET_REPO_URL -e MINION_COMMAND \
+  -e BITBUCKET_WORKSPACE -e BITBUCKET_REPO_SLUG -e BITBUCKET_TOKEN -e MINION_COMMAND \
   foreman:latest
 ```
 
