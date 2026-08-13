@@ -54,11 +54,19 @@ describe('nextAttemptNumber', () => {
 })
 
 describe('giveUpAttemptCount', () => {
-  it('counts failed_verify, crashed, and timeout, not success', () => {
+  it('counts failed_verify, crashed, timeout, and given_up, not success', () => {
     recordAttempt(db, attempt({ attempt_number: 1, status: 'failed_verify' }))
     recordAttempt(db, attempt({ attempt_number: 2, status: 'crashed' }))
     recordAttempt(db, attempt({ attempt_number: 3, status: 'timeout' }))
-    recordAttempt(db, attempt({ attempt_number: 4, status: 'success' }))
+    recordAttempt(db, attempt({ attempt_number: 4, status: 'given_up' }))
+    recordAttempt(db, attempt({ attempt_number: 5, status: 'success' }))
+    expect(giveUpAttemptCount(db, 'KAZ-1')).toBe(4)
+  })
+
+  it('a single given_up attempt on its own still counts toward the total', () => {
+    recordAttempt(db, attempt({ attempt_number: 1, status: 'failed_verify' }))
+    recordAttempt(db, attempt({ attempt_number: 2, status: 'failed_verify' }))
+    recordAttempt(db, attempt({ attempt_number: 3, status: 'given_up' }))
     expect(giveUpAttemptCount(db, 'KAZ-1')).toBe(3)
   })
 
