@@ -1,6 +1,6 @@
 ---
 name: docs-consistency-check
-description: 'Cross-checks docs/adr/*.md, docs/vision.md, and CLAUDE.md against each other for contradictions and stale references — one ADR assuming something another ADR later decided differently, a claim attributed to the wrong document, or a path/command that no longer matches the repo. Use when asked to review documentation or ADRs for consistency, after adding a new ADR that touches ground an earlier one already covered, or before starting a new batch of decisions.'
+description: 'Cross-checks docs/adr/*.md, docs/vision.md, CLAUDE.md, and CONTEXT.md against each other for contradictions and stale references — one ADR assuming something another ADR later decided differently, a claim attributed to the wrong document, a term used inconsistently with its glossary definition, or a path/command that no longer matches the repo. Use when asked to review documentation or ADRs for consistency, after adding a new ADR that touches ground an earlier one already covered, or before starting a new batch of decisions.'
 ---
 
 # docs-consistency-check: finding contradictions and stale claims across the docs
@@ -31,6 +31,9 @@ Everything that states policy, not just `docs/adr/`:
   nothing on disk is missing from it.
 - `CLAUDE.md` — the standing rules; confirm its links resolve to files that still
   exist, and that its own text (stack, workflow, don'ts) isn't contradicted by any ADR.
+- `CONTEXT.md`, if it defines a glossary — the canonical terms. Confirm a term used in an ADR
+  or `architecture.md` matches its glossary definition; a term redefined, narrowed, or used
+  inconsistently elsewhere is a finding, not just incompleteness.
 - `README.md`, if present, for anything maintainer-facing that an ADR has since changed underneath.
 
 ## What counts as a finding

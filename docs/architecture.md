@@ -9,27 +9,27 @@ individual decisions this document just states as given.
 
 ```mermaid
 flowchart TD
-    Jira[("Jira\n(backlog, priority/sprint)")]
-    TP["Task Provider\n(plugin inside Foreman —\nJira adapter today)"]
+    Jira[("Jira (backlog, priority/sprint)")]
     Human(["Human"])
 
     subgraph Foreman["Foreman container (long-running daemon)"]
+        TP["Task Provider (plugin inside Foreman — Jira adapter today)"]
         Pick["Pick / loop logic"]
-        DB[("SQLite on a\npersistent volume\ntask state + history")]
-        API["Thin API + minimal Web UI\n(status, history, stop/start/continue/budget)"]
+        DB[("SQLite on a persistent volume task state + history")]
+        API["Thin API + minimal Web UI(status, history, stop/start/continue/budget)"]
     end
 
-    Minion["Minion container\n(ephemeral, one per task)"]
-    Target[("Target project\ncode + knowledge + gates + PR state")]
+    Minion["Minion container (ephemeral, one per task)"]
+    Target[("Target project code + knowledge + gates + PR state")]
 
     Jira -- "live query: backlog + order" --> TP
     TP --> Pick
     Pick <--> DB
     Human -- "stop / start[ticket] / continue / budget" --> API
     API --> Pick
-    Pick -- "task_id, jira_key, description,\nattempt #, prior context" --> Minion
-    Minion -- "checkout, implement,\nverify gate, commit, PR" --> Target
-    Minion -- "single result at exit:\nstatus + PR url" --> Pick
+    Pick -- "task_id, jira_key, description, attempt #, prior context" --> Minion
+    Minion -- "checkout, implement, verify gate, commit, PR" --> Target
+    Minion -- "single result at exit: status + PR url" --> Pick
     Human -- "priority, cancel ticket" --> Jira
     Human -- "review, merge PR" --> Target
 ```
@@ -166,7 +166,7 @@ on the same fact. Full reasoning and the exact combination rule for give-up is
 |---|---|
 | Jira (live query) | Is this task still wanted at all? |
 | SQLite (Foreman's own) | What has Foreman itself observed about its attempts — including a crash or timeout with no PR to show for it? |
-| GitHub (target repo PR history) | Resilient backstop for give-up if SQLite is ever lost or diverges from reality. |
+| GitHub (target repo PR history) | Checked alongside SQLite on every Pick; give-up triggers the moment either source crosses the attempt threshold first, so it also catches give-up if SQLite is ever lost or diverges from reality. |
 
 ## Known, accepted gaps
 
