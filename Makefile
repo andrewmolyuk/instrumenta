@@ -20,7 +20,7 @@ dev: build
 		echo "Missing $(ENV_FILE) — copy .env.example to $(ENV_FILE) and fill in real values."; \
 		exit 1; \
 	}
-	docker run --rm -it \
+	docker run --rm -i \
 		-p 3000:3000 \
 		-v /var/run/docker.sock:/var/run/docker.sock \
 		--env-file $(ENV_FILE) \
