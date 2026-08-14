@@ -1,7 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Database } from 'bun:sqlite'
 import { openDb, type TaskRow } from '../src/db/index.mts'
-import { getBudget, getStartTicket, isStopped, setBudget, setStartTicket, setStopped } from '../src/db/queries.mts'
+import {
+  type CurrentTask,
+  getBudget,
+  getCurrentTask,
+  getStartTicket,
+  isStopped,
+  setBudget,
+  setStartTicket,
+  setStopped,
+} from '../src/db/queries.mts'
 import { noopStatusMirror, runLoop, type StatusMirror } from '../src/foreman/loop.mts'
 import type { BitbucketConfig } from '../src/bitbucket/closed-prs.mts'
 import type { MinionRunner } from '../src/minion/types.mts'
@@ -262,6 +271,58 @@ describe('runLoop', () => {
     })
 
     expect(events).toEqual(['dispatch:KAZ-1', 'complete:KAZ-1:success'])
+  })
+
+  it('records the current task while dispatch is in flight, then clears it', async () => {
+    setBudget(db, 1)
+    let sawWhileDispatching = null as CurrentTask | null
+    const runner: MinionRunner = {
+      run: async () => {
+        sawWhileDispatching = getCurrentTask(db)
+        return { status: 'success', pr_url: null }
+      },
+    }
+
+    await runLoop({
+      db,
+      taskProvider: { listBacklog: async () => [{ jira_key: 'KAZ-1', summary: 's', description: '' }] },
+      bitbucket: BITBUCKET,
+      runner,
+      statusMirror: noopStatusMirror,
+      timeoutMs: 1000,
+      pollIntervalMs: 1000,
+      fetchImpl: fakeFetch(),
+      sleep: noSleep,
+    })
+
+    expect(sawWhileDispatching?.jira_key).toBe('KAZ-1')
+    expect(getCurrentTask(db)).toBeNull()
+  })
+
+  it('clears the current task even when dispatch throws', async () => {
+    let calls = 0
+    const runner: MinionRunner = {
+      run: async () => {
+        calls += 1
+        if (calls === 1) throw new Error('minion runner exploded')
+        setStopped(db, true)
+        return { status: 'success', pr_url: null }
+      },
+    }
+
+    await runLoop({
+      db,
+      taskProvider: { listBacklog: async () => [{ jira_key: 'KAZ-1', summary: 's', description: '' }] },
+      bitbucket: BITBUCKET,
+      runner,
+      statusMirror: noopStatusMirror,
+      timeoutMs: 1000,
+      pollIntervalMs: 1000,
+      fetchImpl: fakeFetch(),
+      sleep: noSleep,
+    })
+
+    expect(getCurrentTask(db)).toBeNull()
   })
 
   it('consumes start_ticket on the next iteration, bypassing normal ordering', async () => {

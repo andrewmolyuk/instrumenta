@@ -2,7 +2,10 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import type { Database } from 'bun:sqlite'
 import { openDb, type TaskRow } from '../src/db/index.mts'
 import {
+  deleteAttempts,
   getBudget,
+  getBudgetTotal,
+  getCurrentTask,
   getStartTicket,
   giveUpAttemptCount,
   isStopped,
@@ -11,6 +14,8 @@ import {
   nextAttemptNumber,
   recordAttempt,
   setBudget,
+  setBudgetTotal,
+  setCurrentTask,
   setStartTicket,
   setStopped,
 } from '../src/db/queries.mts'
@@ -109,6 +114,21 @@ describe('budget', () => {
   })
 })
 
+describe('budget_total', () => {
+  it('starts unset (null)', () => {
+    expect(getBudgetTotal(db)).toBeNull()
+  })
+
+  it('round-trips a numeric value, including back to null, independently of budget', () => {
+    setBudgetTotal(db, 5)
+    expect(getBudgetTotal(db)).toBe(5)
+    setBudget(db, 2)
+    expect(getBudgetTotal(db)).toBe(5)
+    setBudgetTotal(db, null)
+    expect(getBudgetTotal(db)).toBeNull()
+  })
+})
+
 describe('start_ticket', () => {
   it('starts unset (null)', () => {
     expect(getStartTicket(db)).toBeNull()
@@ -119,6 +139,19 @@ describe('start_ticket', () => {
     expect(getStartTicket(db)).toBe('KAZ-42')
     setStartTicket(db, null)
     expect(getStartTicket(db)).toBeNull()
+  })
+})
+
+describe('current task', () => {
+  it('starts unset (null)', () => {
+    expect(getCurrentTask(db)).toBeNull()
+  })
+
+  it('round-trips a jira_key and dispatched_at, including back to null', () => {
+    setCurrentTask(db, { jira_key: 'KAZ-42', dispatched_at: '2026-08-14T00:00:00Z' })
+    expect(getCurrentTask(db)).toEqual({ jira_key: 'KAZ-42', dispatched_at: '2026-08-14T00:00:00Z' })
+    setCurrentTask(db, null)
+    expect(getCurrentTask(db)).toBeNull()
   })
 })
 
@@ -133,5 +166,25 @@ describe('listAttempts', () => {
 
   it('returns an empty list when there are no attempts', () => {
     expect(listAttempts(db, 10)).toEqual([])
+  })
+})
+
+describe('deleteAttempts', () => {
+  it('removes only the given jira_key, resetting its give-up count, and returns the number removed', () => {
+    recordAttempt(db, attempt({ task_id: 't1', jira_key: 'KAZ-1', status: 'crashed' }))
+    recordAttempt(db, attempt({ task_id: 't2', jira_key: 'KAZ-1', status: 'crashed' }))
+    recordAttempt(db, attempt({ task_id: 't3', jira_key: 'KAZ-1', status: 'crashed' }))
+    recordAttempt(db, attempt({ task_id: 't4', jira_key: 'KAZ-2', status: 'crashed' }))
+    expect(giveUpAttemptCount(db, 'KAZ-1')).toBe(3)
+
+    expect(deleteAttempts(db, 'KAZ-1')).toBe(3)
+
+    expect(giveUpAttemptCount(db, 'KAZ-1')).toBe(0)
+    expect(giveUpAttemptCount(db, 'KAZ-2')).toBe(1)
+    expect(listAttempts(db, 10).map((r) => r.task_id)).toEqual(['t4'])
+  })
+
+  it('returns 0 when there is nothing to delete for that jira_key', () => {
+    expect(deleteAttempts(db, 'KAZ-999')).toBe(0)
   })
 })

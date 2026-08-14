@@ -1,6 +1,15 @@
 import type { Database } from 'bun:sqlite'
 import type { TaskRow } from '../db/index.mts'
-import { getBudget, getStartTicket, isStopped, recordAttempt, setBudget, setStartTicket, setStopped } from '../db/queries.mts'
+import {
+  getBudget,
+  getStartTicket,
+  isStopped,
+  recordAttempt,
+  setBudget,
+  setCurrentTask,
+  setStartTicket,
+  setStopped,
+} from '../db/queries.mts'
 import type { BitbucketConfig } from '../bitbucket/closed-prs.mts'
 import type { MinionRunner } from '../minion/types.mts'
 import type { TaskProvider } from '../task-provider/types.mts'
@@ -81,17 +90,22 @@ export async function runLoop(deps: LoopDeps): Promise<void> {
       }
 
       await deps.statusMirror.onDispatch(task.jira_key)
-      const row = await dispatch(deps.db, deps.runner, task, deps.timeoutMs)
-      recordAttempt(deps.db, row)
-      await deps.statusMirror.onComplete(row)
+      setCurrentTask(deps.db, { jira_key: task.jira_key, dispatched_at: new Date().toISOString() })
+      try {
+        const row = await dispatch(deps.db, deps.runner, task, deps.timeoutMs)
+        recordAttempt(deps.db, row)
+        await deps.statusMirror.onComplete(row)
 
-      if (remainingBudget !== null) {
-        remainingBudget -= 1
-        setBudget(deps.db, remainingBudget)
-        if (remainingBudget <= 0) {
-          setStopped(deps.db, true)
-          break
+        if (remainingBudget !== null) {
+          remainingBudget -= 1
+          setBudget(deps.db, remainingBudget)
+          if (remainingBudget <= 0) {
+            setStopped(deps.db, true)
+            break
+          }
         }
+      } finally {
+        setCurrentTask(deps.db, null)
       }
     } catch (err) {
       onIterationError(err)

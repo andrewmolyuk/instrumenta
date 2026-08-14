@@ -1,5 +1,5 @@
 import { openDb } from '../db/index.mts'
-import { isStopped, setBudget, setStartTicket } from '../db/queries.mts'
+import { isStopped, setBudget, setBudgetTotal, setStartTicket, setStopped } from '../db/queries.mts'
 import { ProcessMinionRunner } from '../minion/process-runner.mts'
 import { JiraTaskProvider } from '../task-provider/jira.mts'
 import { startApiServer } from './api.mts'
@@ -19,11 +19,22 @@ import { type LoopDeps, runLoop } from './loop.mts'
  * up to it. So main() supervises: run the loop while not stopped, idle and
  * recheck while stopped, forever. A human clearing `stopped` via the API
  * (`/api/continue`) is what makes this loop call runLoop() again.
+ *
+ * Every boot forces `stopped = true` before anything else runs, regardless
+ * of whatever the (currently ephemeral, per-container) DB already had —
+ * dispatching against the real Jira/Bitbucket backlog the moment the
+ * container comes up, with no chance to look at the queue first, is exactly
+ * the failure mode hit testing this locally. A human has to hit
+ * `/api/continue` (or the UI's Continue button) to actually start it.
  */
 export async function main(env: NodeJS.ProcessEnv = process.env): Promise<void> {
   const config = parseConfig(env)
   const db = openDb(config.dbPath)
-  if (config.budget !== undefined) setBudget(db, config.budget)
+  setStopped(db, true)
+  if (config.budget !== undefined) {
+    setBudget(db, config.budget)
+    setBudgetTotal(db, config.budget)
+  }
   if (config.startTicket !== undefined) setStartTicket(db, config.startTicket)
 
   const taskProvider = new JiraTaskProvider(config.jira)
@@ -37,7 +48,7 @@ export async function main(env: NodeJS.ProcessEnv = process.env): Promise<void> 
     pollIntervalMs: config.pollIntervalMs,
   }
 
-  startApiServer({ db, taskProvider }, config.apiPort)
+  startApiServer({ db, taskProvider, bitbucket: config.bitbucket }, config.apiPort)
 
   while (true) {
     if (isStopped(db)) {
