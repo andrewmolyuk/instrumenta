@@ -59,6 +59,16 @@ export function setBudget(db: Database, budget: number | null): void {
   db.run('UPDATE foreman_state SET budget = ? WHERE id = 1', [budget])
 }
 
+/** The capacity `budget` was last set to — only moves when a human sets a new budget, unlike `budget` itself. */
+export function getBudgetTotal(db: Database): number | null {
+  const row = db.query<{ budget_total: number | null }, []>('SELECT budget_total FROM foreman_state WHERE id = 1').get()
+  return row?.budget_total ?? null
+}
+
+export function setBudgetTotal(db: Database, budgetTotal: number | null): void {
+  db.run('UPDATE foreman_state SET budget_total = ? WHERE id = 1', [budgetTotal])
+}
+
 /** ADR-003's start[ticket]: the jira_key queued for the next Pick, if any. */
 export function getStartTicket(db: Database): string | null {
   const row = db.query<{ start_ticket: string | null }, []>('SELECT start_ticket FROM foreman_state WHERE id = 1').get()
@@ -69,9 +79,44 @@ export function setStartTicket(db: Database, jiraKey: string | null): void {
   db.run('UPDATE foreman_state SET start_ticket = ? WHERE id = 1', [jiraKey])
 }
 
+export interface CurrentTask {
+  jira_key: string
+  dispatched_at: string
+}
+
+/** The task the loop is inside `dispatch` for right now, if any (ADR-003's control surface). */
+export function getCurrentTask(db: Database): CurrentTask | null {
+  const row = db
+    .query<{ current_jira_key: string | null; current_dispatched_at: string | null }, []>(
+      'SELECT current_jira_key, current_dispatched_at FROM foreman_state WHERE id = 1',
+    )
+    .get()
+  if (!row?.current_jira_key || !row.current_dispatched_at) return null
+  return { jira_key: row.current_jira_key, dispatched_at: row.current_dispatched_at }
+}
+
+export function setCurrentTask(db: Database, task: CurrentTask | null): void {
+  db.run('UPDATE foreman_state SET current_jira_key = ?, current_dispatched_at = ? WHERE id = 1', [
+    task?.jira_key ?? null,
+    task?.dispatched_at ?? null,
+  ])
+}
+
 /** Most recent attempts first — the history view of the control-surface API. */
 export function listAttempts(db: Database, limit: number): TaskRow[] {
   return db
     .query<TaskRow, [number]>('SELECT * FROM tasks ORDER BY dispatched_at DESC LIMIT ?')
     .all(limit)
+}
+
+/**
+ * Clears a jira_key's recorded attempts, resetting giveUpAttemptCount back to
+ * 0 — the only way to force a given-up ticket eligible again, since
+ * pickSpecific deliberately doesn't bypass the give-up check itself (see its
+ * doc comment). Only the SQLite half: a closed-PR count on Bitbucket that
+ * alone crosses GIVE_UP_THRESHOLD still leaves the ticket given-up after
+ * this. Returns the number of rows removed.
+ */
+export function deleteAttempts(db: Database, jiraKey: string): number {
+  return db.run('DELETE FROM tasks WHERE jira_key = ?', [jiraKey]).changes
 }

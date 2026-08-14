@@ -9,12 +9,22 @@
   th, td { border: 1px solid #ccc; padding: 4px 8px; text-align: left; font-size: 0.9rem; }
   form { display: inline-block; margin-right: 1rem; }
   #status { margin-bottom: 1rem; font-weight: 600; }
+  #start-error { color: #b00020; margin-bottom: 1rem; }
+  #budget-bar-wrap { margin-bottom: 1rem; display: none; }
+  #budget-bar-track { background: #e0e0e0; border-radius: 4px; height: 12px; width: 300px; overflow: hidden; }
+  #budget-bar-fill { background: #2f6feb; height: 100%; width: 0%; }
+  #budget-bar-label { font-size: 0.85rem; margin-top: 2px; }
 </style>
 </head>
 <body>
 <h1>Foreman</h1>
 
 <div id="status">Loading…</div>
+
+<div id="budget-bar-wrap">
+  <div id="budget-bar-track"><div id="budget-bar-fill"></div></div>
+  <div id="budget-bar-label"></div>
+</div>
 
 <div>
   <button id="stop">Stop</button>
@@ -23,10 +33,16 @@
     <input id="start-ticket" placeholder="JIRA-123" required />
     <button type="submit">Start ticket</button>
   </form>
+  <div id="start-error"></div>
   <form id="budget-form">
     <input id="budget-value" type="number" placeholder="budget (blank = unlimited)" />
     <button type="submit">Set budget</button>
   </form>
+  <form id="delete-attempts-form">
+    <input id="delete-attempts-ticket" placeholder="JIRA-123" required />
+    <button type="submit">Clear attempts</button>
+  </form>
+  <div id="delete-attempts-status"></div>
 </div>
 
 <h2>Queue</h2>
@@ -75,11 +91,26 @@
     }
   }
 
+  function renderBudgetBar(budget, budgetTotal) {
+    const wrap = document.getElementById('budget-bar-wrap')
+    if (budgetTotal === null) {
+      wrap.style.display = 'none'
+      return
+    }
+    wrap.style.display = ''
+    const used = budgetTotal - (budget ?? 0)
+    const percent = budgetTotal > 0 ? Math.min(100, Math.max(0, (used / budgetTotal) * 100)) : 100
+    document.getElementById('budget-bar-fill').style.width = `${percent}%`
+    document.getElementById('budget-bar-label').textContent = `Budget used: ${used} / ${budgetTotal} attempts`
+  }
+
   async function refresh() {
     const res = await fetch('/api/status')
     const s = await res.json()
+    renderBudgetBar(s.budget, s.budgetTotal)
     document.getElementById('status').textContent =
       `Stopped: ${s.stopped} | Budget: ${s.budget ?? 'unlimited'} | Start ticket queued: ${s.startTicket ?? 'none'}` +
+      ` | Minion working on: ${s.current ? `${s.current.jira_key} (since ${s.current.dispatched_at})` : 'nothing right now'}` +
       (s.queueError ? ` | Queue read failed: ${s.queueError}` : '')
     renderQueue(s.queue)
     renderHistory(s.history)
@@ -98,12 +129,19 @@
   document.getElementById('start-form').addEventListener('submit', async (e) => {
     e.preventDefault()
     const input = document.getElementById('start-ticket')
-    await fetch('/api/start', {
+    const errorEl = document.getElementById('start-error')
+    const res = await fetch('/api/start', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ jiraKey: input.value }),
     })
-    input.value = ''
+    if (res.ok) {
+      errorEl.textContent = ''
+      input.value = ''
+    } else {
+      const body = await res.json().catch(() => null)
+      errorEl.textContent = body?.error ?? `Start failed (${res.status})`
+    }
     refresh()
   })
 
@@ -116,6 +154,33 @@
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ budget }),
     })
+    refresh()
+  })
+
+  document.getElementById('delete-attempts-form').addEventListener('submit', async (e) => {
+    e.preventDefault()
+    const input = document.getElementById('delete-attempts-ticket')
+    const statusEl = document.getElementById('delete-attempts-status')
+    const jiraKey = input.value
+    // Deletes every recorded attempt for this ticket, not just the failed
+    // ones — it's what resets giveUpAttemptCount, since a human clicking this
+    // wants the ticket eligible again, not a partially-trimmed history.
+    if (!confirm(`Delete all recorded attempts for ${jiraKey}? This can't be undone.`)) {
+      return
+    }
+    const res = await fetch('/api/delete-attempts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jiraKey }),
+    })
+    if (res.ok) {
+      const body = await res.json()
+      statusEl.textContent = `Deleted ${body.deleted} attempt(s) for ${jiraKey}`
+      input.value = ''
+    } else {
+      const body = await res.json().catch(() => null)
+      statusEl.textContent = body?.error ?? `Delete failed (${res.status})`
+    }
     refresh()
   })
 
