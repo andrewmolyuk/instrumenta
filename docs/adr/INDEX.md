@@ -19,6 +19,8 @@ and dated.
   Bitbucket, not GitHub (amends ADR-001's third source)
 - [ADR-005](005-rename-continue-and-start-ticket.md) — rename "continue" to "start" and
   "start[ticket]" to "queue[ticket]" (amends ADR-003's control names)
+- [ADR-006](006-minion-auth-is-subscription-not-api-key.md) — Minion authenticates
+  Claude Code via a subscription's `CLAUDE_CODE_OAUTH_TOKEN`, not `ANTHROPIC_API_KEY`
 
 ## Superseded
 

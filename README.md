@@ -29,6 +29,7 @@ All of these are required unless marked optional — see
 | `JIRA_BASE_URL`, `JIRA_EMAIL`, `JIRA_API_TOKEN` | Jira auth, shared by the Task Provider and status mirror |
 | `JIRA_JQL` | The live backlog query — ordering and "open" are this query's job, not Foreman's (architecture.md) |
 | `BITBUCKET_WORKSPACE`, `BITBUCKET_REPO_SLUG`, `BITBUCKET_TOKEN` | Target repo, for the give-up check's declined-PR count and for Minion (inherited — see below). Minion derives its git clone URL from these three (`buildCloneUrl`) rather than taking one of its own — one source of truth for which repo this is |
+| `CLAUDE_CODE_OAUTH_TOKEN` | Claude Code auth inside Minion's sandbox (inherited — see below) — this is what actually implements each task. Generate with `claude setup-token` (Pro/Max/Team/Enterprise subscription, flat-rate billing rather than metered API usage); the token is valid for one year with no rotation mechanism |
 | `MINION_COMMAND` | JSON argv array Foreman runs per task — see below |
 | `FOREMAN_DB_PATH` *(optional, default `./foreman.db`)* | SQLite file |
 | `MINION_TIMEOUT_MS` *(optional, default `600000`)* | Kill a Minion run past this |
@@ -41,7 +42,7 @@ All of these are required unless marked optional — see
 without shell-quoting rules — e.g.:
 
 ```json
-["docker","run","--rm","-i","-e","BITBUCKET_WORKSPACE","-e","BITBUCKET_REPO_SLUG","-e","BITBUCKET_TOKEN","minion:latest"]
+["docker","run","--rm","-i","-e","BITBUCKET_WORKSPACE","-e","BITBUCKET_REPO_SLUG","-e","BITBUCKET_TOKEN","-e","CLAUDE_CODE_OAUTH_TOKEN","minion:latest"]
 ```
 
 `-e VAR` with no `=value` forwards that variable from whatever environment the
