@@ -4,8 +4,13 @@ async function run(cmd: string[], cwd?: string): Promise<void> {
   const proc = Bun.spawn(cmd, { cwd, stdout: 'pipe', stderr: 'pipe' })
   const code = await proc.exited
   if (code !== 0) {
-    const stderr = await new Response(proc.stderr).text()
-    throw new Error(`Command failed (${cmd.join(' ')}): ${stderr.trim()}`)
+    // git doesn't consistently put its failure reason on stderr — e.g. "nothing to
+    // commit" and some auth-related push failures land on stdout — so both streams
+    // are captured, not just stderr, or the thrown message can end up empty.
+    const stdout = (await new Response(proc.stdout).text()).trim()
+    const stderr = (await new Response(proc.stderr).text()).trim()
+    const detail = [stdout, stderr].filter(Boolean).join('\n') || '(no output on stdout or stderr)'
+    throw new Error(`Command failed (${cmd.join(' ')}): ${detail}`)
   }
 }
 
