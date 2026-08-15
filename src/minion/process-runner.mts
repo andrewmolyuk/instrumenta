@@ -1,7 +1,7 @@
 import type { MinionInput, MinionResult, MinionRunner } from './types.mts'
 
 /** Cap on captured crash/timeout output — keeps the tail, where the relevant part usually is. */
-const MAX_CAPTURED_OUTPUT_CHARS = 4000
+const MAX_CAPTURED_OUTPUT_CHARS = 16000
 
 /**
  * Starts Minion as a subprocess (in production, `docker run ...`), waits

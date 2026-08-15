@@ -65,10 +65,10 @@ describe('runVerify', () => {
 
   it('truncates output over the cap, keeping the tail', async () => {
     const d = tempDir()
-    writeFileSync(join(d, 'package.json'), JSON.stringify({ scripts: { verify: 'yes x | head -c 5000; exit 1' } }))
+    writeFileSync(join(d, 'package.json'), JSON.stringify({ scripts: { verify: 'yes x | head -c 20000; exit 1' } }))
     const result = await runVerify(d)
     expect(result.passed).toBe(false)
-    expect(result.output.length).toBeLessThan(5000)
+    expect(result.output.length).toBeLessThan(20000)
     expect(result.output).toContain('truncated')
   })
 })
