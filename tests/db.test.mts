@@ -15,6 +15,7 @@ describe('openDb', () => {
       'attempt_number',
       'status',
       'pr_url',
+      'output',
       'dispatched_at',
       'finished_at',
     ])

@@ -29,14 +29,14 @@ export class ProcessMinionRunner implements MinionRunner {
 
     if (timedOut) {
       proc.kill()
-      return { status: 'timeout', pr_url: null }
+      return { status: 'timeout', pr_url: null, output: null }
     }
 
     const stdout = (await new Response(proc.stdout).text()).trim()
     const parsed = parseResult(stdout)
     // A non-zero exit with no valid result on stdout is exactly ADR-001's
     // "crashed" — Minion exited without reporting a structured result at all.
-    return parsed ?? { status: 'crashed', pr_url: null }
+    return parsed ?? { status: 'crashed', pr_url: null, output: null }
   }
 }
 
@@ -44,7 +44,7 @@ function parseResult(stdout: string): MinionResult | null {
   try {
     const parsed = JSON.parse(stdout)
     if (typeof parsed?.status !== 'string') return null
-    return { status: parsed.status, pr_url: parsed.pr_url ?? null }
+    return { status: parsed.status, pr_url: parsed.pr_url ?? null, output: parsed.output ?? null }
   } catch {
     return null
   }

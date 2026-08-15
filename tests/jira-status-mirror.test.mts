@@ -20,6 +20,7 @@ function row(overrides: Partial<TaskRow> = {}): TaskRow {
     attempt_number: 1,
     status: 'success',
     pr_url: null,
+    output: null,
     dispatched_at: '2026-08-13T00:00:00Z',
     finished_at: '2026-08-13T00:05:00Z',
     ...overrides,

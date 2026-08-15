@@ -11,7 +11,17 @@ describe('ProcessMinionRunner', () => {
       "const input = JSON.parse(await Bun.stdin.text()); console.log(JSON.stringify({ status: 'success', pr_url: `https://example.com/pr/${input.attempt_number}` }))",
     ])
     const result = await runner.run(INPUT, 5000)
-    expect(result).toEqual({ status: 'success', pr_url: 'https://example.com/pr/1' })
+    expect(result).toEqual({ status: 'success', pr_url: 'https://example.com/pr/1', output: null })
+  })
+
+  it('parses the output field through when the process reports one', async () => {
+    const runner = new ProcessMinionRunner([
+      'bun',
+      '-e',
+      "console.log(JSON.stringify({ status: 'failed_verify', pr_url: null, output: 'test 1 failed' }))",
+    ])
+    const result = await runner.run(INPUT, 5000)
+    expect(result).toEqual({ status: 'failed_verify', pr_url: null, output: 'test 1 failed' })
   })
 
   it('passes input to the process over stdin as JSON', async () => {
@@ -27,20 +37,20 @@ describe('ProcessMinionRunner', () => {
   it('reports crashed when stdout has no valid result', async () => {
     const runner = new ProcessMinionRunner(['bun', '-e', "console.log('not json')"])
     const result = await runner.run(INPUT, 5000)
-    expect(result).toEqual({ status: 'crashed', pr_url: null })
+    expect(result).toEqual({ status: 'crashed', pr_url: null, output: null })
   })
 
   it('reports crashed on empty stdout', async () => {
     const runner = new ProcessMinionRunner(['bun', '-e', 'await Bun.stdin.text()'])
     const result = await runner.run(INPUT, 5000)
-    expect(result).toEqual({ status: 'crashed', pr_url: null })
+    expect(result).toEqual({ status: 'crashed', pr_url: null, output: null })
   })
 
   it('reports timeout and kills a process that outlives its budget', async () => {
     const runner = new ProcessMinionRunner(['bun', '-e', 'await Bun.sleep(5000)'])
     const start = Date.now()
     const result = await runner.run(INPUT, 100)
-    expect(result).toEqual({ status: 'timeout', pr_url: null })
+    expect(result).toEqual({ status: 'timeout', pr_url: null, output: null })
     expect(Date.now() - start).toBeLessThan(4000)
   })
 })

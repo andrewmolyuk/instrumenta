@@ -20,6 +20,7 @@ export interface TaskRow {
   attempt_number: number
   status: TaskStatus
   pr_url: string | null
+  output: string | null
   dispatched_at: string
   finished_at: string | null
 }

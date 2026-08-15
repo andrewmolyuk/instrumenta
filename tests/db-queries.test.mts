@@ -33,6 +33,7 @@ function attempt(overrides: Partial<TaskRow> = {}): TaskRow {
     attempt_number: 1,
     status: 'success',
     pr_url: null,
+    output: null,
     dispatched_at: '2026-08-13T00:00:00Z',
     finished_at: '2026-08-13T00:05:00Z',
     ...overrides,
@@ -166,6 +167,14 @@ describe('listAttempts', () => {
 
   it('returns an empty list when there are no attempts', () => {
     expect(listAttempts(db, 10)).toEqual([])
+  })
+
+  it('round-trips a failed attempt\'s captured output, and leaves it null when absent', () => {
+    recordAttempt(db, attempt({ task_id: 't1', status: 'failed_verify', output: 'test 1 failed' }))
+    recordAttempt(db, attempt({ task_id: 't2', status: 'success', output: null }))
+    const rows = listAttempts(db, 10)
+    expect(rows.find((r) => r.task_id === 't1')?.output).toBe('test 1 failed')
+    expect(rows.find((r) => r.task_id === 't2')?.output).toBeNull()
   })
 })
 
