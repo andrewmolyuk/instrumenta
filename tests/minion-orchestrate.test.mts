@@ -18,7 +18,7 @@ function fakeDeps(overrides: Partial<MinionDeps> = {}): MinionDeps {
     cloneAndBranch: vi.fn(async () => {}),
     implementTask: vi.fn(async () => {}),
     hasVerifyScript: vi.fn(async () => true),
-    runVerify: vi.fn(async () => true),
+    runVerify: vi.fn(async () => ({ passed: true, output: '' })),
     writeNote: vi.fn(async () => {}),
     commitAndPush: vi.fn(async () => {}),
     createPullRequest: vi.fn(async () => 'https://bitbucket.org/o/r/pull-requests/1'),
@@ -39,7 +39,11 @@ describe('runMinion', () => {
     const deps = fakeDeps()
     const result = await runMinion(input(), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
 
-    expect(result).toEqual({ status: 'success', pr_url: 'https://bitbucket.org/o/r/pull-requests/1' })
+    expect(result).toEqual({
+      status: 'success',
+      pr_url: 'https://bitbucket.org/o/r/pull-requests/1',
+      output: null,
+    })
     expect(deps.commitAndPush).toHaveBeenCalledWith('/tmp/wd', 'KAZ-1', expect.stringContaining('KAZ-1'))
     expect(deps.createPullRequest).toHaveBeenCalledWith('KAZ-1', expect.objectContaining({ jira_key: 'KAZ-1' }))
   })
@@ -48,26 +52,26 @@ describe('runMinion', () => {
     const deps = fakeDeps({ hasVerifyScript: vi.fn(async () => false) })
     const result = await runMinion(input({ attempt_number: 1 }), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
 
-    expect(result).toEqual({ status: 'blocked_no_verify', pr_url: null })
+    expect(result).toEqual({ status: 'blocked_no_verify', pr_url: null, output: null })
     expect(deps.writeNote).toHaveBeenCalledWith('/tmp/wd', 'docs/todo/', 'kaz-1-blocked-no-verify.md', expect.any(String))
     expect(deps.commitAndPush).toHaveBeenCalledOnce()
     expect(deps.createPullRequest).not.toHaveBeenCalled()
   })
 
-  it('reports failed_verify and commits nothing when verify fails on a non-final attempt', async () => {
-    const deps = fakeDeps({ runVerify: vi.fn(async () => false) })
+  it('reports failed_verify with the captured output and commits nothing on a non-final attempt', async () => {
+    const deps = fakeDeps({ runVerify: vi.fn(async () => ({ passed: false, output: 'test 1 failed' })) })
     const result = await runMinion(input({ attempt_number: 1 }), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
 
-    expect(result).toEqual({ status: 'failed_verify', pr_url: null })
+    expect(result).toEqual({ status: 'failed_verify', pr_url: null, output: 'test 1 failed' })
     expect(deps.commitAndPush).not.toHaveBeenCalled()
     expect(deps.writeNote).not.toHaveBeenCalled()
   })
 
-  it('reports given_up with a note when verify fails on the final (3rd) attempt', async () => {
-    const deps = fakeDeps({ runVerify: vi.fn(async () => false) })
+  it('reports given_up with the captured output and a note when verify fails on the final (3rd) attempt', async () => {
+    const deps = fakeDeps({ runVerify: vi.fn(async () => ({ passed: false, output: 'test 1 failed' })) })
     const result = await runMinion(input({ attempt_number: 3 }), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
 
-    expect(result).toEqual({ status: 'given_up', pr_url: null })
+    expect(result).toEqual({ status: 'given_up', pr_url: null, output: 'test 1 failed' })
     expect(deps.writeNote).toHaveBeenCalledWith('/tmp/wd', 'docs/todo/', 'kaz-1-given-up.md', expect.any(String))
     expect(deps.commitAndPush).toHaveBeenCalledOnce()
     expect(deps.createPullRequest).not.toHaveBeenCalled()

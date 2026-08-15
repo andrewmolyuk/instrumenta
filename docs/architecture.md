@@ -80,8 +80,11 @@ Foreman owns two things directly:
 
 - **SQLite on a persistent Docker volume** — the only state instrumenta keeps for
   itself. Schema: `task_id (uuid, pk) | jira_key | attempt_number | status | pr_url |
-  dispatched_at | finished_at`, plus a `stopped` flag. Only Foreman reads or writes it.
-  Why this exists and what it's authoritative for (and what it isn't) is
+  output | dispatched_at | finished_at`, plus a `stopped` flag. `output` is the verify
+  gate's captured stdout+stderr on a failed run (null otherwise) — a human's only
+  in-product way to see why an attempt failed, since Minion's own container is already
+  destroyed by the time this is read. Only Foreman reads or writes it. Why this exists
+  and what it's authoritative for (and what it isn't) is
   [ADR-001](adr/001-task-state-three-sources.md).
 - **A thin API, and a minimal Web UI on top of the same API, served from the same
   container.** One page: current status, the queue as Task Provider would return it,

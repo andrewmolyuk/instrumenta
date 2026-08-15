@@ -8,10 +8,15 @@ export interface MinionInput {
   attempt_number: number
 }
 
-/** The one structured result Minion reports at exit — status + PR url, if any. */
+/**
+ * The one structured result Minion reports at exit — status + PR url, if any.
+ * `output` is the verify gate's captured stdout+stderr on a failed run (and the
+ * given_up that follows it) — null for every other status, including a passing verify.
+ */
 export interface MinionResult {
   status: TaskStatus
   pr_url: string | null
+  output: string | null
 }
 
 export interface MinionRunner {

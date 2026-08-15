@@ -40,15 +40,35 @@ describe('hasVerifyScript', () => {
 })
 
 describe('runVerify', () => {
-  it('is true when the verify script exits 0', async () => {
+  it('passes when the verify script exits 0', async () => {
     const d = tempDir()
     writeFileSync(join(d, 'package.json'), JSON.stringify({ scripts: { verify: 'exit 0' } }))
-    expect(await runVerify(d)).toBe(true)
+    expect((await runVerify(d)).passed).toBe(true)
   })
 
-  it('is false when the verify script exits non-zero', async () => {
+  it('fails when the verify script exits non-zero', async () => {
     const d = tempDir()
     writeFileSync(join(d, 'package.json'), JSON.stringify({ scripts: { verify: 'exit 1' } }))
-    expect(await runVerify(d)).toBe(false)
+    expect((await runVerify(d)).passed).toBe(false)
+  })
+
+  it('captures combined stdout and stderr in output', async () => {
+    const d = tempDir()
+    writeFileSync(
+      join(d, 'package.json'),
+      JSON.stringify({ scripts: { verify: 'echo out-line; echo err-line 1>&2; exit 1' } }),
+    )
+    const result = await runVerify(d)
+    expect(result.output).toContain('out-line')
+    expect(result.output).toContain('err-line')
+  })
+
+  it('truncates output over the cap, keeping the tail', async () => {
+    const d = tempDir()
+    writeFileSync(join(d, 'package.json'), JSON.stringify({ scripts: { verify: 'yes x | head -c 5000; exit 1' } }))
+    const result = await runVerify(d)
+    expect(result.passed).toBe(false)
+    expect(result.output.length).toBeLessThan(5000)
+    expect(result.output).toContain('truncated')
   })
 })

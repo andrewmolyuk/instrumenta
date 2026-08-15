@@ -14,6 +14,7 @@
   #budget-bar-track { background: #e0e0e0; border-radius: 4px; height: 12px; width: 300px; overflow: hidden; }
   #budget-bar-fill { background: #2f6feb; height: 100%; width: 0%; }
   #budget-bar-label { font-size: 0.85rem; margin-top: 2px; }
+  td.output pre { margin: 0; max-width: 320px; max-height: 6em; overflow: auto; white-space: pre-wrap; font-size: 0.8rem; }
 </style>
 </head>
 <body>
@@ -50,7 +51,7 @@
 
 <h2>History</h2>
 <table id="history">
-  <thead><tr><th>Jira key</th><th>Attempt</th><th>Status</th><th>PR</th><th>Dispatched</th></tr></thead>
+  <thead><tr><th>Jira key</th><th>Attempt</th><th>Status</th><th>PR</th><th>Output</th><th>Dispatched</th></tr></thead>
   <tbody></tbody>
 </table>
 
@@ -86,7 +87,21 @@
         a.textContent = 'PR'
         prTd.append(a)
       }
-      tr.append(td(row.jira_key), td(String(row.attempt_number)), td(row.status), prTd, td(row.dispatched_at))
+      const outputTd = document.createElement('td')
+      outputTd.className = 'output'
+      if (row.output) {
+        const pre = document.createElement('pre')
+        pre.textContent = row.output
+        outputTd.append(pre)
+      }
+      tr.append(
+        td(row.jira_key),
+        td(String(row.attempt_number)),
+        td(row.status),
+        prTd,
+        outputTd,
+        td(row.dispatched_at),
+      )
       tbody.append(tr)
     }
   }

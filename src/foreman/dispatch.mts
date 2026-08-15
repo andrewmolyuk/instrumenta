@@ -31,6 +31,7 @@ export async function dispatch(
     attempt_number,
     status: result.status,
     pr_url: result.pr_url,
+    output: result.output,
     dispatched_at,
     finished_at: new Date().toISOString(),
   }

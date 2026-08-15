@@ -13,6 +13,10 @@ CREATE TABLE IF NOT EXISTS tasks (
     status IN ('success', 'failed_verify', 'blocked_no_verify', 'crashed', 'timeout', 'given_up')
   ),
   pr_url TEXT,
+  -- Captured verify-gate output (stdout+stderr, tail-truncated) on failed_verify and
+  -- the given_up that follows it — null for every other status, including a passing
+  -- verify. See minion/verify-gate.mts.
+  output TEXT,
   dispatched_at TEXT NOT NULL,
   finished_at TEXT
 );

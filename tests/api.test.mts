@@ -74,6 +74,7 @@ describe('GET /api/status', () => {
       attempt_number: 1,
       status: 'success',
       pr_url: 'https://x/pr/1',
+      output: null,
       dispatched_at: '2026-08-13T00:00:00Z',
       finished_at: '2026-08-13T00:05:00Z',
     })
@@ -213,6 +214,7 @@ describe('POST /api/delete-attempts', () => {
       attempt_number: 1,
       status: 'crashed',
       pr_url: null,
+      output: null,
       dispatched_at: '2026-08-13T00:00:00Z',
       finished_at: '2026-08-13T00:01:00Z',
     })
@@ -222,6 +224,7 @@ describe('POST /api/delete-attempts', () => {
       attempt_number: 2,
       status: 'crashed',
       pr_url: null,
+      output: null,
       dispatched_at: '2026-08-13T00:02:00Z',
       finished_at: '2026-08-13T00:03:00Z',
     })

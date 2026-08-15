@@ -1,12 +1,13 @@
 import type { MinionInput, MinionResult } from '../src/minion/types.mts'
 import { MAX_ATTEMPTS } from './constants.mts'
 import { blockedNoVerifyFilename, blockedNoVerifyNote, givenUpFilename, givenUpNote } from './notes.mts'
+import type { VerifyResult } from './verify-gate.mts'
 
 export interface MinionDeps {
   cloneAndBranch(repoUrl: string, branch: string, workDir: string): Promise<void>
   implementTask(workDir: string, input: MinionInput): Promise<void>
   hasVerifyScript(workDir: string): Promise<boolean>
-  runVerify(workDir: string): Promise<boolean>
+  runVerify(workDir: string): Promise<VerifyResult>
   writeNote(workDir: string, notesPath: string, filename: string, content: string): Promise<void>
   commitAndPush(workDir: string, branch: string, message: string): Promise<void>
   createPullRequest(branch: string, input: MinionInput): Promise<string>
@@ -38,19 +39,20 @@ export async function runMinion(
   if (!(await deps.hasVerifyScript(workDir))) {
     await deps.writeNote(workDir, notesPath, blockedNoVerifyFilename(input.jira_key), blockedNoVerifyNote(input))
     await deps.commitAndPush(workDir, input.jira_key, `${input.jira_key}: no verify gate found`)
-    return { status: isFinalAttempt ? 'given_up' : 'blocked_no_verify', pr_url: null }
+    return { status: isFinalAttempt ? 'given_up' : 'blocked_no_verify', pr_url: null, output: null }
   }
 
-  if (!(await deps.runVerify(workDir))) {
+  const verify = await deps.runVerify(workDir)
+  if (!verify.passed) {
     if (!isFinalAttempt) {
-      return { status: 'failed_verify', pr_url: null }
+      return { status: 'failed_verify', pr_url: null, output: verify.output }
     }
     await deps.writeNote(workDir, notesPath, givenUpFilename(input.jira_key), givenUpNote(input))
     await deps.commitAndPush(workDir, input.jira_key, `${input.jira_key}: giving up after ${MAX_ATTEMPTS} attempts`)
-    return { status: 'given_up', pr_url: null }
+    return { status: 'given_up', pr_url: null, output: verify.output }
   }
 
   await deps.commitAndPush(workDir, input.jira_key, `${input.jira_key}: ${input.description.slice(0, 72)}`)
   const prUrl = await deps.createPullRequest(input.jira_key, input)
-  return { status: 'success', pr_url: prUrl }
+  return { status: 'success', pr_url: prUrl, output: null }
 }
