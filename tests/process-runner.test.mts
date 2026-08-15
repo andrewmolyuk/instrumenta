@@ -34,16 +34,23 @@ describe('ProcessMinionRunner', () => {
     expect(result.status).toBe('success')
   })
 
-  it('reports crashed when stdout has no valid result', async () => {
+  it('reports crashed with the raw stdout as output when it is not a valid result', async () => {
     const runner = new ProcessMinionRunner(['bun', '-e', "console.log('not json')"])
+    const result = await runner.run(INPUT, 5000)
+    expect(result).toEqual({ status: 'crashed', pr_url: null, output: 'not json' })
+  })
+
+  it('reports crashed with null output on empty stdout and stderr', async () => {
+    const runner = new ProcessMinionRunner(['bun', '-e', 'await Bun.stdin.text()'])
     const result = await runner.run(INPUT, 5000)
     expect(result).toEqual({ status: 'crashed', pr_url: null, output: null })
   })
 
-  it('reports crashed on empty stdout', async () => {
-    const runner = new ProcessMinionRunner(['bun', '-e', 'await Bun.stdin.text()'])
+  it('captures stderr (e.g. an uncaught exception) as crash output', async () => {
+    const runner = new ProcessMinionRunner(['bun', '-e', "throw new Error('boom')"])
     const result = await runner.run(INPUT, 5000)
-    expect(result).toEqual({ status: 'crashed', pr_url: null, output: null })
+    expect(result.status).toBe('crashed')
+    expect(result.output).toContain('boom')
   })
 
   it('reports timeout and kills a process that outlives its budget', async () => {
@@ -52,5 +59,20 @@ describe('ProcessMinionRunner', () => {
     const result = await runner.run(INPUT, 100)
     expect(result).toEqual({ status: 'timeout', pr_url: null, output: null })
     expect(Date.now() - start).toBeLessThan(4000)
+  })
+
+  it('captures whatever was printed before a timeout kills the process', async () => {
+    const runner = new ProcessMinionRunner([
+      'bun',
+      '-e',
+      "console.log('cloned repo'); console.error('still implementing...'); await Bun.sleep(10000)",
+    ])
+    // A longer budget than the other timeout test — this one needs the child
+    // process to actually boot and print before it's killed, which a very
+    // tight budget can miss under load (flaky, not wrong).
+    const result = await runner.run(INPUT, 500)
+    expect(result.status).toBe('timeout')
+    expect(result.output).toContain('cloned repo')
+    expect(result.output).toContain('still implementing...')
   })
 })
