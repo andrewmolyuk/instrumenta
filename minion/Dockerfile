@@ -18,4 +18,17 @@ COPY minion ./minion
 COPY src/minion/types.mts ./src/minion/types.mts
 COPY src/db/index.mts ./src/db/index.mts
 
+# Claude Code refuses --dangerously-skip-permissions as root/sudo (security
+# guardrail on its end) — found live: Minion ran as root by default, so every
+# implementTask invocation was silently refusing to start, making no changes
+# at all. A real (if throwaway, container-scoped) user works around that.
+# Also needs write access to npm's global install location: target projects'
+# own `npm install` can reach for global-ish packages (e.g. turbo) as part of
+# their own toolchain, and that path is root-owned by default (it's where
+# `npm install -g @anthropic-ai/claude-code` above just wrote, as root).
+RUN useradd --create-home --shell /bin/bash minion \
+  && chown -R minion:minion /app /usr/local/lib/node_modules /usr/local/bin
+USER minion
+ENV HOME=/home/minion
+
 ENTRYPOINT ["bun", "minion/main.mts"]
