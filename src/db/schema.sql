@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS tasks (
 -- written when a human sets a new budget, never by the loop's own decrement),
 -- kept alongside `budget` purely so the API can report "X of Y attempts
 -- used" — `budget` alone can't tell used from total once it's been
--- decremented. `start_ticket` is a jira_key queued via start[ticket],
+-- decremented. `queue_ticket` is a jira_key queued via queue[ticket],
 -- consumed (cleared) the next time Pick reads it. `current_jira_key`/
 -- `current_dispatched_at` mirror the task the loop is inside `dispatch` for
 -- right now, if any — set just before Minion runs, cleared right after, so
@@ -35,9 +35,9 @@ CREATE TABLE IF NOT EXISTS foreman_state (
   stopped INTEGER NOT NULL DEFAULT 0,
   budget INTEGER,
   budget_total INTEGER,
-  start_ticket TEXT,
+  queue_ticket TEXT,
   current_jira_key TEXT,
   current_dispatched_at TEXT
 );
 
-INSERT OR IGNORE INTO foreman_state (id, stopped, budget, start_ticket) VALUES (1, 0, NULL, NULL);
+INSERT OR IGNORE INTO foreman_state (id, stopped, budget, queue_ticket) VALUES (1, 0, NULL, NULL);

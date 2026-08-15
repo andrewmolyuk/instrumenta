@@ -33,7 +33,7 @@ describe('parseConfig', () => {
     expect(config.pollIntervalMs).toBe(60_000)
     expect(config.apiPort).toBe(3000)
     expect(config.budget).toBeUndefined()
-    expect(config.startTicket).toBeUndefined()
+    expect(config.queueTicket).toBeUndefined()
   })
 
   it('overrides defaults when set', () => {
@@ -44,14 +44,14 @@ describe('parseConfig', () => {
       FOREMAN_POLL_INTERVAL_MS: '5000',
       FOREMAN_API_PORT: '8080',
       FOREMAN_BUDGET: '3',
-      FOREMAN_START_TICKET: 'KAZ-42',
+      FOREMAN_QUEUE_TICKET: 'KAZ-42',
     })
     expect(config.dbPath).toBe('/data/foreman.db')
     expect(config.timeoutMs).toBe(120_000)
     expect(config.pollIntervalMs).toBe(5_000)
     expect(config.apiPort).toBe(8080)
     expect(config.budget).toBe(3)
-    expect(config.startTicket).toBe('KAZ-42')
+    expect(config.queueTicket).toBe('KAZ-42')
   })
 
   it.each([

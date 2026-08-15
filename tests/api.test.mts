@@ -5,13 +5,13 @@ import { openDb } from '../src/db/index.mts'
 import {
   getBudget,
   getBudgetTotal,
-  getStartTicket,
+  getQueueTicket,
   isStopped,
   recordAttempt,
   setBudget,
   setBudgetTotal,
   setCurrentTask,
-  setStartTicket,
+  setQueueTicket,
   setStopped,
 } from '../src/db/queries.mts'
 import { createApiHandler } from '../src/foreman/api.mts'
@@ -55,18 +55,18 @@ describe('GET /', () => {
     expect(body).toContain('<title>Foreman</title>')
     expect(body).toContain('/api/status')
     expect(body).toContain('/api/stop')
-    expect(body).toContain('/api/continue')
     expect(body).toContain('/api/start')
+    expect(body).toContain('/api/queue-ticket')
     expect(body).toContain('/api/budget')
     expect(body).toContain('/api/delete-attempts')
   })
 })
 
 describe('GET /api/status', () => {
-  it('reports stopped, budget, budgetTotal, startTicket, current, the live queue, and history', async () => {
+  it('reports stopped, budget, budgetTotal, queueTicket, current, the live queue, and history', async () => {
     setBudget(db, 5)
     setBudgetTotal(db, 10)
-    setStartTicket(db, 'KAZ-2')
+    setQueueTicket(db, 'KAZ-2')
     setCurrentTask(db, { jira_key: 'KAZ-1', dispatched_at: '2026-08-14T00:00:00Z' })
     recordAttempt(db, {
       task_id: 't1',
@@ -84,7 +84,7 @@ describe('GET /api/status', () => {
       stopped: boolean
       budget: number | null
       budgetTotal: number | null
-      startTicket: string | null
+      queueTicket: string | null
       current: { jira_key: string; dispatched_at: string } | null
       queue: BacklogItem[]
       history: Array<{ jira_key: string }>
@@ -92,7 +92,7 @@ describe('GET /api/status', () => {
     expect(body.stopped).toBe(false)
     expect(body.budget).toBe(5)
     expect(body.budgetTotal).toBe(10)
-    expect(body.startTicket).toBe('KAZ-2')
+    expect(body.queueTicket).toBe('KAZ-2')
     expect(body.current).toEqual({ jira_key: 'KAZ-1', dispatched_at: '2026-08-14T00:00:00Z' })
     expect(body.queue).toEqual(BACKLOG)
     expect(body.history).toHaveLength(1)
@@ -123,39 +123,39 @@ describe('POST /api/stop', () => {
   })
 })
 
-describe('POST /api/continue', () => {
+describe('POST /api/start', () => {
   it('clears stopped', async () => {
     setStopped(db, true)
-    const res = await handler(req('POST', '/api/continue'))
+    const res = await handler(req('POST', '/api/start'))
     expect(res.status).toBe(200)
     expect(isStopped(db)).toBe(false)
   })
 })
 
-describe('POST /api/start', () => {
-  it('sets start_ticket to the given jiraKey when it is in the live backlog', async () => {
-    const res = await handler(req('POST', '/api/start', { jiraKey: 'KAZ-1' }))
+describe('POST /api/queue-ticket', () => {
+  it('sets queue_ticket to the given jiraKey when it is in the live backlog', async () => {
+    const res = await handler(req('POST', '/api/queue-ticket', { jiraKey: 'KAZ-1' }))
     expect(res.status).toBe(200)
-    expect(getStartTicket(db)).toBe('KAZ-1')
+    expect(getQueueTicket(db)).toBe('KAZ-1')
   })
 
   it('rejects a missing jiraKey', async () => {
-    const res = await handler(req('POST', '/api/start', {}))
+    const res = await handler(req('POST', '/api/queue-ticket', {}))
     expect(res.status).toBe(400)
-    expect(getStartTicket(db)).toBeNull()
+    expect(getQueueTicket(db)).toBeNull()
   })
 
   it('rejects a non-string jiraKey', async () => {
-    const res = await handler(req('POST', '/api/start', { jiraKey: 42 }))
+    const res = await handler(req('POST', '/api/queue-ticket', { jiraKey: 42 }))
     expect(res.status).toBe(400)
   })
 
   it('rejects a jiraKey not in the live backlog with a visible error', async () => {
-    const res = await handler(req('POST', '/api/start', { jiraKey: 'KAZ-999' }))
+    const res = await handler(req('POST', '/api/queue-ticket', { jiraKey: 'KAZ-999' }))
     expect(res.status).toBe(404)
     const body = (await res.json()) as { error: string }
     expect(body.error).toContain('KAZ-999')
-    expect(getStartTicket(db)).toBeNull()
+    expect(getQueueTicket(db)).toBeNull()
   })
 
   it('rejects a jiraKey that has already been given up on', async () => {
@@ -165,11 +165,11 @@ describe('POST /api/start', () => {
       bitbucket: BITBUCKET,
       fetchImpl: fakeBitbucketFetch({ 'KAZ-1': 3 }),
     })
-    const res = await givenUpHandler(req('POST', '/api/start', { jiraKey: 'KAZ-1' }))
+    const res = await givenUpHandler(req('POST', '/api/queue-ticket', { jiraKey: 'KAZ-1' }))
     expect(res.status).toBe(409)
     const body = (await res.json()) as { error: string }
     expect(body.error).toContain('KAZ-1')
-    expect(getStartTicket(db)).toBeNull()
+    expect(getQueueTicket(db)).toBeNull()
   })
 })
 

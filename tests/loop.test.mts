@@ -5,10 +5,10 @@ import {
   type CurrentTask,
   getBudget,
   getCurrentTask,
-  getStartTicket,
+  getQueueTicket,
   isStopped,
   setBudget,
-  setStartTicket,
+  setQueueTicket,
   setStopped,
 } from '../src/db/queries.mts'
 import { noopStatusMirror, runLoop, type StatusMirror } from '../src/foreman/loop.mts'
@@ -325,12 +325,12 @@ describe('runLoop', () => {
     expect(getCurrentTask(db)).toBeNull()
   })
 
-  it('consumes start_ticket on the next iteration, bypassing normal ordering', async () => {
+  it('consumes queue_ticket on the next iteration, bypassing normal ordering', async () => {
     setBudget(db, 2)
-    setStartTicket(db, 'KAZ-2')
+    setQueueTicket(db, 'KAZ-2')
     const backlog: BacklogItem[] = [
       { jira_key: 'KAZ-1', summary: 'normal order first', description: '' },
-      { jira_key: 'KAZ-2', summary: 'requested via start[ticket]', description: '' },
+      { jira_key: 'KAZ-2', summary: 'requested via queue[ticket]', description: '' },
     ]
     const completed: string[] = []
     const statusMirror: StatusMirror = {
@@ -353,12 +353,12 @@ describe('runLoop', () => {
     })
 
     expect(completed).toEqual(['KAZ-2', 'KAZ-1'])
-    expect(getStartTicket(db)).toBeNull()
+    expect(getQueueTicket(db)).toBeNull()
   })
 
-  it('clears start_ticket even if the requested task turns out ineligible', async () => {
+  it('clears queue_ticket even if the requested task turns out ineligible', async () => {
     setBudget(db, 1)
-    setStartTicket(db, 'KAZ-999')
+    setQueueTicket(db, 'KAZ-999')
     const backlog: BacklogItem[] = [{ jira_key: 'KAZ-1', summary: 's', description: '' }]
 
     await runLoop({
@@ -373,7 +373,7 @@ describe('runLoop', () => {
       sleep: noSleep,
     })
 
-    expect(getStartTicket(db)).toBeNull()
+    expect(getQueueTicket(db)).toBeNull()
     expect(db.query('SELECT jira_key FROM tasks').all()).toEqual([{ jira_key: 'KAZ-1' }])
   })
 })

@@ -13,9 +13,12 @@ and dated.
 - [ADR-002](002-foreman-minion-execution-boundary.md) — Foreman and Minion are separate
   containers; Minion is ephemeral, sandboxed, and runs unattended
 - [ADR-003](003-foreman-daemon-trigger-control.md) — Foreman runs as a self-looping
-  daemon, not an externally cron-triggered job
+  daemon, not an externally cron-triggered job. Its control names "continue" and
+  "start[ticket]" are amended by ADR-005 — they're "start" and "queue[ticket]"
 - [ADR-004](004-target-repo-hosting-is-bitbucket.md) — the target repo's hosting is
   Bitbucket, not GitHub (amends ADR-001's third source)
+- [ADR-005](005-rename-continue-and-start-ticket.md) — rename "continue" to "start" and
+  "start[ticket]" to "queue[ticket]" (amends ADR-003's control names)
 
 ## Superseded
 

@@ -8,12 +8,12 @@ import {
   getBudget,
   getBudgetTotal,
   getCurrentTask,
-  getStartTicket,
+  getQueueTicket,
   isStopped,
   listAttempts,
   setBudget,
   setBudgetTotal,
-  setStartTicket,
+  setQueueTicket,
   setStopped,
 } from '../db/queries.mts'
 import type { TaskProvider } from '../task-provider/types.mts'
@@ -37,13 +37,14 @@ function json(body: unknown, status = 200): Response {
  * The thin API and minimal Web UI architecture.md describes, served from the
  * same container: `GET /` serves ui.html, a single static page (no build
  * step) that calls the JSON endpoints below — current status, the live
- * queue, an attempt history, and the four controls ADR-003 names: stop,
- * continue, start[ticket], budget — plus delete-attempts, added later to give
- * a human a way to force a given-up ticket eligible again (deleteAttempts,
- * db/queries.mts) without wiping the whole database. A plain fetch handler,
- * not bound to a port, so it's testable directly with constructed Request objects;
- * startApiServer wraps it with Bun.serve. No separate CLI artifact
- * (architecture.md) — this JSON API is the only scriptable surface, and the
+ * queue, an attempt history, and the four controls ADR-003 names — renamed by
+ * ADR-005 to match what they actually do: stop, start (was "continue"),
+ * queue[ticket] (was "start[ticket]"), budget — plus delete-attempts, added
+ * later to give a human a way to force a given-up ticket eligible again
+ * (deleteAttempts, db/queries.mts) without wiping the whole database. A plain
+ * fetch handler, not bound to a port, so it's testable directly with
+ * constructed Request objects; startApiServer wraps it with Bun.serve. No
+ * separate CLI artifact (architecture.md) — this JSON API is the only scriptable surface, and the
  * only thing the UI itself calls.
  */
 export function createApiHandler(deps: ApiDeps): (req: Request) => Promise<Response> {
@@ -73,7 +74,7 @@ export function createApiHandler(deps: ApiDeps): (req: Request) => Promise<Respo
         stopped: isStopped(deps.db),
         budget: getBudget(deps.db),
         budgetTotal: getBudgetTotal(deps.db),
-        startTicket: getStartTicket(deps.db),
+        queueTicket: getQueueTicket(deps.db),
         current: getCurrentTask(deps.db),
         queue,
         queueError,
@@ -86,12 +87,12 @@ export function createApiHandler(deps: ApiDeps): (req: Request) => Promise<Respo
       return json({ stopped: true })
     }
 
-    if (req.method === 'POST' && url.pathname === '/api/continue') {
+    if (req.method === 'POST' && url.pathname === '/api/start') {
       setStopped(deps.db, false)
       return json({ stopped: false })
     }
 
-    if (req.method === 'POST' && url.pathname === '/api/start') {
+    if (req.method === 'POST' && url.pathname === '/api/queue-ticket') {
       const body = await req.json().catch(() => null)
       const jiraKey = (body as { jiraKey?: unknown } | null)?.jiraKey
       if (typeof jiraKey !== 'string' || jiraKey.length === 0) {
@@ -100,7 +101,7 @@ export function createApiHandler(deps: ApiDeps): (req: Request) => Promise<Respo
 
       // pickSpecific (pick.mts) would silently no-op on either case below —
       // it's built for the loop, where nothing eligible just means "try again
-      // next iteration." A human clicking Start Ticket needs to know why now.
+      // next iteration." A human clicking Queue Ticket needs to know why now.
       const backlog = await deps.taskProvider.listBacklog()
       if (!backlog.some((item) => item.jira_key === jiraKey)) {
         return json({ error: `${jiraKey} is not in the live backlog (doesn't match the configured JQL)` }, 404)
@@ -109,8 +110,8 @@ export function createApiHandler(deps: ApiDeps): (req: Request) => Promise<Respo
         return json({ error: `${jiraKey} has already been given up on (3+ failed attempts or closed PRs)` }, 409)
       }
 
-      setStartTicket(deps.db, jiraKey)
-      return json({ startTicket: jiraKey })
+      setQueueTicket(deps.db, jiraKey)
+      return json({ queueTicket: jiraKey })
     }
 
     if (req.method === 'POST' && url.pathname === '/api/delete-attempts') {

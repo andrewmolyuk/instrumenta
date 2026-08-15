@@ -99,14 +99,19 @@ Sets Foreman's `stopped` flag. Prevents the *next* Pick only — does not abort 
 in flight.
 _Decided in_: [ADR-003](docs/adr/003-foreman-daemon-trigger-control.md).
 
-**Continue**:
-Clears the `stopped` flag, resuming normal looping.
-_Decided in_: [ADR-003](docs/adr/003-foreman-daemon-trigger-control.md).
+**Start**:
+Clears the `stopped` flag, resuming normal looping — Foreman always boots stopped, so this
+is what actually gets it running. Named "Continue" in ADR-003; renamed here to match what it
+does, since a fresh boot has nothing to "continue."
+_Decided in_: [ADR-003](docs/adr/003-foreman-daemon-trigger-control.md),
+[ADR-005](docs/adr/005-rename-continue-and-start-ticket.md).
 
-**Start[ticket]**:
+**Queue[ticket]**:
 Dispatch a specific `jira_key` on the next iteration, bypassing normal priority ordering, for
-that one iteration only.
-_Decided in_: [ADR-003](docs/adr/003-foreman-daemon-trigger-control.md).
+that one iteration only. Named "Start[ticket]" in ADR-003; renamed here to free up "Start"
+for the control above.
+_Decided in_: [ADR-003](docs/adr/003-foreman-daemon-trigger-control.md),
+[ADR-005](docs/adr/005-rename-continue-and-start-ticket.md).
 
 **Budget**:
 An optional max-tasks-this-run counter, decremented once per completed dispatch cycle;

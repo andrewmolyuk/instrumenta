@@ -42,10 +42,12 @@ export async function pick(
 }
 
 /**
- * ADR-003's start[ticket]: `jiraKey` on the next iteration, bypassing normal
- * priority ordering. Give-up eligibility still applies — ADR-003 only says
- * ordering is bypassed, not the give-up check, so a human forcing a task back
- * that's already hit the threshold isn't something this implements.
+ * ADR-005's queue[ticket] (amends ADR-003's start[ticket]): `jiraKey` on the
+ * next iteration, bypassing normal priority ordering. Give-up eligibility
+ * still applies — ADR-003 only says ordering is bypassed, not the give-up
+ * check, so a human forcing a task back that's already hit the threshold
+ * isn't something this implements (see deleteAttempts, db/queries.mts, for
+ * the actual way to force one eligible again).
  */
 export async function pickSpecific(
   db: Database,
