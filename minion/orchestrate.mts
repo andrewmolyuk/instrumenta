@@ -29,6 +29,12 @@ function combineOutputs(...parts: (string | null | undefined)[]): string | null 
  * "isFinalAttempt" field to MinionInput, since Foreman already enforces the
  * same threshold independently (giveUpAttemptCount) and this only needs to
  * agree with it, not be the source of truth for it.
+ *
+ * Commit messages are prefixed `fix:`/`chore:` (Conventional Commits) — found
+ * live that a target repo with a Husky commit-msg hook (commitlint) rejects
+ * anything else outright, turning what should be a clean `blocked_no_verify`
+ * or `failed_verify` report into a crash instead. `fix:` for the real
+ * implementation commit, `chore:` for the note-only commits (no code change).
  */
 export async function runMinion(
   input: MinionInput,
@@ -44,7 +50,7 @@ export async function runMinion(
 
   if (!(await deps.hasVerifyScript(workDir))) {
     await deps.writeNote(workDir, notesPath, blockedNoVerifyFilename(input.jira_key), blockedNoVerifyNote(input))
-    await deps.commitAndPush(workDir, input.jira_key, `${input.jira_key}: no verify gate found`)
+    await deps.commitAndPush(workDir, input.jira_key, `chore: ${input.jira_key}: no verify gate found`)
     return {
       status: isFinalAttempt ? 'given_up' : 'blocked_no_verify',
       pr_url: null,
@@ -59,11 +65,15 @@ export async function runMinion(
       return { status: 'failed_verify', pr_url: null, output }
     }
     await deps.writeNote(workDir, notesPath, givenUpFilename(input.jira_key), givenUpNote(input))
-    await deps.commitAndPush(workDir, input.jira_key, `${input.jira_key}: giving up after ${MAX_ATTEMPTS} attempts`)
+    await deps.commitAndPush(
+      workDir,
+      input.jira_key,
+      `chore: ${input.jira_key}: giving up after ${MAX_ATTEMPTS} attempts`,
+    )
     return { status: 'given_up', pr_url: null, output }
   }
 
-  await deps.commitAndPush(workDir, input.jira_key, `${input.jira_key}: ${input.description.slice(0, 72)}`)
+  await deps.commitAndPush(workDir, input.jira_key, `fix: ${input.jira_key}: ${input.description.slice(0, 72)}`)
   const prUrl = await deps.createPullRequest(input.jira_key, input)
   return { status: 'success', pr_url: prUrl, output: null }
 }

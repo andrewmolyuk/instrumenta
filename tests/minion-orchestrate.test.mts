@@ -44,17 +44,17 @@ describe('runMinion', () => {
       pr_url: 'https://bitbucket.org/o/r/pull-requests/1',
       output: null,
     })
-    expect(deps.commitAndPush).toHaveBeenCalledWith('/tmp/wd', 'KAZ-1', expect.stringContaining('KAZ-1'))
+    expect(deps.commitAndPush).toHaveBeenCalledWith('/tmp/wd', 'KAZ-1', expect.stringMatching(/^fix: KAZ-1:/))
     expect(deps.createPullRequest).toHaveBeenCalledWith('KAZ-1', expect.objectContaining({ jira_key: 'KAZ-1' }))
   })
 
-  it('writes a blocked_no_verify note and commits it, without a PR, when there is no verify script', async () => {
+  it('writes a blocked_no_verify note and commits it with a chore: message, without a PR, when there is no verify script', async () => {
     const deps = fakeDeps({ hasVerifyScript: vi.fn(async () => false) })
     const result = await runMinion(input({ attempt_number: 1 }), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
 
     expect(result).toEqual({ status: 'blocked_no_verify', pr_url: null, output: null })
     expect(deps.writeNote).toHaveBeenCalledWith('/tmp/wd', 'docs/todo/', 'kaz-1-blocked-no-verify.md', expect.any(String))
-    expect(deps.commitAndPush).toHaveBeenCalledOnce()
+    expect(deps.commitAndPush).toHaveBeenCalledWith('/tmp/wd', 'KAZ-1', expect.stringMatching(/^chore: KAZ-1:/))
     expect(deps.createPullRequest).not.toHaveBeenCalled()
   })
 
@@ -94,7 +94,7 @@ describe('runMinion', () => {
 
     expect(result).toEqual({ status: 'given_up', pr_url: null, output: 'test 1 failed' })
     expect(deps.writeNote).toHaveBeenCalledWith('/tmp/wd', 'docs/todo/', 'kaz-1-given-up.md', expect.any(String))
-    expect(deps.commitAndPush).toHaveBeenCalledOnce()
+    expect(deps.commitAndPush).toHaveBeenCalledWith('/tmp/wd', 'KAZ-1', expect.stringMatching(/^chore: KAZ-1:/))
     expect(deps.createPullRequest).not.toHaveBeenCalled()
   })
 
