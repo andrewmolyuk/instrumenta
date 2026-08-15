@@ -59,4 +59,11 @@ describe('commitAndPush', () => {
     const log = git(['log', 'KAZ-1', '-1', '--format=%s'], remoteDir).trim()
     expect(log).toBe('KAZ-1: add note')
   })
+
+  it('surfaces stdout in the thrown error when a git command fails without writing to stderr', async () => {
+    // `git commit` with nothing staged prints "nothing to commit..." on stdout, not
+    // stderr — a real example of the case this is guarding against, not a contrived one.
+    await cloneAndBranch(remoteDir, 'KAZ-1', workDir)
+    await expect(commitAndPush(workDir, 'KAZ-1', 'KAZ-1: no changes')).rejects.toThrow(/nothing to commit/i)
+  })
 })
