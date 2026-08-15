@@ -16,7 +16,7 @@ function input(overrides: Partial<MinionInput> = {}): MinionInput {
 function fakeDeps(overrides: Partial<MinionDeps> = {}): MinionDeps {
   return {
     cloneAndBranch: vi.fn(async () => {}),
-    implementTask: vi.fn(async () => {}),
+    implementTask: vi.fn(async () => ''),
     hasVerifyScript: vi.fn(async () => true),
     runVerify: vi.fn(async () => ({ passed: true, output: '' })),
     writeNote: vi.fn(async () => {}),
@@ -58,6 +58,16 @@ describe('runMinion', () => {
     expect(deps.createPullRequest).not.toHaveBeenCalled()
   })
 
+  it('includes implementTask output on blocked_no_verify when there was some', async () => {
+    const deps = fakeDeps({
+      hasVerifyScript: vi.fn(async () => false),
+      implementTask: vi.fn(async () => 'claude: nothing to change here'),
+    })
+    const result = await runMinion(input({ attempt_number: 1 }), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
+
+    expect(result.output).toBe('claude: nothing to change here')
+  })
+
   it('reports failed_verify with the captured output and commits nothing on a non-final attempt', async () => {
     const deps = fakeDeps({ runVerify: vi.fn(async () => ({ passed: false, output: 'test 1 failed' })) })
     const result = await runMinion(input({ attempt_number: 1 }), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
@@ -65,6 +75,17 @@ describe('runMinion', () => {
     expect(result).toEqual({ status: 'failed_verify', pr_url: null, output: 'test 1 failed' })
     expect(deps.commitAndPush).not.toHaveBeenCalled()
     expect(deps.writeNote).not.toHaveBeenCalled()
+  })
+
+  it('combines implementTask output with verify output on failed_verify when there was both', async () => {
+    const deps = fakeDeps({
+      implementTask: vi.fn(async () => 'claude did something'),
+      runVerify: vi.fn(async () => ({ passed: false, output: 'test 1 failed' })),
+    })
+    const result = await runMinion(input({ attempt_number: 1 }), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
+
+    expect(result.output).toContain('claude did something')
+    expect(result.output).toContain('test 1 failed')
   })
 
   it('reports given_up with the captured output and a note when verify fails on the final (3rd) attempt', async () => {
