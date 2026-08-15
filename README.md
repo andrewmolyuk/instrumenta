@@ -35,7 +35,7 @@ All of these are required unless marked optional — see
 | `FOREMAN_POLL_INTERVAL_MS` *(optional, default `60000`)* | Sleep between Picks when the queue is empty |
 | `FOREMAN_API_PORT` *(optional, default `3000`)* | Control API + Web UI |
 | `FOREMAN_BUDGET` *(optional)* | Max tasks this run — also settable live via the API/UI |
-| `FOREMAN_START_TICKET` *(optional)* | Seed `start[ticket]` on first boot |
+| `FOREMAN_QUEUE_TICKET` *(optional)* | Seed `queue[ticket]` on first boot |
 
 `MINION_COMMAND` is a JSON array, not a shell string, so it can carry arbitrary argv
 without shell-quoting rules — e.g.:
@@ -62,7 +62,9 @@ docker run --rm -it \
 ```
 
 The control API/UI is then at `http://localhost:3000` — status, queue, attempt
-history, and the four ADR-003 controls (stop, continue, start[ticket], budget).
+history, and the four ADR-003 controls, renamed by ADR-005 to match what they
+actually do: stop, start (was "continue"), queue[ticket] (was "start[ticket]"),
+budget. Foreman always boots stopped — hit Start (`/api/start`) to begin dispatching.
 
 ### Known gaps
 

@@ -38,11 +38,12 @@ Two separate channels, not one:
 
 - **Instrumenta's own control surface** — stop, resume, point it at a specific task
   next, or cap how much it does in one go, without redesigning anything. Concretely:
-  **stop** (don't pick anything new), **continue** (resume normal operation),
-  **start with a specific ticket** (work this one next, bypassing normal ordering),
-  and an optional **budget** (do at most N tasks, then stop on its own). See
+  **stop** (don't pick anything new), **start** (resume normal operation — it always
+  boots stopped), **queue a specific ticket** (work this one next, bypassing normal
+  ordering), and an optional **budget** (do at most N tasks, then stop on its own). See
   [ADR-003](adr/003-foreman-daemon-trigger-control.md) for how this is exposed and what
-  it does and doesn't interrupt.
+  it does and doesn't interrupt (control names updated by
+  [ADR-005](adr/005-rename-continue-and-start-ticket.md)).
 - **Everything else goes through the systems the human already uses.** Reordering or
   cancelling a task happens in Jira, the same way it always would. Adding a constraint,
   a decision record, or a new gate a task must pass happens by editing the target

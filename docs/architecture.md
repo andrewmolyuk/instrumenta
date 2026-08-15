@@ -16,7 +16,7 @@ flowchart TD
         TP["Task Provider (plugin inside Foreman — Jira adapter today)"]
         Pick["Pick / loop logic"]
         DB[("SQLite on a persistent volume task state + history")]
-        API["Thin API + minimal Web UI(status, history, stop/start/continue/budget)"]
+        API["Thin API + minimal Web UI(status, history, stop/start/queue-ticket/budget)"]
     end
 
     Minion["Minion container (ephemeral, one per task)"]
@@ -25,7 +25,7 @@ flowchart TD
     Jira -- "live query: backlog + order" --> TP
     TP --> Pick
     Pick <--> DB
-    Human -- "stop / start[ticket] / continue / budget" --> API
+    Human -- "stop / start / queue[ticket] / budget" --> API
     API --> Pick
     Pick -- "task_id, jira_key, description, attempt #, prior context" --> Minion
     Minion -- "checkout, implement, verify gate, commit, PR" --> Target
@@ -85,12 +85,15 @@ Foreman owns two things directly:
   [ADR-001](adr/001-task-state-three-sources.md).
 - **A thin API, and a minimal Web UI on top of the same API, served from the same
   container.** One page: current status, the queue as Task Provider would return it,
-  a history table from SQLite, and four controls — stop, continue, start with a
-  specific ticket, and an optional budget (do at most N tasks, then stop). No separate
-  CLI artifact: anyone who wants scriptable access hits the API directly. Why a daemon
-  instead of an externally-triggered job, and exactly what stop/continue/start/budget
-  do and don't affect, is
-  [ADR-003](adr/003-foreman-daemon-trigger-control.md).
+  a history table from SQLite, and four controls — stop, start (clear the stopped
+  flag), queue a specific ticket next, and an optional budget (do at most N tasks,
+  then stop). No separate CLI artifact: anyone who wants scriptable access hits the
+  API directly. Why a daemon instead of an externally-triggered job, and exactly
+  what stop/start/queue-ticket/budget do and don't affect, is
+  [ADR-003](adr/003-foreman-daemon-trigger-control.md) (control names updated by
+  [ADR-005](adr/005-rename-continue-and-start-ticket.md) — ADR-003's original
+  "continue"/"start[ticket]" wording is left as written, per this project's
+  append-only ADR convention).
 
 Foreman never executes target-authored or LLM-directed shell commands itself — that's
 Minion's job, deliberately kept out of Foreman's own trust boundary. See ADR-002.
@@ -150,7 +153,7 @@ would still make complete sense on its own.
 
 Two distinct relationships, not one generic "human in the loop":
 
-- **To Foreman**, through the API/UI: stop, continue, start[ticket], budget. Lifecycle
+- **To Foreman**, through the API/UI: stop, start, queue[ticket], budget. Lifecycle
   control only — nothing about task content flows through this channel.
 - **To Jira and the target project directly**: reordering/cancelling tasks, reviewing
   and merging PRs, adding knowledge or a new gate. All of this is the human doing what

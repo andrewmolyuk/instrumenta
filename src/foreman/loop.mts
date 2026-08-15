@@ -2,12 +2,12 @@ import type { Database } from 'bun:sqlite'
 import type { TaskRow } from '../db/index.mts'
 import {
   getBudget,
-  getStartTicket,
+  getQueueTicket,
   isStopped,
   recordAttempt,
   setBudget,
   setCurrentTask,
-  setStartTicket,
+  setQueueTicket,
   setStopped,
 } from '../db/queries.mts'
 import type { BitbucketConfig } from '../bitbucket/closed-prs.mts'
@@ -48,16 +48,17 @@ export interface LoopDeps {
 /**
  * Foreman's loop (architecture.md, ADR-003): pick -> (sleep if empty) ->
  * dispatch -> record -> mirror, until the `stopped` flag in `foreman_state` is
- * set. `budget` and `start_ticket` live in the same table (ADR-003's control
+ * set. `budget` and `queue_ticket` live in the same table (ADR-003's control
  * surface, exposed over the API — see api.mts) rather than being fixed
  * arguments here, since a human can change either while this is already
  * running. `budget` is read once per call (a "max-tasks-*this run*" counter,
  * per ADR-003's own wording) and persisted back on each decrement so the API
  * can show live remaining budget; hitting zero sets `stopped` — "the same way
  * the stopped flag does" (ADR-003) — rather than exiting the process, since
- * Foreman's API/UI needs to keep running regardless. `start_ticket` is
- * re-read and consumed every iteration, not just the first, so a human can
- * queue one at any point during a long-running loop.
+ * Foreman's API/UI needs to keep running regardless. `queue_ticket` (ADR-005,
+ * amending ADR-003's start[ticket]) is re-read and consumed every iteration,
+ * not just the first, so a human can queue one at any point during a
+ * long-running loop.
  *
  * Every iteration is wrapped in try/catch: a transient failure anywhere in
  * pick/dispatch (Jira, Bitbucket, or Minion itself being unreachable) backs off
@@ -75,10 +76,10 @@ export async function runLoop(deps: LoopDeps): Promise<void> {
   while (!isStopped(deps.db)) {
     try {
       let task = null
-      const startTicket = getStartTicket(deps.db)
-      if (startTicket) {
-        setStartTicket(deps.db, null)
-        task = await pickSpecific(deps.db, deps.taskProvider, deps.bitbucket, startTicket, deps.fetchImpl)
+      const queueTicket = getQueueTicket(deps.db)
+      if (queueTicket) {
+        setQueueTicket(deps.db, null)
+        task = await pickSpecific(deps.db, deps.taskProvider, deps.bitbucket, queueTicket, deps.fetchImpl)
       }
       if (!task) {
         task = await pick(deps.db, deps.taskProvider, deps.bitbucket, deps.fetchImpl)

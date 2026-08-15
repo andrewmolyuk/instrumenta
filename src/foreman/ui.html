@@ -9,7 +9,7 @@
   th, td { border: 1px solid #ccc; padding: 4px 8px; text-align: left; font-size: 0.9rem; }
   form { display: inline-block; margin-right: 1rem; }
   #status { margin-bottom: 1rem; font-weight: 600; }
-  #start-error { color: #b00020; margin-bottom: 1rem; }
+  #queue-ticket-error { color: #b00020; margin-bottom: 1rem; }
   #budget-bar-wrap { margin-bottom: 1rem; display: none; }
   #budget-bar-track { background: #e0e0e0; border-radius: 4px; height: 12px; width: 300px; overflow: hidden; }
   #budget-bar-fill { background: #2f6feb; height: 100%; width: 0%; }
@@ -28,12 +28,12 @@
 
 <div>
   <button id="stop">Stop</button>
-  <button id="continue">Continue</button>
-  <form id="start-form">
-    <input id="start-ticket" placeholder="JIRA-123" required />
-    <button type="submit">Start ticket</button>
+  <button id="start">Start</button>
+  <form id="queue-ticket-form">
+    <input id="queue-ticket-input" placeholder="JIRA-123" required />
+    <button type="submit">Queue ticket</button>
   </form>
-  <div id="start-error"></div>
+  <div id="queue-ticket-error"></div>
   <form id="budget-form">
     <input id="budget-value" type="number" placeholder="budget (blank = unlimited)" />
     <button type="submit">Set budget</button>
@@ -109,7 +109,7 @@
     const s = await res.json()
     renderBudgetBar(s.budget, s.budgetTotal)
     document.getElementById('status').textContent =
-      `Stopped: ${s.stopped} | Budget: ${s.budget ?? 'unlimited'} | Start ticket queued: ${s.startTicket ?? 'none'}` +
+      `Stopped: ${s.stopped} | Budget: ${s.budget ?? 'unlimited'} | Ticket queued: ${s.queueTicket ?? 'none'}` +
       ` | Minion working on: ${s.current ? `${s.current.jira_key} (since ${s.current.dispatched_at})` : 'nothing right now'}` +
       (s.queueError ? ` | Queue read failed: ${s.queueError}` : '')
     renderQueue(s.queue)
@@ -121,16 +121,16 @@
     refresh()
   })
 
-  document.getElementById('continue').addEventListener('click', async () => {
-    await fetch('/api/continue', { method: 'POST' })
+  document.getElementById('start').addEventListener('click', async () => {
+    await fetch('/api/start', { method: 'POST' })
     refresh()
   })
 
-  document.getElementById('start-form').addEventListener('submit', async (e) => {
+  document.getElementById('queue-ticket-form').addEventListener('submit', async (e) => {
     e.preventDefault()
-    const input = document.getElementById('start-ticket')
-    const errorEl = document.getElementById('start-error')
-    const res = await fetch('/api/start', {
+    const input = document.getElementById('queue-ticket-input')
+    const errorEl = document.getElementById('queue-ticket-error')
+    const res = await fetch('/api/queue-ticket', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ jiraKey: input.value }),
@@ -140,7 +140,7 @@
       input.value = ''
     } else {
       const body = await res.json().catch(() => null)
-      errorEl.textContent = body?.error ?? `Start failed (${res.status})`
+      errorEl.textContent = body?.error ?? `Queue failed (${res.status})`
     }
     refresh()
   })

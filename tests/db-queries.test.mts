@@ -6,7 +6,7 @@ import {
   getBudget,
   getBudgetTotal,
   getCurrentTask,
-  getStartTicket,
+  getQueueTicket,
   giveUpAttemptCount,
   isStopped,
   listAttempts,
@@ -16,7 +16,7 @@ import {
   setBudget,
   setBudgetTotal,
   setCurrentTask,
-  setStartTicket,
+  setQueueTicket,
   setStopped,
 } from '../src/db/queries.mts'
 
@@ -129,16 +129,16 @@ describe('budget_total', () => {
   })
 })
 
-describe('start_ticket', () => {
+describe('queue_ticket', () => {
   it('starts unset (null)', () => {
-    expect(getStartTicket(db)).toBeNull()
+    expect(getQueueTicket(db)).toBeNull()
   })
 
   it('round-trips a jira_key, including back to null', () => {
-    setStartTicket(db, 'KAZ-42')
-    expect(getStartTicket(db)).toBe('KAZ-42')
-    setStartTicket(db, null)
-    expect(getStartTicket(db)).toBeNull()
+    setQueueTicket(db, 'KAZ-42')
+    expect(getQueueTicket(db)).toBe('KAZ-42')
+    setQueueTicket(db, null)
+    expect(getQueueTicket(db)).toBeNull()
   })
 })
 

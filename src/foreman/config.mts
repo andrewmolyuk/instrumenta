@@ -12,7 +12,7 @@ export interface ForemanConfig {
   pollIntervalMs: number
   apiPort: number
   budget?: number
-  startTicket?: string
+  queueTicket?: string
 }
 
 function required(env: NodeJS.ProcessEnv, key: string): string {
@@ -54,6 +54,6 @@ export function parseConfig(env: NodeJS.ProcessEnv): ForemanConfig {
     pollIntervalMs: optionalInt(env, 'FOREMAN_POLL_INTERVAL_MS') ?? 60_000,
     apiPort: optionalInt(env, 'FOREMAN_API_PORT') ?? 3000,
     budget: optionalInt(env, 'FOREMAN_BUDGET'),
-    startTicket: env.FOREMAN_START_TICKET,
+    queueTicket: env.FOREMAN_QUEUE_TICKET,
   }
 }

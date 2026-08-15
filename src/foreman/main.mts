@@ -1,5 +1,5 @@
 import { openDb } from '../db/index.mts'
-import { isStopped, setBudget, setBudgetTotal, setStartTicket, setStopped } from '../db/queries.mts'
+import { isStopped, setBudget, setBudgetTotal, setQueueTicket, setStopped } from '../db/queries.mts'
 import { ProcessMinionRunner } from '../minion/process-runner.mts'
 import { JiraTaskProvider } from '../task-provider/jira.mts'
 import { startApiServer } from './api.mts'
@@ -9,7 +9,7 @@ import { type LoopDeps, runLoop } from './loop.mts'
 
 /**
  * Foreman's composition root — wires the pieces built so far into a
- * long-running process. `budget`/`startTicket` from the environment only
+ * long-running process. `budget`/`queueTicket` from the environment only
  * seed the DB-backed control state on first boot; once running, the API
  * (started alongside the loop, below) is what changes them.
  *
@@ -18,14 +18,14 @@ import { type LoopDeps, runLoop } from './loop.mts'
  * continuously," and its API has to stay reachable through a stop, not just
  * up to it. So main() supervises: run the loop while not stopped, idle and
  * recheck while stopped, forever. A human clearing `stopped` via the API
- * (`/api/continue`) is what makes this loop call runLoop() again.
+ * (`/api/start`) is what makes this loop call runLoop() again.
  *
  * Every boot forces `stopped = true` before anything else runs, regardless
  * of whatever the (currently ephemeral, per-container) DB already had —
  * dispatching against the real Jira/Bitbucket backlog the moment the
  * container comes up, with no chance to look at the queue first, is exactly
- * the failure mode hit testing this locally. A human has to hit
- * `/api/continue` (or the UI's Continue button) to actually start it.
+ * the failure mode hit testing this locally. A human has to hit `/api/start`
+ * (or the UI's Start button) to actually start it.
  */
 export async function main(env: NodeJS.ProcessEnv = process.env): Promise<void> {
   const config = parseConfig(env)
@@ -35,7 +35,7 @@ export async function main(env: NodeJS.ProcessEnv = process.env): Promise<void> 
     setBudget(db, config.budget)
     setBudgetTotal(db, config.budget)
   }
-  if (config.startTicket !== undefined) setStartTicket(db, config.startTicket)
+  if (config.queueTicket !== undefined) setQueueTicket(db, config.queueTicket)
 
   const taskProvider = new JiraTaskProvider(config.jira)
   const deps: LoopDeps = {

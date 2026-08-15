@@ -69,14 +69,14 @@ export function setBudgetTotal(db: Database, budgetTotal: number | null): void {
   db.run('UPDATE foreman_state SET budget_total = ? WHERE id = 1', [budgetTotal])
 }
 
-/** ADR-003's start[ticket]: the jira_key queued for the next Pick, if any. */
-export function getStartTicket(db: Database): string | null {
-  const row = db.query<{ start_ticket: string | null }, []>('SELECT start_ticket FROM foreman_state WHERE id = 1').get()
-  return row?.start_ticket ?? null
+/** ADR-005's queue[ticket] (amends ADR-003's start[ticket]): the jira_key queued for the next Pick, if any. */
+export function getQueueTicket(db: Database): string | null {
+  const row = db.query<{ queue_ticket: string | null }, []>('SELECT queue_ticket FROM foreman_state WHERE id = 1').get()
+  return row?.queue_ticket ?? null
 }
 
-export function setStartTicket(db: Database, jiraKey: string | null): void {
-  db.run('UPDATE foreman_state SET start_ticket = ? WHERE id = 1', [jiraKey])
+export function setQueueTicket(db: Database, jiraKey: string | null): void {
+  db.run('UPDATE foreman_state SET queue_ticket = ? WHERE id = 1', [jiraKey])
 }
 
 export interface CurrentTask {
