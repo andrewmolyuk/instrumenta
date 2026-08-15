@@ -13,7 +13,8 @@ CREATE TABLE IF NOT EXISTS tasks (
     status IN ('success', 'failed_verify', 'blocked_no_verify', 'crashed', 'timeout', 'given_up')
   ),
   pr_url TEXT,
-  -- Captured diagnostic text, tail-truncated: the verify gate's stdout+stderr on
+  -- Captured diagnostic text, tail-truncated: Claude Code's own stdout+stderr
+  -- (minion/implement-task.mts) combined with the verify gate's stdout+stderr on
   -- failed_verify and the given_up that follows it (minion/verify-gate.mts), or
   -- Minion's own process stdout+stderr on crashed or timeout
   -- (src/minion/process-runner.mts) — null for every other status, including a
