@@ -1,3 +1,4 @@
+import { hasOpenPrForBranch } from '../src/bitbucket/closed-prs.mts'
 import type { MinionInput } from '../src/minion/types.mts'
 import { buildCloneUrl, createPullRequest, type BitbucketPrConfig } from './bitbucket-pr.mts'
 import { cloneAndBranch, commitAndPush, writeNote } from './git.mts'
@@ -37,6 +38,7 @@ async function main(): Promise<void> {
 
   const deps: MinionDeps = {
     cloneAndBranch,
+    hasOpenPrForBranch: (branch) => hasOpenPrForBranch(bitbucket, branch),
     implementTask,
     hasVerifyScript,
     runVerify,

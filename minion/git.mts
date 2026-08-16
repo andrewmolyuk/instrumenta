@@ -14,14 +14,44 @@ async function run(cmd: string[], cwd?: string): Promise<void> {
   }
 }
 
+/** True if `origin/<branch>` exists in a repo already cloned into `workDir`. */
+async function remoteBranchExists(workDir: string, branch: string): Promise<boolean> {
+  const proc = Bun.spawn(['git', 'rev-parse', '--verify', '--quiet', `origin/${branch}`], {
+    cwd: workDir,
+    stdout: 'ignore',
+    stderr: 'ignore',
+  })
+  return (await proc.exited) === 0
+}
+
 /**
  * Checkout the target project on a branch named after jira_key (architecture.md).
  * Sets a local (repo-scoped, not global) commit identity — a fresh container has
  * none configured, and `git commit` refuses to run without one.
+ *
+ * `reuseExisting` (true unless the caller already knows this branch has an open
+ * PR — see orchestrate.mts): when a remote branch of this name already exists,
+ * checks it out instead of branching fresh from the base tip. Without this, a
+ * retry after a crash that happened *after* a successful push (e.g. PR creation
+ * failing on a bad base-branch config) always re-branches from the base and
+ * collides on push — `git push` rejects it as non-fast-forward against the
+ * branch the earlier attempt already pushed, every time, until the ticket gives
+ * up — even though real, possibly-correct work is sitting on that branch. `git
+ * checkout <branch>` DWIMs into tracking `origin/<branch>` here since the clone
+ * just above fetched it but never checked it out locally.
  */
-export async function cloneAndBranch(repoUrl: string, branch: string, workDir: string): Promise<void> {
+export async function cloneAndBranch(
+  repoUrl: string,
+  branch: string,
+  workDir: string,
+  reuseExisting: boolean,
+): Promise<void> {
   await run(['git', 'clone', repoUrl, workDir])
-  await run(['git', 'checkout', '-b', branch], workDir)
+  if (reuseExisting && (await remoteBranchExists(workDir, branch))) {
+    await run(['git', 'checkout', branch], workDir)
+  } else {
+    await run(['git', 'checkout', '-b', branch], workDir)
+  }
   await run(['git', 'config', 'user.name', process.env.MINION_GIT_AUTHOR_NAME ?? 'instrumenta-minion'], workDir)
   await run(
     ['git', 'config', 'user.email', process.env.MINION_GIT_AUTHOR_EMAIL ?? 'minion@instrumenta.invalid'],
