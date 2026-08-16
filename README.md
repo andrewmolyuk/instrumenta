@@ -30,6 +30,7 @@ All of these are required unless marked optional — see
 | `JIRA_JQL` | The live backlog query — ordering and "open" are this query's job, not Foreman's (architecture.md) |
 | `BITBUCKET_WORKSPACE`, `BITBUCKET_REPO_SLUG`, `BITBUCKET_TOKEN` | Target repo, for the give-up check's declined-PR count and for Minion (inherited — see below). Minion derives its git clone URL from these three (`buildCloneUrl`) rather than taking one of its own — one source of truth for which repo this is |
 | `BITBUCKET_BASE_BRANCH` *(optional, default `main`)* | The branch Minion opens PRs against — read directly by Minion (`minion/main.mts`), not via `src/foreman/config.mts`. Must match the target repo's actual default branch (e.g. `master`), or every PR creation fails outright |
+| `BITBUCKET_PR_REVIEWERS` *(optional)* | Comma-separated Bitbucket account UUIDs (not display names or usernames — Bitbucket's PR API only accepts UUIDs) added as reviewers on every PR Minion opens — read directly by Minion (`minion/main.mts`). No reviewers are added if unset |
 | `MINION_GIT_AUTHOR_NAME`, `MINION_GIT_AUTHOR_EMAIL` *(optional, default `instrumenta-minion` / `minion@instrumenta.invalid`)* | Git identity Minion commits as in the target repo — read directly by Minion (`minion/git.mts`), not via `src/foreman/config.mts` |
 | `CLAUDE_CODE_OAUTH_TOKEN` | Claude Code auth inside Minion's sandbox (inherited — see below) — this is what actually implements each task. Generate with `claude setup-token` (Pro/Max/Team/Enterprise subscription, flat-rate billing rather than metered API usage); the token is valid for one year with no rotation mechanism |
 | `MINION_COMMAND` | JSON argv array Foreman runs per task — see below |
@@ -44,7 +45,7 @@ All of these are required unless marked optional — see
 without shell-quoting rules — e.g.:
 
 ```json
-["docker","run","--rm","-i","-e","BITBUCKET_WORKSPACE","-e","BITBUCKET_REPO_SLUG","-e","BITBUCKET_TOKEN","-e","BITBUCKET_BASE_BRANCH","-e","MINION_GIT_AUTHOR_NAME","-e","MINION_GIT_AUTHOR_EMAIL","-e","CLAUDE_CODE_OAUTH_TOKEN","minion:latest"]
+["docker","run","--rm","-i","-e","BITBUCKET_WORKSPACE","-e","BITBUCKET_REPO_SLUG","-e","BITBUCKET_TOKEN","-e","BITBUCKET_BASE_BRANCH","-e","BITBUCKET_PR_REVIEWERS","-e","MINION_GIT_AUTHOR_NAME","-e","MINION_GIT_AUTHOR_EMAIL","-e","CLAUDE_CODE_OAUTH_TOKEN","minion:latest"]
 ```
 
 `-e VAR` with no `=value` forwards that variable from whatever environment the
@@ -63,7 +64,7 @@ docker run --rm -it \
   -v instrumenta-foreman-db:/data \
   -e JIRA_BASE_URL -e JIRA_EMAIL -e JIRA_API_TOKEN -e JIRA_JQL \
   -e BITBUCKET_WORKSPACE -e BITBUCKET_REPO_SLUG -e BITBUCKET_TOKEN -e BITBUCKET_BASE_BRANCH \
-  -e MINION_GIT_AUTHOR_NAME -e MINION_GIT_AUTHOR_EMAIL -e MINION_COMMAND \
+  -e BITBUCKET_PR_REVIEWERS -e MINION_GIT_AUTHOR_NAME -e MINION_GIT_AUTHOR_EMAIL -e MINION_COMMAND \
   -e FOREMAN_DB_PATH=/data/foreman.db \
   foreman:latest
 ```

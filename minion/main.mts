@@ -33,6 +33,9 @@ async function main(): Promise<void> {
     repoSlug: requiredEnv('BITBUCKET_REPO_SLUG'),
     token: requiredEnv('BITBUCKET_TOKEN'),
     base: process.env.BITBUCKET_BASE_BRANCH,
+    reviewers: process.env.BITBUCKET_PR_REVIEWERS?.split(',')
+      .map((uuid) => uuid.trim())
+      .filter(Boolean),
   }
   const repoUrl = buildCloneUrl(bitbucket)
 

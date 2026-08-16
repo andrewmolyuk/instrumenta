@@ -5,6 +5,8 @@ export interface BitbucketPrConfig {
   repoSlug: string
   token: string
   base?: string
+  /** Bitbucket account UUIDs (not display names — Bitbucket's PR API only accepts these). */
+  reviewers?: string[]
 }
 
 interface CreatePrResponse {
@@ -43,6 +45,7 @@ export async function createPullRequest(
         source: { branch: { name: branch } },
         destination: { branch: { name: config.base ?? 'main' } },
         description: input.description,
+        ...(config.reviewers?.length ? { reviewers: config.reviewers.map((uuid) => ({ uuid })) } : {}),
       }),
     },
   )
