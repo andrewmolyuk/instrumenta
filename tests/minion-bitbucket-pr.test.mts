@@ -11,6 +11,7 @@ function fakeFetch(body: unknown, ok = true, status = 201) {
     status,
     statusText: ok ? 'Created' : 'Error',
     json: async () => body,
+    text: async () => JSON.stringify(body),
   }))
 }
 
@@ -49,10 +50,10 @@ describe('createPullRequest', () => {
     expect(JSON.parse(call[1].body as string).destination.branch.name).toBe('develop')
   })
 
-  it('throws on a non-ok response', async () => {
-    const fetchImpl = fakeFetch({}, false, 422)
+  it('throws on a non-ok response, including the response body so the real reason is visible', async () => {
+    const fetchImpl = fakeFetch({ error: { message: 'destination: branch not found: main' } }, false, 400)
     await expect(
       createPullRequest(CONFIG, 'KAZ-1', INPUT, fetchImpl as unknown as typeof fetch),
-    ).rejects.toThrow('Bitbucket PR creation failed: 422')
+    ).rejects.toThrow(/Bitbucket PR creation failed: 400.*destination: branch not found: main/s)
   })
 })

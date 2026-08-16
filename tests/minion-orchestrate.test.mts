@@ -48,6 +48,23 @@ describe('runMinion', () => {
     expect(deps.createPullRequest).toHaveBeenCalledWith('KAZ-1', expect.objectContaining({ jira_key: 'KAZ-1' }))
   })
 
+  it('lowercases the first letter of the description in the commit subject, to satisfy commitlint subject-case', async () => {
+    const deps = fakeDeps()
+    await runMinion(
+      input({ description: 'In previous versions checking the terms and conditions once was enough' }),
+      'https://x/repo.git',
+      '/tmp/wd',
+      'docs/todo/',
+      deps,
+    )
+
+    expect(deps.commitAndPush).toHaveBeenCalledWith(
+      '/tmp/wd',
+      'KAZ-1',
+      'fix: KAZ-1: in previous versions checking the terms and conditions once was enough',
+    )
+  })
+
   it('writes a blocked_no_verify note and commits it with a chore: message, without a PR, when there is no verify script', async () => {
     const deps = fakeDeps({ hasVerifyScript: vi.fn(async () => false) })
     const result = await runMinion(input({ attempt_number: 1 }), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
@@ -103,5 +120,50 @@ describe('runMinion', () => {
     const result = await runMinion(input({ attempt_number: 3 }), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
 
     expect(result.status).toBe('given_up')
+  })
+
+  it('reports crashed with the error, instead of throwing, when the success-path commit fails', async () => {
+    const deps = fakeDeps({ commitAndPush: vi.fn(async () => { throw new Error('commit-msg hook rejected') }) })
+    const result = await runMinion(input(), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
+
+    expect(result.status).toBe('crashed')
+    expect(result.pr_url).toBeNull()
+    expect(result.output).toContain('commit-msg hook rejected')
+    expect(deps.createPullRequest).not.toHaveBeenCalled()
+  })
+
+  it('reports crashed with the error when the blocked_no_verify commit fails', async () => {
+    const deps = fakeDeps({
+      hasVerifyScript: vi.fn(async () => false),
+      commitAndPush: vi.fn(async () => { throw new Error('commit-msg hook rejected') }),
+    })
+    const result = await runMinion(input({ attempt_number: 1 }), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
+
+    expect(result.status).toBe('crashed')
+    expect(result.output).toContain('commit-msg hook rejected')
+  })
+
+  it('reports crashed with the error, instead of throwing, when PR creation fails after a successful commit', async () => {
+    const deps = fakeDeps({
+      createPullRequest: vi.fn(async () => { throw new Error('Bitbucket PR creation failed: 400 Bad Request\ndestination: branch not found: main') }),
+    })
+    const result = await runMinion(input(), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
+
+    expect(result.status).toBe('crashed')
+    expect(result.pr_url).toBeNull()
+    expect(result.output).toContain('branch not found: main')
+    expect(deps.commitAndPush).toHaveBeenCalled()
+  })
+
+  it('reports crashed with the error when the given_up commit fails on the final attempt', async () => {
+    const deps = fakeDeps({
+      runVerify: vi.fn(async () => ({ passed: false, output: 'test 1 failed' })),
+      commitAndPush: vi.fn(async () => { throw new Error('commit-msg hook rejected') }),
+    })
+    const result = await runMinion(input({ attempt_number: 3 }), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
+
+    expect(result.status).toBe('crashed')
+    expect(result.output).toContain('test 1 failed')
+    expect(result.output).toContain('commit-msg hook rejected')
   })
 })
