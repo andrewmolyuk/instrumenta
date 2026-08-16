@@ -35,7 +35,46 @@ function combineOutputs(...parts: (string | null | undefined)[]): string | null 
  * anything else outright, turning what should be a clean `blocked_no_verify`
  * or `failed_verify` report into a crash instead. `fix:` for the real
  * implementation commit, `chore:` for the note-only commits (no code change).
+ * The subject text itself also has to avoid sentence-case (commitlint's
+ * `subject-case` rule, part of the conventional-commit preset most target
+ * repos use) — Jira descriptions are free text and often start capitalized,
+ * so the first character is lowercased before it goes into the subject.
+ *
+ * Even with that, a target repo's commit-msg hook can still reject a commit
+ * for reasons this file can't predict (a different lint rule, max length,
+ * scope format, ...), and `createPullRequest` can fail for reasons entirely
+ * outside the commit itself (e.g. a misconfigured base branch — Bitbucket
+ * rejects a PR whose destination branch doesn't exist). Both are caught here
+ * rather than left to crash the process uncaught, so either case still ends
+ * in the one structured MinionResult this contract promises instead of an
+ * uncaught exception ProcessMinionRunner has to guess at from raw
+ * stdout/stderr. `status: 'crashed'` still fits ADR-001's definition ("Minion
+ * exited without reporting a structured result at all") in spirit — this is
+ * that same fatal, unplanned outcome, just reported directly instead of
+ * inferred. Note that by the time createPullRequest can fail, commitAndPush
+ * has already succeeded — the branch is pushed even though this attempt
+ * reports `crashed`; a human fixing the underlying cause can open the PR
+ * from that branch by hand rather than needing a full re-run.
  */
+function lowercaseFirst(text: string): string {
+  return text.charAt(0).toLowerCase() + text.slice(1)
+}
+
+/** Runs commitAndPush; returns the error message instead of throwing on failure. */
+async function tryCommitAndPush(
+  deps: MinionDeps,
+  workDir: string,
+  branch: string,
+  message: string,
+): Promise<string | null> {
+  try {
+    await deps.commitAndPush(workDir, branch, message)
+    return null
+  } catch (err) {
+    return err instanceof Error ? err.message : String(err)
+  }
+}
+
 export async function runMinion(
   input: MinionInput,
   repoUrl: string,
@@ -50,7 +89,15 @@ export async function runMinion(
 
   if (!(await deps.hasVerifyScript(workDir))) {
     await deps.writeNote(workDir, notesPath, blockedNoVerifyFilename(input.jira_key), blockedNoVerifyNote(input))
-    await deps.commitAndPush(workDir, input.jira_key, `chore: ${input.jira_key}: no verify gate found`)
+    const commitError = await tryCommitAndPush(
+      deps,
+      workDir,
+      input.jira_key,
+      `chore: ${input.jira_key}: no verify gate found`,
+    )
+    if (commitError) {
+      return { status: 'crashed', pr_url: null, output: combineOutputs(implementOutput, commitError) }
+    }
     return {
       status: isFinalAttempt ? 'given_up' : 'blocked_no_verify',
       pr_url: null,
@@ -65,15 +112,32 @@ export async function runMinion(
       return { status: 'failed_verify', pr_url: null, output }
     }
     await deps.writeNote(workDir, notesPath, givenUpFilename(input.jira_key), givenUpNote(input))
-    await deps.commitAndPush(
+    const commitError = await tryCommitAndPush(
+      deps,
       workDir,
       input.jira_key,
       `chore: ${input.jira_key}: giving up after ${MAX_ATTEMPTS} attempts`,
     )
+    if (commitError) {
+      return { status: 'crashed', pr_url: null, output: combineOutputs(output, commitError) }
+    }
     return { status: 'given_up', pr_url: null, output }
   }
 
-  await deps.commitAndPush(workDir, input.jira_key, `fix: ${input.jira_key}: ${input.description.slice(0, 72)}`)
-  const prUrl = await deps.createPullRequest(input.jira_key, input)
-  return { status: 'success', pr_url: prUrl, output: null }
+  const commitError = await tryCommitAndPush(
+    deps,
+    workDir,
+    input.jira_key,
+    `fix: ${input.jira_key}: ${lowercaseFirst(input.description.slice(0, 72))}`,
+  )
+  if (commitError) {
+    return { status: 'crashed', pr_url: null, output: combineOutputs(implementOutput, commitError) }
+  }
+  try {
+    const prUrl = await deps.createPullRequest(input.jira_key, input)
+    return { status: 'success', pr_url: prUrl, output: null }
+  } catch (err) {
+    const prError = err instanceof Error ? err.message : String(err)
+    return { status: 'crashed', pr_url: null, output: combineOutputs(implementOutput, prError) }
+  }
 }

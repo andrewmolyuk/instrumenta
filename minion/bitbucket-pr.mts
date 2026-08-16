@@ -48,7 +48,8 @@ export async function createPullRequest(
   )
 
   if (!res.ok) {
-    throw new Error(`Bitbucket PR creation failed: ${res.status} ${res.statusText}`)
+    const body = await res.text()
+    throw new Error(`Bitbucket PR creation failed: ${res.status} ${res.statusText}\n${body}`)
   }
 
   const data = (await res.json()) as CreatePrResponse
