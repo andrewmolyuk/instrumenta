@@ -8,6 +8,14 @@ import { MAX_IMPLEMENT_OUTPUT_CHARS } from './constants.mts'
  * root-cause analysis and a proposed fix, then ended the run asking a human to
  * confirm before proceeding — which nobody was there to answer (this is `-p`,
  * one-shot, unattended), so it made zero file changes despite doing real work.
+ *
+ * The explicit "leave the commit to Minion" instruction exists because, also found
+ * live: with full tool access, Claude Code sometimes committed its own changes
+ * before returning. `orchestrate.mts` always runs its own `commitAndPush` afterward
+ * (needed for the no-op case — see implementTask's comment below); running on an
+ * already-clean tree, that second commit fails with "nothing to commit," which
+ * orchestrate.mts reports as `crashed` even though the real work had already
+ * landed in a commit — a false crash on a fully successful attempt.
  */
 export function defaultImplementCommand(input: MinionInput): string[] {
   const prompt = `${input.jira_key}: ${input.description}
@@ -15,7 +23,9 @@ export function defaultImplementCommand(input: MinionInput): string[] {
 This is an unattended, one-shot run — there is no human available to answer
 questions or approve a plan. Investigate the issue and implement the fix
 directly in the codebase yourself. Do not stop to describe or propose a fix
-and ask for confirmation; make the actual code changes.`
+and ask for confirmation; make the actual code changes. Leave the changes
+uncommitted — do not run \`git commit\` yourself; committing is handled
+separately after you finish.`
   return ['claude', '--dangerously-skip-permissions', '-p', prompt]
 }
 
