@@ -28,12 +28,18 @@ function attempt(overrides: Partial<TaskRow> = {}): TaskRow {
   }
 }
 
-/** Reads `source.branch.name="<key>"` out of the search query and returns that key's configured count. */
-function fakeBitbucketFetch(counts: Record<string, number>) {
+/**
+ * Reads `source.branch.name="<key>"` and `state="<STATE>"` out of the search
+ * query and returns that key+state's configured count — declined and open
+ * are separate queries (closedPrCountForBranch vs. hasOpenPrForBranch), so
+ * this has to distinguish them rather than keying on branch alone.
+ */
+function fakeBitbucketFetch(declinedCounts: Record<string, number>, openCounts: Record<string, number> = {}) {
   return vi.fn(async (url: string) => {
     const q = new URL(url).searchParams.get('q') ?? ''
-    const match = q.match(/source\.branch\.name="([^"]+)"/)
-    const key = match?.[1] ?? ''
+    const key = q.match(/source\.branch\.name="([^"]+)"/)?.[1] ?? ''
+    const state = q.match(/state="([^"]+)"/)?.[1] ?? ''
+    const counts = state === 'OPEN' ? openCounts : declinedCounts
     return {
       ok: true,
       status: 200,
@@ -96,5 +102,14 @@ describe('pick', () => {
   it('returns null for an empty backlog', async () => {
     const result = await pick(db, fakeTaskProvider([]), BITBUCKET, fakeBitbucketFetch({}))
     expect(result).toBeNull()
+  })
+
+  it('skips a task with an open PR (ADR-007) and returns the next eligible one', async () => {
+    const backlog = [
+      { jira_key: 'KAZ-1', summary: 'already has an open PR', description: '' },
+      { jira_key: 'KAZ-2', summary: 'eligible', description: '' },
+    ]
+    const result = await pick(db, fakeTaskProvider(backlog), BITBUCKET, fakeBitbucketFetch({}, { 'KAZ-1': 1 }))
+    expect(result?.jira_key).toBe('KAZ-2')
   })
 })

@@ -21,6 +21,9 @@ and dated.
   "start[ticket]" to "queue[ticket]" (amends ADR-003's control names)
 - [ADR-006](006-minion-auth-is-subscription-not-api-key.md) — Minion authenticates
   Claude Code via a subscription's `CLAUDE_CODE_OAUTH_TOKEN`, not `ANTHROPIC_API_KEY`
+- [ADR-007](007-success-mirrors-in-progress-not-done.md) — `success` mirrors stay "In
+  Progress", not "Done" (amends ADR-001's mirror); pick also skips any branch that
+  already has an open PR
 
 ## Superseded
 
