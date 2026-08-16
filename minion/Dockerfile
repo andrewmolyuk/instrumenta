@@ -17,6 +17,7 @@ RUN bun install --frozen-lockfile --production
 COPY minion ./minion
 COPY src/minion/types.mts ./src/minion/types.mts
 COPY src/db/index.mts ./src/db/index.mts
+COPY src/bitbucket/closed-prs.mts ./src/bitbucket/closed-prs.mts
 
 # Claude Code refuses --dangerously-skip-permissions as root/sudo (security
 # guardrail on its end) — found live: Minion ran as root by default, so every
