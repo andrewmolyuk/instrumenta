@@ -26,7 +26,19 @@ directly in the codebase yourself. Do not stop to describe or propose a fix
 and ask for confirmation; make the actual code changes. Leave the changes
 uncommitted — do not run \`git commit\` yourself; committing is handled
 separately after you finish.`
-  return ['claude', '--dangerously-skip-permissions', '-p', prompt]
+  return ['claude', '--dangerously-skip-permissions', '-p', prompt, '--output-format', 'json']
+}
+
+/**
+ * `output` is the same captured diagnostic text this always returned; `costUsd`
+ * is Claude Code's own `total_cost_usd` from its `--output-format json` result
+ * (docs/todo/measure-claude-api-cost-per-ticket.md) — null whenever that JSON
+ * couldn't be parsed (crash, missing binary, non-JSON stdout), not just when
+ * cost happens to be zero.
+ */
+export interface ImplementResult {
+  output: string
+  costUsd: number | null
 }
 
 /**
@@ -63,24 +75,51 @@ export async function implementTask(
   workDir: string,
   input: MinionInput,
   command: string[] = defaultImplementCommand(input),
-): Promise<string> {
-  const output = await captureImplementOutput(workDir, command)
-  if (output) console.error(`--- Claude Code output (${input.jira_key}) ---\n${output}`)
-  return output
+): Promise<ImplementResult> {
+  const result = await captureImplementOutput(workDir, command)
+  if (result.output) console.error(`--- Claude Code output (${input.jira_key}) ---\n${result.output}`)
+  return result
 }
 
-async function captureImplementOutput(workDir: string, command: string[]): Promise<string> {
+/**
+ * Claude Code's `--output-format json` prints one JSON object to stdout —
+ * `.result` is its final human-readable text (used as the diagnostic output,
+ * in place of the raw JSON blob) and `.total_cost_usd` is its own cost
+ * estimate. Falls back to the raw combined stdout+stderr text (the pre-JSON
+ * behavior) whenever stdout isn't that shape — a crash, a missing binary, or
+ * a test double that doesn't speak this format all still produce something.
+ */
+async function captureImplementOutput(workDir: string, command: string[]): Promise<ImplementResult> {
   try {
     const proc = Bun.spawn(command, { cwd: workDir, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' })
     await proc.exited
     const stdout = (await new Response(proc.stdout).text()).trim()
     const stderr = (await new Response(proc.stderr).text()).trim()
-    const combined = [stdout, stderr].filter(Boolean).join('\n')
-    return combined.length > MAX_IMPLEMENT_OUTPUT_CHARS
-      ? `…(truncated)…\n${combined.slice(-MAX_IMPLEMENT_OUTPUT_CHARS)}`
-      : combined
+
+    const parsed = parseClaudeCodeResult(stdout)
+    const output = parsed ? [parsed.output, stderr].filter(Boolean).join('\n') : [stdout, stderr].filter(Boolean).join('\n')
+    const costUsd = parsed?.costUsd ?? null
+
+    return {
+      output:
+        output.length > MAX_IMPLEMENT_OUTPUT_CHARS
+          ? `…(truncated)…\n${output.slice(-MAX_IMPLEMENT_OUTPUT_CHARS)}`
+          : output,
+      costUsd,
+    }
   } catch (err) {
     // Command not available — caller doesn't treat this as fatal (see above).
-    return `(claude command failed to start: ${err instanceof Error ? err.message : String(err)})`
+    return { output: `(claude command failed to start: ${err instanceof Error ? err.message : String(err)})`, costUsd: null }
+  }
+}
+
+function parseClaudeCodeResult(stdout: string): { output: string; costUsd: number | null } | null {
+  try {
+    const parsed = JSON.parse(stdout)
+    if (typeof parsed?.result !== 'string') return null
+    const costUsd = typeof parsed.total_cost_usd === 'number' ? parsed.total_cost_usd : null
+    return { output: parsed.result, costUsd }
+  } catch {
+    return null
   }
 }

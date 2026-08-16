@@ -17,7 +17,7 @@ function fakeDeps(overrides: Partial<MinionDeps> = {}): MinionDeps {
   return {
     cloneAndBranch: vi.fn(async () => {}),
     hasOpenPrForBranch: vi.fn(async () => false),
-    implementTask: vi.fn(async () => ''),
+    implementTask: vi.fn(async () => ({ output: '', costUsd: null })),
     hasVerifyScript: vi.fn(async () => true),
     runVerify: vi.fn(async () => ({ passed: true, output: '' })),
     writeNote: vi.fn(async () => {}),
@@ -58,9 +58,17 @@ describe('runMinion', () => {
       status: 'success',
       pr_url: 'https://bitbucket.org/o/r/pull-requests/1',
       output: null,
+      cost_usd: null,
     })
     expect(deps.commitAndPush).toHaveBeenCalledWith('/tmp/wd', 'KAZ-1', expect.stringMatching(/^fix: KAZ-1:/))
     expect(deps.createPullRequest).toHaveBeenCalledWith('KAZ-1', expect.objectContaining({ jira_key: 'KAZ-1' }))
+  })
+
+  it('carries implementTask\'s reported cost through to a successful result', async () => {
+    const deps = fakeDeps({ implementTask: vi.fn(async () => ({ output: '', costUsd: 0.42 })) })
+    const result = await runMinion(input(), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
+
+    expect(result.cost_usd).toBe(0.42)
   })
 
   it('lowercases the first letter of the description in the commit subject, to satisfy commitlint subject-case', async () => {
@@ -84,7 +92,7 @@ describe('runMinion', () => {
     const deps = fakeDeps({ hasVerifyScript: vi.fn(async () => false) })
     const result = await runMinion(input({ attempt_number: 1 }), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
 
-    expect(result).toEqual({ status: 'blocked_no_verify', pr_url: null, output: null })
+    expect(result).toEqual({ status: 'blocked_no_verify', pr_url: null, output: null, cost_usd: null })
     expect(deps.writeNote).toHaveBeenCalledWith('/tmp/wd', 'docs/todo/', 'kaz-1-blocked-no-verify.md', expect.any(String))
     expect(deps.commitAndPush).toHaveBeenCalledWith('/tmp/wd', 'KAZ-1', expect.stringMatching(/^chore: KAZ-1:/))
     expect(deps.createPullRequest).not.toHaveBeenCalled()
@@ -93,7 +101,7 @@ describe('runMinion', () => {
   it('includes implementTask output on blocked_no_verify when there was some', async () => {
     const deps = fakeDeps({
       hasVerifyScript: vi.fn(async () => false),
-      implementTask: vi.fn(async () => 'claude: nothing to change here'),
+      implementTask: vi.fn(async () => ({ output: 'claude: nothing to change here', costUsd: null })),
     })
     const result = await runMinion(input({ attempt_number: 1 }), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
 
@@ -104,14 +112,14 @@ describe('runMinion', () => {
     const deps = fakeDeps({ runVerify: vi.fn(async () => ({ passed: false, output: 'test 1 failed' })) })
     const result = await runMinion(input({ attempt_number: 1 }), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
 
-    expect(result).toEqual({ status: 'failed_verify', pr_url: null, output: 'test 1 failed' })
+    expect(result).toEqual({ status: 'failed_verify', pr_url: null, output: 'test 1 failed', cost_usd: null })
     expect(deps.commitAndPush).not.toHaveBeenCalled()
     expect(deps.writeNote).not.toHaveBeenCalled()
   })
 
   it('combines implementTask output with verify output on failed_verify when there was both', async () => {
     const deps = fakeDeps({
-      implementTask: vi.fn(async () => 'claude did something'),
+      implementTask: vi.fn(async () => ({ output: 'claude did something', costUsd: null })),
       runVerify: vi.fn(async () => ({ passed: false, output: 'test 1 failed' })),
     })
     const result = await runMinion(input({ attempt_number: 1 }), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
@@ -124,7 +132,7 @@ describe('runMinion', () => {
     const deps = fakeDeps({ runVerify: vi.fn(async () => ({ passed: false, output: 'test 1 failed' })) })
     const result = await runMinion(input({ attempt_number: 3 }), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
 
-    expect(result).toEqual({ status: 'given_up', pr_url: null, output: 'test 1 failed' })
+    expect(result).toEqual({ status: 'given_up', pr_url: null, output: 'test 1 failed', cost_usd: null })
     expect(deps.writeNote).toHaveBeenCalledWith('/tmp/wd', 'docs/todo/', 'kaz-1-given-up.md', expect.any(String))
     expect(deps.commitAndPush).toHaveBeenCalledWith('/tmp/wd', 'KAZ-1', expect.stringMatching(/^chore: KAZ-1:/))
     expect(deps.createPullRequest).not.toHaveBeenCalled()

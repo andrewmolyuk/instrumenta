@@ -34,7 +34,7 @@ function fakeFetch(totalCount = 0): typeof fetch {
 }
 
 function fakeRunner(status: TaskRow['status'] = 'success'): MinionRunner {
-  return { run: async () => ({ status, pr_url: null, output: null }) }
+  return { run: async () => ({ status, pr_url: null, output: null, cost_usd: null }) }
 }
 
 const noSleep = async () => {}
@@ -279,7 +279,7 @@ describe('runLoop', () => {
     const runner: MinionRunner = {
       run: async () => {
         sawWhileDispatching = getCurrentTask(db)
-        return { status: 'success', pr_url: null, output: null }
+        return { status: 'success', pr_url: null, output: null, cost_usd: null }
       },
     }
 
@@ -306,7 +306,7 @@ describe('runLoop', () => {
         calls += 1
         if (calls === 1) throw new Error('minion runner exploded')
         setStopped(db, true)
-        return { status: 'success', pr_url: null, output: null }
+        return { status: 'success', pr_url: null, output: null, cost_usd: null }
       },
     }
 

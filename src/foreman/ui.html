@@ -51,7 +51,7 @@
 
 <h2>History</h2>
 <table id="history">
-  <thead><tr><th>Jira key</th><th>Attempt</th><th>Status</th><th>PR</th><th>Output</th><th>Dispatched</th></tr></thead>
+  <thead><tr><th>Jira key</th><th>Attempt</th><th>Status</th><th>PR</th><th>Cost</th><th>Output</th><th>Dispatched</th></tr></thead>
   <tbody></tbody>
 </table>
 
@@ -99,6 +99,7 @@
         td(String(row.attempt_number)),
         td(row.status),
         prTd,
+        td(typeof row.cost_usd === 'number' ? `$${row.cost_usd.toFixed(4)}` : ''),
         outputTd,
         td(row.dispatched_at),
       )

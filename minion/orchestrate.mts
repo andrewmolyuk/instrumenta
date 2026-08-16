@@ -1,12 +1,13 @@
 import type { MinionInput, MinionResult } from '../src/minion/types.mts'
 import { MAX_ATTEMPTS } from './constants.mts'
+import type { ImplementResult } from './implement-task.mts'
 import { blockedNoVerifyFilename, blockedNoVerifyNote, givenUpFilename, givenUpNote } from './notes.mts'
 import type { VerifyResult } from './verify-gate.mts'
 
 export interface MinionDeps {
   cloneAndBranch(repoUrl: string, branch: string, workDir: string, reuseExisting: boolean): Promise<void>
   hasOpenPrForBranch(branch: string): Promise<boolean>
-  implementTask(workDir: string, input: MinionInput): Promise<string>
+  implementTask(workDir: string, input: MinionInput): Promise<ImplementResult>
   hasVerifyScript(workDir: string): Promise<boolean>
   runVerify(workDir: string): Promise<VerifyResult>
   writeNote(workDir: string, notesPath: string, filename: string, content: string): Promise<void>
@@ -101,7 +102,7 @@ export async function runMinion(
 
   const hasOpenPr = await deps.hasOpenPrForBranch(input.jira_key)
   await deps.cloneAndBranch(repoUrl, input.jira_key, workDir, !hasOpenPr)
-  const implementOutput = await deps.implementTask(workDir, input)
+  const { output: implementOutput, costUsd } = await deps.implementTask(workDir, input)
 
   if (!(await deps.hasVerifyScript(workDir))) {
     await deps.writeNote(workDir, notesPath, blockedNoVerifyFilename(input.jira_key), blockedNoVerifyNote(input))
@@ -112,12 +113,13 @@ export async function runMinion(
       `chore: ${input.jira_key}: no verify gate found`,
     )
     if (commitError) {
-      return { status: 'crashed', pr_url: null, output: combineOutputs(implementOutput, commitError) }
+      return { status: 'crashed', pr_url: null, output: combineOutputs(implementOutput, commitError), cost_usd: costUsd }
     }
     return {
       status: isFinalAttempt ? 'given_up' : 'blocked_no_verify',
       pr_url: null,
       output: combineOutputs(implementOutput),
+      cost_usd: costUsd,
     }
   }
 
@@ -125,7 +127,7 @@ export async function runMinion(
   if (!verify.passed) {
     const output = combineOutputs(implementOutput, verify.output)
     if (!isFinalAttempt) {
-      return { status: 'failed_verify', pr_url: null, output }
+      return { status: 'failed_verify', pr_url: null, output, cost_usd: costUsd }
     }
     await deps.writeNote(workDir, notesPath, givenUpFilename(input.jira_key), givenUpNote(input))
     const commitError = await tryCommitAndPush(
@@ -135,9 +137,9 @@ export async function runMinion(
       `chore: ${input.jira_key}: giving up after ${MAX_ATTEMPTS} attempts`,
     )
     if (commitError) {
-      return { status: 'crashed', pr_url: null, output: combineOutputs(output, commitError) }
+      return { status: 'crashed', pr_url: null, output: combineOutputs(output, commitError), cost_usd: costUsd }
     }
-    return { status: 'given_up', pr_url: null, output }
+    return { status: 'given_up', pr_url: null, output, cost_usd: costUsd }
   }
 
   const commitError = await tryCommitAndPush(
@@ -147,13 +149,13 @@ export async function runMinion(
     `fix: ${input.jira_key}: ${lowercaseFirst(input.description.slice(0, 72))}`,
   )
   if (commitError) {
-    return { status: 'crashed', pr_url: null, output: combineOutputs(implementOutput, commitError) }
+    return { status: 'crashed', pr_url: null, output: combineOutputs(implementOutput, commitError), cost_usd: costUsd }
   }
   try {
     const prUrl = await deps.createPullRequest(input.jira_key, input)
-    return { status: 'success', pr_url: prUrl, output: null }
+    return { status: 'success', pr_url: prUrl, output: null, cost_usd: costUsd }
   } catch (err) {
     const prError = err instanceof Error ? err.message : String(err)
-    return { status: 'crashed', pr_url: null, output: combineOutputs(implementOutput, prError) }
+    return { status: 'crashed', pr_url: null, output: combineOutputs(implementOutput, prError), cost_usd: costUsd }
   }
 }
