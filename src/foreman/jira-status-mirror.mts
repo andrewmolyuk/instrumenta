@@ -23,9 +23,16 @@ interface TransitionsResponse {
  * issue's available transitions and matches by target status *name* rather
  * than a hardcoded transition id, since transition ids are workflow-specific
  * per target project. If the target project's workflow has no status named
- * "In Progress"/"Done", this silently does nothing — same as the verify gate
- * and notes-path elsewhere, Foreman doesn't invent a convention a target
- * project didn't provide.
+ * "In Progress", this silently does nothing — same as the verify gate and
+ * notes-path elsewhere, Foreman doesn't invent a convention a target project
+ * didn't provide.
+ *
+ * ADR-007 (amends ADR-001): `success` no longer transitions to "Done" — a
+ * successful attempt only means Minion opened a PR that passed verify, not
+ * that a human has reviewed or merged it. `onComplete` is a no-op for every
+ * attempt status now; a ticket stays wherever `onDispatch` left it ("In
+ * Progress") until a human moves it to Done themselves, after actually
+ * merging the PR.
  */
 export class JiraStatusMirror implements StatusMirror {
   constructor(
@@ -37,11 +44,7 @@ export class JiraStatusMirror implements StatusMirror {
     await this.transitionTo(jiraKey, 'In Progress')
   }
 
-  async onComplete(row: TaskRow): Promise<void> {
-    if (row.status === 'success') {
-      await this.transitionTo(row.jira_key, 'Done')
-    }
-  }
+  async onComplete(_row: TaskRow): Promise<void> {}
 
   private async transitionTo(jiraKey: string, statusName: string): Promise<void> {
     const transitions = await this.listTransitions(jiraKey)

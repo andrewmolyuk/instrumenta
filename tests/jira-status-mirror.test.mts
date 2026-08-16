@@ -70,10 +70,10 @@ describe('JiraStatusMirror', () => {
   })
 
   describe('onComplete', () => {
-    it('transitions to "Done" on success', async () => {
+    it('does nothing on success (ADR-007) — Done is a human call after the PR is actually merged', async () => {
       const { fn, posted } = fakeFetch()
       await new JiraStatusMirror(CONFIG, fn).onComplete(row({ status: 'success' }))
-      expect(posted[0]?.body).toEqual({ transition: { id: '31' } })
+      expect(posted).toHaveLength(0)
     })
 
     it('does nothing for a non-success status', async () => {

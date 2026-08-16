@@ -52,7 +52,7 @@ describe('GET /', () => {
     expect(res.status).toBe(200)
     expect(res.headers.get('Content-Type')).toBe('text/html; charset=utf-8')
     const body = await res.text()
-    expect(body).toContain('<title>Foreman</title>')
+    expect(body).toContain('<title>Instrumenta</title>')
     expect(body).toContain('/api/status')
     expect(body).toContain('/api/stop')
     expect(body).toContain('/api/start')

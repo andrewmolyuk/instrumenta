@@ -13,10 +13,12 @@ beforeEach(() => {
   db = openDb(':memory:')
 })
 
-function fakeBitbucketFetch(counts: Record<string, number>) {
+function fakeBitbucketFetch(declinedCounts: Record<string, number>, openCounts: Record<string, number> = {}) {
   return vi.fn(async (url: string) => {
     const q = new URL(url).searchParams.get('q') ?? ''
     const key = q.match(/source\.branch\.name="([^"]+)"/)?.[1] ?? ''
+    const state = q.match(/state="([^"]+)"/)?.[1] ?? ''
+    const counts = state === 'OPEN' ? openCounts : declinedCounts
     return { ok: true, status: 200, statusText: 'OK', json: async () => ({ size: counts[key] ?? 0 }) }
   }) as unknown as typeof fetch
 }
@@ -43,6 +45,17 @@ describe('pickSpecific', () => {
 
   it('returns null when the requested key is already given up', async () => {
     const result = await pickSpecific(db, fakeTaskProvider(BACKLOG), BITBUCKET, 'KAZ-2', fakeBitbucketFetch({ 'KAZ-2': 3 }))
+    expect(result).toBeNull()
+  })
+
+  it('returns null when the requested key already has an open PR (ADR-007)', async () => {
+    const result = await pickSpecific(
+      db,
+      fakeTaskProvider(BACKLOG),
+      BITBUCKET,
+      'KAZ-2',
+      fakeBitbucketFetch({}, { 'KAZ-2': 1 }),
+    )
     expect(result).toBeNull()
   })
 })
