@@ -40,4 +40,9 @@ describe('defaultImplementCommand', () => {
     expect(prompt).toMatch(/unattended/i)
     expect(prompt).toMatch(/do not stop to describe or propose/i)
   })
+
+  it('tells Claude Code to leave the changes uncommitted', () => {
+    const [, , , prompt] = defaultImplementCommand(INPUT)
+    expect(prompt).toMatch(/do not run `git commit`/i)
+  })
 })
