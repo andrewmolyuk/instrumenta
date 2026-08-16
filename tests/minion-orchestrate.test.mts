@@ -16,6 +16,7 @@ function input(overrides: Partial<MinionInput> = {}): MinionInput {
 function fakeDeps(overrides: Partial<MinionDeps> = {}): MinionDeps {
   return {
     cloneAndBranch: vi.fn(async () => {}),
+    hasOpenPrForBranch: vi.fn(async () => false),
     implementTask: vi.fn(async () => ''),
     hasVerifyScript: vi.fn(async () => true),
     runVerify: vi.fn(async () => ({ passed: true, output: '' })),
@@ -31,8 +32,22 @@ describe('runMinion', () => {
     const deps = fakeDeps()
     await runMinion(input(), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
 
-    expect(deps.cloneAndBranch).toHaveBeenCalledWith('https://x/repo.git', 'KAZ-1', '/tmp/wd')
+    expect(deps.cloneAndBranch).toHaveBeenCalledWith('https://x/repo.git', 'KAZ-1', '/tmp/wd', true)
     expect(deps.implementTask).toHaveBeenCalledWith('/tmp/wd', expect.objectContaining({ jira_key: 'KAZ-1' }))
+  })
+
+  it('checks for an open PR on this jira_key before cloning', async () => {
+    const deps = fakeDeps()
+    await runMinion(input(), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
+
+    expect(deps.hasOpenPrForBranch).toHaveBeenCalledWith('KAZ-1')
+  })
+
+  it('tells cloneAndBranch not to reuse an existing branch when one has an open PR', async () => {
+    const deps = fakeDeps({ hasOpenPrForBranch: vi.fn(async () => true) })
+    await runMinion(input(), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
+
+    expect(deps.cloneAndBranch).toHaveBeenCalledWith('https://x/repo.git', 'KAZ-1', '/tmp/wd', false)
   })
 
   it('reports success with the PR url when verify passes', async () => {

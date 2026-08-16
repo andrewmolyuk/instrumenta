@@ -4,7 +4,8 @@ import { blockedNoVerifyFilename, blockedNoVerifyNote, givenUpFilename, givenUpN
 import type { VerifyResult } from './verify-gate.mts'
 
 export interface MinionDeps {
-  cloneAndBranch(repoUrl: string, branch: string, workDir: string): Promise<void>
+  cloneAndBranch(repoUrl: string, branch: string, workDir: string, reuseExisting: boolean): Promise<void>
+  hasOpenPrForBranch(branch: string): Promise<boolean>
   implementTask(workDir: string, input: MinionInput): Promise<string>
   hasVerifyScript(workDir: string): Promise<boolean>
   runVerify(workDir: string): Promise<VerifyResult>
@@ -55,6 +56,20 @@ function combineOutputs(...parts: (string | null | undefined)[]): string | null 
  * has already succeeded — the branch is pushed even though this attempt
  * reports `crashed`; a human fixing the underlying cause can open the PR
  * from that branch by hand rather than needing a full re-run.
+ *
+ * Before cloning, checks whether this jira_key's branch already has an open
+ * PR — if not (the common retry-after-crash case), cloneAndBranch reuses an
+ * existing remote branch of the same name instead of always branching fresh
+ * from the base tip (see its own comment for why: a plain re-branch-and-push
+ * collides non-fast-forward against a branch an earlier, partially-successful
+ * attempt already pushed). This lets a retry resume and re-verify whatever's
+ * already on that branch — implementTask and runVerify run against it exactly
+ * as they would a fresh clone — rather than redoing the work or getting stuck
+ * behind a stale push every attempt. Foreman's own pick() (ADR-007) already
+ * skips a jira_key with an open PR before ever dispatching it, so this mostly
+ * matters for retries within the give-up window, not fresh dispatches — but
+ * checking here too means Minion's own contract doesn't depend on Foreman
+ * having done it first.
  */
 function lowercaseFirst(text: string): string {
   return text.charAt(0).toLowerCase() + text.slice(1)
@@ -84,7 +99,8 @@ export async function runMinion(
 ): Promise<MinionResult> {
   const isFinalAttempt = input.attempt_number >= MAX_ATTEMPTS
 
-  await deps.cloneAndBranch(repoUrl, input.jira_key, workDir)
+  const hasOpenPr = await deps.hasOpenPrForBranch(input.jira_key)
+  await deps.cloneAndBranch(repoUrl, input.jira_key, workDir, !hasOpenPr)
   const implementOutput = await deps.implementTask(workDir, input)
 
   if (!(await deps.hasVerifyScript(workDir))) {
