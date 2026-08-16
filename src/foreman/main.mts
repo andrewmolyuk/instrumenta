@@ -48,7 +48,7 @@ export async function main(env: NodeJS.ProcessEnv = process.env): Promise<void> 
     pollIntervalMs: config.pollIntervalMs,
   }
 
-  startApiServer({ db, taskProvider, bitbucket: config.bitbucket }, config.apiPort)
+  startApiServer({ db, taskProvider, bitbucket: config.bitbucket, config }, config.apiPort)
 
   while (true) {
     if (isStopped(db)) {

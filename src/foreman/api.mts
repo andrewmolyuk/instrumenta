@@ -17,6 +17,7 @@ import {
   setStopped,
 } from '../db/queries.mts'
 import type { TaskProvider } from '../task-provider/types.mts'
+import type { ForemanConfig } from './config.mts'
 import { isGivenUp } from './pick.mts'
 
 const UI_HTML = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'ui.html'), 'utf-8')
@@ -25,6 +26,8 @@ export interface ApiDeps {
   db: Database
   taskProvider: TaskProvider
   bitbucket: BitbucketConfig
+  /** Powers GET /api/config (the Settings tab). Omit to 404 that route — every other route works without it. */
+  config?: ForemanConfig
   historyLimit?: number
   fetchImpl?: typeof fetch
 }
@@ -41,10 +44,12 @@ function json(body: unknown, status = 200): Response {
  * ADR-005 to match what they actually do: stop, start (was "continue"),
  * queue[ticket] (was "start[ticket]"), budget — plus delete-attempts, added
  * later to give a human a way to force a given-up ticket eligible again
- * (deleteAttempts, db/queries.mts) without wiping the whole database. A plain
- * fetch handler, not bound to a port, so it's testable directly with
- * constructed Request objects; startApiServer wraps it with Bun.serve. No
- * separate CLI artifact (architecture.md) — this JSON API is the only scriptable surface, and the
+ * (deleteAttempts, db/queries.mts) without wiping the whole database, and
+ * GET /api/config, a read-only allowlisted subset of ForemanConfig for the
+ * UI's Settings tab (never the auth secrets). A plain fetch handler, not
+ * bound to a port, so it's testable directly with constructed Request
+ * objects; startApiServer wraps it with Bun.serve. No separate CLI artifact
+ * (architecture.md) — this JSON API is the only scriptable surface, and the
  * only thing the UI itself calls.
  */
 export function createApiHandler(deps: ApiDeps): (req: Request) => Promise<Response> {
@@ -79,6 +84,24 @@ export function createApiHandler(deps: ApiDeps): (req: Request) => Promise<Respo
         queue,
         queueError,
         history: listAttempts(deps.db, deps.historyLimit ?? 50),
+      })
+    }
+
+    if (req.method === 'GET' && url.pathname === '/api/config') {
+      // Settings tab, read-only. Deliberately an allowlist of fields, not the
+      // full ForemanConfig: jiraAuth.apiToken and bitbucket.token must never
+      // reach the browser, so each field sent here is named explicitly rather
+      // than spreading or redacting after the fact.
+      if (!deps.config) return json({ error: 'Not found' }, 404)
+      const c = deps.config
+      return json({
+        dbPath: c.dbPath,
+        jira: { baseUrl: c.jira.baseUrl, jql: c.jira.jql, email: c.jiraAuth.email },
+        bitbucket: { workspace: c.bitbucket.workspace, repoSlug: c.bitbucket.repoSlug },
+        minionCommand: c.minionCommand,
+        timeoutMs: c.timeoutMs,
+        pollIntervalMs: c.pollIntervalMs,
+        apiPort: c.apiPort,
       })
     }
 
