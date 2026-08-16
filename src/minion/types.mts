@@ -24,6 +24,8 @@ export interface MinionResult {
   status: TaskStatus
   pr_url: string | null
   output: string | null
+  /** Claude Code's own total_cost_usd for this attempt; null when implementTask never got a parseable result (crash, timeout before Claude ran, missing binary). */
+  cost_usd: number | null
 }
 
 export interface MinionRunner {

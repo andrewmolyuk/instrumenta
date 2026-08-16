@@ -6,22 +6,40 @@ const INPUT: MinionInput = { task_id: 't1', jira_key: 'KAZ-1', description: 'Fix
 
 describe('implementTask', () => {
   it('runs the given command and returns empty output when it prints nothing', async () => {
-    await expect(implementTask('/tmp', INPUT, ['true'])).resolves.toBe('')
+    await expect(implementTask('/tmp', INPUT, ['true'])).resolves.toEqual({ output: '', costUsd: null })
   })
 
   it('does not throw when the command does not exist, and says so in its output', async () => {
-    const output = await implementTask('/tmp', INPUT, ['this-binary-does-not-exist-anywhere'])
-    expect(output).toContain('claude command failed to start')
+    const result = await implementTask('/tmp', INPUT, ['this-binary-does-not-exist-anywhere'])
+    expect(result.output).toContain('claude command failed to start')
+    expect(result.costUsd).toBeNull()
   })
 
-  it('captures combined stdout and stderr', async () => {
-    const output = await implementTask('/tmp', INPUT, [
+  it('captures combined stdout and stderr when stdout is not Claude Code JSON', async () => {
+    const result = await implementTask('/tmp', INPUT, [
       'bun',
       '-e',
       "console.log('did some work'); console.error('a warning')",
     ])
-    expect(output).toContain('did some work')
-    expect(output).toContain('a warning')
+    expect(result.output).toContain('did some work')
+    expect(result.output).toContain('a warning')
+    expect(result.costUsd).toBeNull()
+  })
+
+  it('parses Claude Code\'s --output-format json result for the output text and cost', async () => {
+    const result = await implementTask('/tmp', INPUT, [
+      'bun',
+      '-e',
+      "console.log(JSON.stringify({ result: 'did the thing', total_cost_usd: 0.1234 }))",
+    ])
+    expect(result.output).toBe('did the thing')
+    expect(result.costUsd).toBe(0.1234)
+  })
+
+  it('falls back to raw output when stdout is JSON but not the Claude Code result shape', async () => {
+    const result = await implementTask('/tmp', INPUT, ['bun', '-e', "console.log(JSON.stringify({ foo: 'bar' }))"])
+    expect(result.output).toContain('"foo"')
+    expect(result.costUsd).toBeNull()
   })
 })
 

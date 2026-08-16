@@ -32,6 +32,7 @@ export async function dispatch(
     status: result.status,
     pr_url: result.pr_url,
     output: result.output,
+    cost_usd: result.cost_usd,
     dispatched_at,
     finished_at: new Date().toISOString(),
   }

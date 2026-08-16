@@ -15,8 +15,8 @@ export function nextAttemptNumber(db: Database, jiraKey: string): number {
 
 export function recordAttempt(db: Database, row: TaskRow): void {
   db.run(
-    `INSERT INTO tasks (task_id, jira_key, attempt_number, status, pr_url, output, dispatched_at, finished_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO tasks (task_id, jira_key, attempt_number, status, pr_url, output, cost_usd, dispatched_at, finished_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       row.task_id,
       row.jira_key,
@@ -24,6 +24,7 @@ export function recordAttempt(db: Database, row: TaskRow): void {
       row.status,
       row.pr_url,
       row.output,
+      row.cost_usd,
       row.dispatched_at,
       row.finished_at,
     ],

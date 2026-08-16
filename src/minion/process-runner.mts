@@ -38,7 +38,7 @@ export class ProcessMinionRunner implements MinionRunner {
       // by the time anyone looks, so this is the only record of how far it got.
       const stdout = (await new Response(proc.stdout).text()).trim()
       const stderr = (await new Response(proc.stderr).text()).trim()
-      return { status: 'timeout', pr_url: null, output: combineOutput(stdout, stderr) }
+      return { status: 'timeout', pr_url: null, output: combineOutput(stdout, stderr), cost_usd: null }
     }
 
     const stdout = (await new Response(proc.stdout).text()).trim()
@@ -51,7 +51,7 @@ export class ProcessMinionRunner implements MinionRunner {
     // Node/Bun uncaught exception's stack trace lands — since the container
     // itself (run with `--rm`) is already gone by the time anyone looks.
     const stderr = (await new Response(proc.stderr).text()).trim()
-    return { status: 'crashed', pr_url: null, output: combineOutput(stdout, stderr) }
+    return { status: 'crashed', pr_url: null, output: combineOutput(stdout, stderr), cost_usd: null }
   }
 }
 
@@ -67,7 +67,12 @@ function parseResult(stdout: string): MinionResult | null {
   try {
     const parsed = JSON.parse(stdout)
     if (typeof parsed?.status !== 'string') return null
-    return { status: parsed.status, pr_url: parsed.pr_url ?? null, output: parsed.output ?? null }
+    return {
+      status: parsed.status,
+      pr_url: parsed.pr_url ?? null,
+      output: parsed.output ?? null,
+      cost_usd: typeof parsed.cost_usd === 'number' ? parsed.cost_usd : null,
+    }
   } catch {
     return null
   }

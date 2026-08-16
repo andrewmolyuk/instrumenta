@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { openDb } from '../src/db/index.mts'
 
 describe('openDb', () => {
-  it('creates the tasks table with ADR-001\'s exact columns', () => {
+  it('creates the tasks table with ADR-001\'s columns, plus ADR-008\'s cost_usd', () => {
     const db = openDb(':memory:')
     const columns = db
       .query('PRAGMA table_info(tasks)')
@@ -16,6 +16,7 @@ describe('openDb', () => {
       'status',
       'pr_url',
       'output',
+      'cost_usd',
       'dispatched_at',
       'finished_at',
     ])

@@ -24,6 +24,9 @@ and dated.
 - [ADR-007](007-success-mirrors-in-progress-not-done.md) — `success` mirrors stay "In
   Progress", not "Done" (amends ADR-001's mirror); pick also skips any branch that
   already has an open PR
+- [ADR-008](008-capture-per-attempt-claude-cost.md) — capture Claude Code's own
+  `total_cost_usd` estimate per dispatch attempt as `tasks.cost_usd` (amends ADR-001's
+  schema), toward filling in vision.md's Claude-cost-per-ticket TBD
 
 ## Superseded
 

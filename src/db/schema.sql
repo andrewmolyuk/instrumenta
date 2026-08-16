@@ -20,6 +20,10 @@ CREATE TABLE IF NOT EXISTS tasks (
   -- (src/minion/process-runner.mts) — null for every other status, including a
   -- passing verify.
   output TEXT,
+  -- Claude Code's own total_cost_usd for this attempt (minion/implement-task.mts),
+  -- carried through MinionResult regardless of outcome — null when Claude Code
+  -- never produced a parseable result (crash, timeout, missing binary).
+  cost_usd REAL,
   dispatched_at TEXT NOT NULL,
   finished_at TEXT
 );

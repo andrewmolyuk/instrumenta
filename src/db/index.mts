@@ -21,6 +21,7 @@ export interface TaskRow {
   status: TaskStatus
   pr_url: string | null
   output: string | null
+  cost_usd: number | null
   dispatched_at: string
   finished_at: string | null
 }
