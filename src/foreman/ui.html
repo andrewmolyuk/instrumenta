@@ -2,71 +2,529 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Instrumenta</title>
 <style>
-  body { font-family: system-ui, sans-serif; margin: 2rem; color: #1a1a1a; }
-  table { border-collapse: collapse; width: 100%; margin-bottom: 1.5rem; }
-  th, td { border: 1px solid #ccc; padding: 4px 8px; text-align: left; font-size: 0.9rem; }
-  form { display: inline-block; margin-right: 1rem; }
-  #status { margin-bottom: 1rem; font-weight: 600; }
-  #queue-ticket-error { color: #b00020; margin-bottom: 1rem; }
-  #budget-bar-wrap { margin-bottom: 1rem; display: none; }
-  #budget-bar-track { background: #e0e0e0; border-radius: 4px; height: 12px; width: 300px; overflow: hidden; }
-  #budget-bar-fill { background: #2f6feb; height: 100%; width: 0%; }
-  #budget-bar-label { font-size: 0.85rem; margin-top: 2px; }
-  td.output pre { margin: 0; max-width: 320px; max-height: 6em; overflow: auto; white-space: pre-wrap; font-size: 0.8rem; }
+  @import url('https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;700&family=Barlow+Condensed:wght@400;600&display=swap');
+
+  :root {
+    --color-bg: #f2f2f3;
+    --color-surface: #e9e9ea;
+    --color-text: #1d1f20;
+    --color-accent: #5980a6;
+    --color-divider: color-mix(in srgb, #1d1f20 16%, transparent);
+
+    --color-neutral-100: #f5f5f8;
+    --color-neutral-600: #7a7a7d;
+    --color-neutral-700: #5d5d60;
+    --color-neutral-800: #424244;
+    --color-neutral-900: #2b2b2d;
+
+    --color-accent-100: #eef6ff;
+    --color-accent-300: #b5d9fd;
+    --color-accent-600: #597ea3;
+    --color-accent-700: #416180;
+    --color-accent-800: #2c455d;
+    --color-accent-900: #1d2d3d;
+
+    --font-heading: "Barlow Condensed", system-ui, sans-serif;
+    --font-body: "Barlow", system-ui, sans-serif;
+
+    --space-1: 3px; --space-2: 7px; --space-3: 10px; --space-4: 14px; --space-6: 20px; --space-8: 27px;
+    --radius-md: 4px;
+    --shadow-lg: 0 12px 32px color-mix(in srgb, #2b2b2d 22%, transparent);
+  }
+
+  * , *::before, *::after { box-sizing: border-box; }
+  body { margin: 0; background: var(--color-bg); color: var(--color-text); font-family: var(--font-body); font-size: 15px; }
+  h1, h2, h3 { font-family: var(--font-heading); font-weight: 600; margin: 0; }
+  a { color: var(--color-accent-700); text-decoration: none; border-bottom: 1px solid var(--color-accent-300); }
+  a:hover { color: var(--color-accent-800); border-bottom-color: var(--color-accent-600); }
+  pre { margin: 0; font-family: ui-monospace, "SFMono-Regular", Menlo, monospace; }
+  button, input { font: inherit; color: inherit; }
+  [hidden] { display: none !important; }
+
+  .nav {
+    display: flex; align-items: center; gap: var(--space-6);
+    padding: var(--space-4) var(--space-8);
+    border-bottom: 1px solid var(--color-divider);
+    background: var(--color-bg); position: sticky; top: 0; z-index: 20;
+  }
+  .nav-brand { font-family: var(--font-heading); font-size: 24px; line-height: 1; letter-spacing: 0.16em; text-transform: uppercase; }
+  .nav-sub { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--color-neutral-600); border-left: 1px solid var(--color-divider); padding-left: var(--space-6); }
+  .nav-tabs { display: flex; gap: var(--space-2); margin-left: auto; }
+
+  .tab-btn {
+    font-family: var(--font-heading); font-size: 14px; letter-spacing: 0.14em; text-transform: uppercase;
+    padding: 7px 16px; cursor: pointer; border: 1px solid var(--color-divider);
+    background: transparent; color: var(--color-neutral-700); border-radius: var(--radius-md);
+  }
+  .tab-btn[aria-current="page"] { border-color: var(--color-accent); background: var(--color-accent); color: var(--color-bg); }
+
+  .page { padding: var(--space-8) var(--space-8) 54px; display: flex; flex-direction: column; gap: 34px; max-width: 1520px; margin: 0 auto; }
+  .page-narrow { max-width: 1180px; }
+
+  .blueprint { position: relative; border: 1px solid var(--color-divider); padding: var(--space-6); }
+  .blueprint > .corner { position: absolute; width: 11px; height: 11px; color: color-mix(in srgb, var(--color-text) 55%, transparent); }
+  .blueprint > .corner::before, .blueprint > .corner::after { content: ""; position: absolute; background: currentColor; }
+  .blueprint > .corner::before { left: 5px; top: 0; width: 1px; height: 100%; }
+  .blueprint > .corner::after { top: 5px; left: 0; width: 100%; height: 1px; }
+  .blueprint > .corner.tl { top: -6px; left: -6px; }
+  .blueprint > .corner.tr { top: -6px; right: -6px; }
+  .blueprint > .corner.bl { bottom: -6px; left: -6px; }
+  .blueprint > .corner.br { bottom: -6px; right: -6px; }
+
+  .kicker { font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--color-neutral-600); }
+  .kicker-sm { font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--color-neutral-600); }
+  .stat { font-family: var(--font-heading); font-size: 38px; line-height: 1; text-transform: uppercase; }
+  .note { font-size: 11px; color: var(--color-neutral-700); }
+
+  .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-8); }
+  .stat-card { display: flex; flex-direction: column; gap: var(--space-2); min-height: 104px; }
+
+  .cockpit-grid { display: grid; grid-template-columns: 360px 1fr; gap: var(--space-8); align-items: start; }
+  .col { display: flex; flex-direction: column; gap: 34px; }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer;
+    font-family: var(--font-heading); font-weight: 600; font-size: 14px; border-radius: var(--radius-md);
+    padding: var(--space-2) calc(var(--space-3) * 1.2); border: 1px solid var(--color-divider);
+    background: transparent; color: var(--color-text);
+  }
+  .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+  .btn-primary { background: var(--color-accent); border-color: var(--color-accent); color: var(--color-bg); }
+  .btn-primary:hover { background: var(--color-accent-600); }
+  .btn-secondary:hover { background: color-mix(in srgb, var(--color-text) 7%, transparent); }
+  .btn-ghost { border-color: transparent; color: var(--color-accent); padding-inline: var(--space-1); }
+  .btn-ghost:hover { background: color-mix(in srgb, var(--color-accent) 10%, transparent); }
+
+  .field { display: flex; flex-direction: column; gap: var(--space-2); }
+  .field > label { font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--color-neutral-600); }
+  .field-row { display: flex; gap: var(--space-2); }
+  .input {
+    width: 100%; min-height: 36px; padding: 6px 10px; font-size: 14px; color: var(--color-text);
+    background: var(--color-surface); border: 1px solid var(--color-divider); border-radius: var(--radius-md);
+  }
+  .input:hover { border-color: color-mix(in srgb, var(--color-text) 45%, transparent); }
+  .input:focus-visible { border-color: var(--color-accent); outline: none; }
+  .input[readonly] { color: var(--color-neutral-700); }
+
+  .error-box { font-size: 11px; color: var(--color-accent-800); background: var(--color-accent-100); border: 1px solid var(--color-accent-300); padding: var(--space-2) var(--space-3); }
+
+  .kv-row { display: flex; justify-content: space-between; font-size: 13px; padding-block: var(--space-1); }
+
+  .tag { display: inline-flex; align-items: center; font-size: 11px; letter-spacing: 0.02em; padding: 3px 10px; border-radius: 3px; }
+  .tag-accent { background: var(--color-accent-100); color: var(--color-accent-800); }
+  .tag-neutral { background: var(--color-neutral-100); color: var(--color-neutral-800); }
+  .tag-outline { border: 1px solid var(--color-accent); color: var(--color-accent); }
+
+  .chip {
+    font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; padding: 5px 11px; cursor: pointer;
+    border: 1px solid var(--color-divider); background: transparent; color: var(--color-neutral-700); border-radius: var(--radius-md);
+  }
+  .chip[aria-current="page"] { border-color: var(--color-accent); background: var(--color-accent-100); color: var(--color-accent-800); }
+
+  .panel-head { display: flex; align-items: baseline; gap: var(--space-4); margin-bottom: var(--space-4); flex-wrap: wrap; }
+  .panel-head h2 { font-size: 20px; letter-spacing: 0.1em; text-transform: uppercase; }
+  .panel-head .note { flex: 1; }
+
+  .table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .table th { text-align: left; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-neutral-600); padding: var(--space-2); border-bottom: 1px solid var(--color-divider); }
+  .table td { padding: var(--space-2); border-bottom: 1px solid color-mix(in srgb, var(--color-text) 8%, transparent); vertical-align: top; }
+  .table tbody tr:hover { background: color-mix(in srgb, var(--color-text) 4%, transparent); }
+  .tabular { font-variant-numeric: tabular-nums; }
+  .output-pre { font-size: 11px; line-height: 1.5; max-height: 5.4em; overflow: auto; white-space: pre-wrap; color: var(--color-neutral-800); border-left: 1px solid var(--color-divider); padding-left: var(--space-3); max-width: 42ch; }
+
+  .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 34px; align-items: start; }
+  .settings-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--space-8); align-items: end; }
+  .env-card { display: flex; flex-direction: column; gap: var(--space-4); }
+  .env-fields { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
+  .card-head { display: flex; align-items: baseline; gap: var(--space-3); }
+
+  .dialog-backdrop {
+    position: fixed; inset: 0; background: color-mix(in srgb, var(--color-neutral-900) 45%, transparent);
+    display: flex; align-items: center; justify-content: center; z-index: 50;
+  }
+  .dialog { background: var(--color-bg); width: 440px; box-shadow: var(--shadow-lg); }
+  .dialog-title { font-size: 20px; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: var(--space-3); }
+  .dialog-body { font-size: 13px; color: var(--color-neutral-800); margin-bottom: var(--space-6); }
+  .dialog-actions { display: flex; gap: var(--space-3); justify-content: flex-end; }
+
+  .toast {
+    position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%);
+    background: var(--color-accent-900); color: var(--color-bg);
+    padding: var(--space-3) var(--space-6); font-size: 13px; letter-spacing: 0.04em; z-index: 60; box-shadow: var(--shadow-lg);
+  }
 </style>
 </head>
 <body>
-<h1>Instrumenta</h1>
 
-<div id="status">Loading…</div>
-
-<div id="budget-bar-wrap">
-  <div id="budget-bar-track"><div id="budget-bar-fill"></div></div>
-  <div id="budget-bar-label"></div>
+<div class="nav">
+  <div class="nav-brand">Instrumenta</div>
+  <div class="nav-sub">Foreman &middot; <span id="nav-port">localhost:3000</span></div>
+  <div class="nav-tabs">
+    <button type="button" class="tab-btn" data-tab="cockpit">Cockpit</button>
+    <button type="button" class="tab-btn" data-tab="attempts">Attempts</button>
+    <button type="button" class="tab-btn" data-tab="settings">Settings</button>
+  </div>
 </div>
 
-<div>
-  <button id="stop">Stop</button>
-  <button id="start">Start</button>
-  <form id="queue-ticket-form">
-    <input id="queue-ticket-input" placeholder="JIRA-123" required />
-    <button type="submit">Queue ticket</button>
-  </form>
-  <div id="queue-ticket-error"></div>
-  <form id="budget-form">
-    <input id="budget-value" type="number" placeholder="budget (blank = unlimited)" />
-    <button type="submit">Set budget</button>
-  </form>
-  <form id="delete-attempts-form">
-    <input id="delete-attempts-ticket" placeholder="JIRA-123" required />
-    <button type="submit">Clear attempts</button>
-  </form>
-  <div id="delete-attempts-status"></div>
+<!-- ─────────────── COCKPIT ─────────────── -->
+<section id="panel-cockpit" class="page" hidden>
+
+  <div class="stat-grid">
+    <div class="blueprint stat-card">
+      <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+      <div class="kicker">Loop state</div>
+      <div style="display:flex;align-items:baseline;gap:var(--space-3)">
+        <div class="stat" id="stat-state">&ndash;</div>
+        <div class="note" id="stat-state-note"></div>
+      </div>
+    </div>
+    <div class="blueprint stat-card">
+      <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+      <div class="kicker">Budget</div>
+      <div class="stat" id="stat-budget">&ndash;</div>
+      <div style="height:8px;border:1px solid var(--color-divider);margin-top:auto">
+        <div id="stat-budget-fill" style="height:100%;background:var(--color-accent);width:0%"></div>
+      </div>
+      <div class="note" id="stat-budget-note"></div>
+    </div>
+    <div class="blueprint stat-card">
+      <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+      <div class="kicker">Queued next</div>
+      <div class="stat" id="stat-queued">&ndash;</div>
+      <div class="note">Bypasses normal Jira ordering. Cleared once Pick reads it.</div>
+    </div>
+    <div class="blueprint stat-card">
+      <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+      <div class="kicker">Minion now</div>
+      <div class="stat" id="stat-current">&ndash;</div>
+      <div class="note" id="stat-current-note"></div>
+    </div>
+  </div>
+
+  <div class="cockpit-grid">
+    <div class="col">
+      <div class="blueprint" style="display:flex;flex-direction:column;gap:var(--space-6)">
+        <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+        <div class="kicker">Control</div>
+
+        <div class="field-row">
+          <button type="button" id="toggle-run" class="btn btn-primary" style="flex:1;height:44px;font-size:16px;letter-spacing:0.12em;text-transform:uppercase">&ndash;</button>
+          <button type="button" id="refresh-btn" class="btn btn-secondary" style="height:44px;padding-inline:var(--space-4);font-size:12px;letter-spacing:0.1em;text-transform:uppercase">Refresh</button>
+        </div>
+        <div class="note" style="margin-top:-14px">Stop only prevents the next Pick. A Minion already in flight keeps running.</div>
+
+        <form id="queue-ticket-form" class="field">
+          <label>Queue a ticket next</label>
+          <div class="field-row">
+            <input id="queue-ticket-input" class="input" placeholder="JIRA-123" style="flex:1" />
+            <button type="submit" class="btn btn-secondary" style="padding-inline:var(--space-4)">Queue</button>
+          </div>
+          <div id="queue-ticket-error" class="error-box" hidden></div>
+        </form>
+
+        <form id="budget-form" class="field">
+          <label>Budget (blank = unlimited)</label>
+          <div class="field-row">
+            <input id="budget-input" class="input" type="number" placeholder="25" style="flex:1" />
+            <button type="submit" class="btn btn-secondary" style="padding-inline:var(--space-4)">Set</button>
+          </div>
+        </form>
+
+        <form id="delete-attempts-form" class="field" style="border-top:1px solid var(--color-divider);padding-top:var(--space-6)">
+          <label>Clear attempts</label>
+          <div class="field-row">
+            <input id="delete-attempts-ticket" class="input" placeholder="JIRA-123" style="flex:1" />
+            <button type="submit" class="btn btn-secondary" style="padding-inline:var(--space-4)">Clear</button>
+          </div>
+          <div class="note">Deletes every recorded attempt for the ticket, making a given-up ticket eligible again.</div>
+        </form>
+      </div>
+
+      <div class="blueprint" style="display:flex;flex-direction:column;gap:var(--space-3)">
+        <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+        <div class="kicker">State sources</div>
+        <div class="kv-row"><span>Jira &mdash; live query</span><span id="src-jira" class="tag tag-outline">OK</span></div>
+        <div class="kv-row"><span>SQLite &mdash; <span id="src-db-path">/data/foreman.db</span></span><span class="tag tag-outline">OK</span></div>
+        <div class="kv-row"><span>Bitbucket &mdash; PR history</span><span class="tag tag-neutral">configured</span></div>
+        <div class="note" style="border-top:1px solid var(--color-divider);padding-top:var(--space-3)">Give-up fires when either SQLite or Bitbucket crosses 3 attempts first.</div>
+      </div>
+    </div>
+
+    <div class="col">
+      <div class="blueprint">
+        <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+        <div class="panel-head">
+          <h2>Queue</h2>
+          <span class="note">Read live from Jira on every Pick &mdash; ordering is the JQL&rsquo;s job</span>
+        </div>
+        <table class="table">
+          <thead><tr><th style="width:120px">Key</th><th>Summary</th></tr></thead>
+          <tbody id="queue-body"></tbody>
+        </table>
+      </div>
+
+      <div class="blueprint">
+        <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+        <div class="panel-head">
+          <h2>Recent attempts</h2>
+          <span class="note" style="flex:1">From Foreman&rsquo;s own SQLite</span>
+          <button type="button" id="go-attempts" class="btn btn-ghost" style="font-size:12px;letter-spacing:0.1em;text-transform:uppercase">All attempts</button>
+        </div>
+        <table class="table">
+          <thead>
+            <tr><th style="width:120px">Jira key</th><th style="width:80px">Attempt</th><th style="width:170px">Status</th><th style="width:70px">PR</th><th style="width:90px">Cost</th><th>Dispatched</th></tr>
+          </thead>
+          <tbody id="recent-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────────── ATTEMPTS ─────────────── -->
+<section id="panel-attempts" class="page" hidden>
+  <div style="display:flex;align-items:baseline;gap:var(--space-6);flex-wrap:wrap">
+    <h1 style="font-size:30px;letter-spacing:0.1em;text-transform:uppercase">Attempt history</h1>
+    <span class="note" id="attempts-summary"></span>
+    <div style="flex:1"></div>
+    <div id="attempts-filters" style="display:flex;gap:var(--space-2);flex-wrap:wrap"></div>
+  </div>
+
+  <div class="blueprint">
+    <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+    <table class="table">
+      <thead>
+        <tr>
+          <th style="width:120px">Jira key</th><th style="width:80px">Attempt</th><th style="width:170px">Status</th>
+          <th style="width:70px">PR</th><th style="width:90px">Cost</th><th style="width:170px">Dispatched</th>
+          <th style="width:110px">Duration</th><th>Output</th>
+        </tr>
+      </thead>
+      <tbody id="attempts-body"></tbody>
+    </table>
+  </div>
+  <div class="note" style="max-width:70ch">Output is captured diagnostic text: Claude Code&rsquo;s stdout and stderr combined with the verify gate&rsquo;s on failed_verify, or Minion&rsquo;s own process output on crashed and timeout. It is null on a passing verify &mdash; nothing to explain there.</div>
+</section>
+
+<!-- ─────────────── SETTINGS ─────────────── -->
+<section id="panel-settings" class="page page-narrow" hidden>
+  <div>
+    <h1 style="font-size:30px;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:var(--space-2)">Settings</h1>
+    <div class="note" style="font-size:13px;max-width:74ch">Everything below comes from Foreman&rsquo;s own container environment (never Minion&rsquo;s &mdash; that&rsquo;s a separate container). Fields marked ENV are read at boot and cannot be changed from here &mdash; change them where the container is started. Secrets (API tokens) are never sent to this page. Only Live controls, below, write back through the API.</div>
+  </div>
+
+  <div class="settings-grid">
+    <div class="blueprint env-card">
+      <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+      <div class="card-head"><h2 style="font-size:19px;letter-spacing:0.1em;text-transform:uppercase">Task source &mdash; Jira</h2><span class="tag tag-neutral" style="font-size:9px;letter-spacing:0.16em">ENV</span></div>
+      <div class="field"><label>JIRA_BASE_URL</label><input class="input" id="cfg-jira-base-url" readonly /></div>
+      <div class="env-fields">
+        <div class="field"><label>JIRA_EMAIL</label><input class="input" id="cfg-jira-email" readonly /></div>
+        <div class="field"><label>JIRA_API_TOKEN</label><input class="input" value="configured via env" readonly /></div>
+      </div>
+      <div class="field">
+        <label>JIRA_JQL</label>
+        <input class="input" id="cfg-jira-jql" readonly />
+        <div class="note">Ordering and what counts as open are this query&rsquo;s job, not Foreman&rsquo;s.</div>
+      </div>
+    </div>
+
+    <div class="blueprint env-card">
+      <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+      <div class="card-head"><h2 style="font-size:19px;letter-spacing:0.1em;text-transform:uppercase">Target repo &mdash; Bitbucket</h2><span class="tag tag-neutral" style="font-size:9px;letter-spacing:0.16em">ENV</span></div>
+      <div class="env-fields">
+        <div class="field"><label>BITBUCKET_WORKSPACE</label><input class="input" id="cfg-bb-workspace" readonly /></div>
+        <div class="field"><label>BITBUCKET_REPO_SLUG</label><input class="input" id="cfg-bb-repo" readonly /></div>
+        <div class="field"><label>BITBUCKET_TOKEN</label><input class="input" value="configured via env" readonly /></div>
+      </div>
+      <div class="note">Base branch and PR reviewers are Minion-only settings &mdash; Foreman&rsquo;s own process never reads them, so they can&rsquo;t be shown here truthfully.</div>
+    </div>
+
+    <div class="blueprint env-card">
+      <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+      <div class="card-head"><h2 style="font-size:19px;letter-spacing:0.1em;text-transform:uppercase">Minion</h2><span class="tag tag-neutral" style="font-size:9px;letter-spacing:0.16em">ENV</span></div>
+      <div class="field">
+        <label>MINION_COMMAND</label>
+        <pre id="cfg-minion-command" class="input" style="line-height:1.6;white-space:pre-wrap;max-height:8em;overflow:auto"></pre>
+      </div>
+      <div class="field"><label>MINION_TIMEOUT_MS</label><input class="input" id="cfg-timeout" readonly /></div>
+    </div>
+
+    <div class="blueprint env-card">
+      <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+      <div class="card-head"><h2 style="font-size:19px;letter-spacing:0.1em;text-transform:uppercase">Foreman daemon</h2><span class="tag tag-neutral" style="font-size:9px;letter-spacing:0.16em">ENV</span></div>
+      <div class="env-fields">
+        <div class="field"><label>FOREMAN_DB_PATH</label><input class="input" id="cfg-db-path" readonly /></div>
+        <div class="field"><label>FOREMAN_API_PORT</label><input class="input" id="cfg-api-port" readonly /></div>
+        <div class="field"><label>FOREMAN_POLL_INTERVAL_MS</label><input class="input" id="cfg-poll-interval" readonly /></div>
+      </div>
+      <div class="note" style="border-top:1px solid var(--color-divider);padding-top:var(--space-3)">Without a persistent volume at FOREMAN_DB_PATH, attempt, give-up and budget history is lost on every restart.</div>
+    </div>
+  </div>
+
+  <div class="blueprint" style="display:flex;flex-direction:column;gap:var(--space-6)">
+    <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+    <div class="card-head">
+      <h2 style="font-size:19px;letter-spacing:0.1em;text-transform:uppercase">Live controls</h2>
+      <span class="tag tag-accent" style="font-size:9px;letter-spacing:0.16em">WRITES</span>
+      <span class="note">Persisted to foreman_state, effective on the next Pick</span>
+    </div>
+    <div class="settings-grid-3">
+      <form id="settings-budget-form" class="field">
+        <label>Budget</label>
+        <div class="field-row">
+          <input id="settings-budget-input" class="input" type="number" placeholder="blank = unlimited" style="flex:1" />
+          <button type="submit" class="btn btn-secondary" style="padding-inline:var(--space-4)">Set</button>
+        </div>
+      </form>
+      <form id="settings-ticket-form" class="field">
+        <label>Queue ticket</label>
+        <div class="field-row">
+          <input id="settings-ticket-input" class="input" placeholder="JIRA-123" style="flex:1" />
+          <button type="submit" class="btn btn-secondary" style="padding-inline:var(--space-4)">Queue</button>
+        </div>
+      </form>
+      <div class="field">
+        <label>Dispatch</label>
+        <button type="button" id="settings-toggle-run" class="btn btn-primary" style="height:40px;font-size:15px;letter-spacing:0.12em;text-transform:uppercase">&ndash;</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div id="dialog-backdrop" class="dialog-backdrop" hidden>
+  <div class="dialog blueprint">
+    <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+    <h3 class="dialog-title">Clear attempts</h3>
+    <div class="dialog-body" id="dialog-body"></div>
+    <div class="dialog-actions">
+      <button type="button" id="dialog-cancel" class="btn btn-secondary">Cancel</button>
+      <button type="button" id="dialog-confirm" class="btn btn-primary">Delete attempts</button>
+    </div>
+  </div>
 </div>
 
-<h2>Queue</h2>
-<table id="queue"><thead><tr><th>Key</th><th>Summary</th></tr></thead><tbody></tbody></table>
-
-<h2>History</h2>
-<table id="history">
-  <thead><tr><th>Jira key</th><th>Attempt</th><th>Status</th><th>PR</th><th>Cost</th><th>Output</th><th>Dispatched</th></tr></thead>
-  <tbody></tbody>
-</table>
+<div id="toast" class="toast" hidden></div>
 
 <script>
-  // Queue summaries and PR urls come from Jira/Bitbucket — not fully trusted
-  // input (same reasoning as ADR-002's Minion sandboxing). Built via DOM APIs
-  // (textContent, not innerHTML) so nothing here can inject markup.
+  // Queue summaries, JQL, PR urls and captured output all come from Jira,
+  // Bitbucket or Minion — not fully trusted input (same reasoning as
+  // ADR-002's Minion sandboxing). Every dynamic value below is set via
+  // textContent/value, never innerHTML, so nothing here can inject markup.
+
+  const STATUSES = ['all', 'success', 'failed_verify', 'blocked_no_verify', 'crashed', 'timeout', 'given_up']
+  const TAG_CLASS = { success: 'tag-accent', given_up: 'tag-outline' }
+  const tagClassFor = (status) => TAG_CLASS[status] ?? 'tag-neutral'
+
+  let currentTab = 'cockpit'
+  let currentFilter = 'all'
+  let lastStatus = null
+  let pendingClearKey = ''
+  let toastTimer
+
   function td(text) {
     const el = document.createElement('td')
     el.textContent = text
     return el
   }
 
+  function setTab(tab) {
+    currentTab = tab
+    for (const btn of document.querySelectorAll('.tab-btn')) {
+      btn.toggleAttribute('aria-current', btn.dataset.tab === tab)
+      if (btn.dataset.tab === tab) btn.setAttribute('aria-current', 'page')
+      else btn.removeAttribute('aria-current')
+    }
+    document.getElementById('panel-cockpit').hidden = tab !== 'cockpit'
+    document.getElementById('panel-attempts').hidden = tab !== 'attempts'
+    document.getElementById('panel-settings').hidden = tab !== 'settings'
+    if (tab === 'attempts' && lastStatus) renderAttempts(lastStatus.history)
+  }
+
+  for (const btn of document.querySelectorAll('.tab-btn')) {
+    btn.addEventListener('click', () => setTab(btn.dataset.tab))
+  }
+
+  function costLabel(cost) {
+    return typeof cost === 'number' ? '$' + cost.toFixed(2) : '—'
+  }
+
+  function prCell(prUrl) {
+    const cell = document.createElement('td')
+    if (typeof prUrl === 'string' && /^https?:\/\//.test(prUrl)) {
+      const a = document.createElement('a')
+      a.href = prUrl
+      a.textContent = 'PR'
+      cell.append(a)
+    }
+    return cell
+  }
+
+  function tagCell(status) {
+    const cell = document.createElement('td')
+    const span = document.createElement('span')
+    span.className = 'tag ' + tagClassFor(status)
+    span.textContent = status
+    cell.append(span)
+    return cell
+  }
+
+  function durationLabel(dispatchedAt, finishedAt) {
+    if (!finishedAt) return 'in progress'
+    const ms = new Date(finishedAt).getTime() - new Date(dispatchedAt).getTime()
+    if (!Number.isFinite(ms) || ms < 0) return '—'
+    const totalSec = Math.round(ms / 1000)
+    const m = Math.floor(totalSec / 60)
+    const s = totalSec % 60
+    return m + 'm ' + String(s).padStart(2, '0') + 's'
+  }
+
+  function renderStatCards(s) {
+    const stateEl = document.getElementById('stat-state')
+    stateEl.textContent = s.stopped ? 'Stopped' : 'Running'
+    document.getElementById('stat-state-note').textContent = s.stopped ? 'no new Picks' : 'polling'
+
+    const total = s.budgetTotal
+    const used = total === null ? 0 : total - (s.budget ?? 0)
+    const pct = total !== null && total > 0 ? Math.min(100, Math.max(0, (used / total) * 100)) : 100
+    document.getElementById('stat-budget').textContent = total === null ? '∞' : used + ' / ' + total
+    document.getElementById('stat-budget-fill').style.width = pct + '%'
+    document.getElementById('stat-budget-note').textContent =
+      total === null ? 'Unlimited' : (s.budget ?? 0) + ' attempts remaining this run'
+
+    document.getElementById('stat-queued').textContent = s.queueTicket ?? '—'
+
+    const currentEl = document.getElementById('stat-current')
+    const currentNoteEl = document.getElementById('stat-current-note')
+    if (s.current) {
+      currentEl.textContent = s.current.jira_key
+      currentNoteEl.textContent = 'dispatched ' + s.current.dispatched_at
+    } else {
+      currentEl.textContent = '—'
+      currentNoteEl.textContent = 'Nothing in flight'
+    }
+
+    const toggleLabel = s.stopped ? 'Start' : 'Stop'
+    document.getElementById('toggle-run').textContent = toggleLabel
+    document.getElementById('settings-toggle-run').textContent = toggleLabel
+
+    const jiraTag = document.getElementById('src-jira')
+    if (s.queueError) {
+      jiraTag.textContent = 'error'
+      jiraTag.className = 'tag tag-neutral'
+      jiraTag.title = s.queueError
+    } else {
+      jiraTag.textContent = 'OK'
+      jiraTag.className = 'tag tag-outline'
+      jiraTag.removeAttribute('title')
+    }
+  }
+
   function renderQueue(queue) {
-    const tbody = document.querySelector('#queue tbody')
+    const tbody = document.getElementById('queue-body')
     tbody.replaceChildren()
     for (const item of queue) {
       const tr = document.createElement('tr')
@@ -75,115 +533,195 @@
     }
   }
 
-  function renderHistory(history) {
-    const tbody = document.querySelector('#history tbody')
+  function renderRecent(history) {
+    const tbody = document.getElementById('recent-body')
     tbody.replaceChildren()
-    for (const row of history) {
+    for (const row of history.slice(0, 5)) {
       const tr = document.createElement('tr')
-      const prTd = document.createElement('td')
-      if (typeof row.pr_url === 'string' && /^https?:\/\//.test(row.pr_url)) {
-        const a = document.createElement('a')
-        a.href = row.pr_url
-        a.textContent = 'PR'
-        prTd.append(a)
-      }
-      const outputTd = document.createElement('td')
-      outputTd.className = 'output'
-      if (row.output) {
-        const pre = document.createElement('pre')
-        pre.textContent = row.output
-        outputTd.append(pre)
-      }
-      tr.append(
-        td(row.jira_key),
-        td(String(row.attempt_number)),
-        td(row.status),
-        prTd,
-        td(typeof row.cost_usd === 'number' ? `$${row.cost_usd.toFixed(4)}` : ''),
-        outputTd,
-        td(row.dispatched_at),
-      )
+      const attemptTd = td(String(row.attempt_number))
+      attemptTd.classList.add('tabular')
+      const costTd = td(costLabel(row.cost_usd))
+      costTd.classList.add('tabular')
+      const dispatchedTd = td(row.dispatched_at)
+      dispatchedTd.classList.add('tabular')
+      dispatchedTd.style.color = 'var(--color-neutral-700)'
+      tr.append(td(row.jira_key), attemptTd, tagCell(row.status), prCell(row.pr_url), costTd, dispatchedTd)
       tbody.append(tr)
     }
   }
 
-  function renderBudgetBar(budget, budgetTotal) {
-    const wrap = document.getElementById('budget-bar-wrap')
-    if (budgetTotal === null) {
-      wrap.style.display = 'none'
-      return
+  function renderFilters() {
+    const wrap = document.getElementById('attempts-filters')
+    wrap.replaceChildren()
+    for (const status of STATUSES) {
+      const btn = document.createElement('button')
+      btn.type = 'button'
+      btn.className = 'chip'
+      btn.textContent = status === 'all' ? 'All' : status
+      if (status === currentFilter) btn.setAttribute('aria-current', 'page')
+      btn.addEventListener('click', () => {
+        currentFilter = status
+        renderFilters()
+        if (lastStatus) renderAttempts(lastStatus.history)
+      })
+      wrap.append(btn)
     }
-    wrap.style.display = ''
-    const used = budgetTotal - (budget ?? 0)
-    const percent = budgetTotal > 0 ? Math.min(100, Math.max(0, (used / budgetTotal) * 100)) : 100
-    document.getElementById('budget-bar-fill').style.width = `${percent}%`
-    document.getElementById('budget-bar-label').textContent = `Budget used: ${used} / ${budgetTotal} attempts`
+  }
+
+  function renderAttempts(history) {
+    const filtered = currentFilter === 'all' ? history : history.filter((r) => r.status === currentFilter)
+    const totalCost = filtered.reduce((a, r) => a + (r.cost_usd || 0), 0)
+    document.getElementById('attempts-summary').textContent =
+      filtered.length + ' attempts · $' + totalCost.toFixed(2) + ' total'
+
+    const tbody = document.getElementById('attempts-body')
+    tbody.replaceChildren()
+    for (const row of filtered) {
+      const tr = document.createElement('tr')
+      const attemptTd = td(String(row.attempt_number))
+      attemptTd.classList.add('tabular')
+      const costTd = td(costLabel(row.cost_usd))
+      costTd.classList.add('tabular')
+      const dispatchedTd = td(row.dispatched_at)
+      dispatchedTd.classList.add('tabular')
+      dispatchedTd.style.color = 'var(--color-neutral-700)'
+      const durationTd = td(durationLabel(row.dispatched_at, row.finished_at))
+      durationTd.classList.add('tabular')
+      durationTd.style.color = 'var(--color-neutral-700)'
+      const outputTd = document.createElement('td')
+      if (row.output) {
+        const pre = document.createElement('pre')
+        pre.className = 'output-pre'
+        pre.textContent = row.output
+        outputTd.append(pre)
+      }
+      tr.append(td(row.jira_key), attemptTd, tagCell(row.status), prCell(row.pr_url), costTd, dispatchedTd, durationTd, outputTd)
+      tbody.append(tr)
+    }
+  }
+
+  function renderConfig(c) {
+    document.getElementById('nav-port').textContent = 'localhost:' + c.apiPort
+    document.getElementById('cfg-jira-base-url').value = c.jira.baseUrl
+    document.getElementById('cfg-jira-email').value = c.jira.email
+    document.getElementById('cfg-jira-jql').value = c.jira.jql
+    document.getElementById('cfg-bb-workspace').value = c.bitbucket.workspace
+    document.getElementById('cfg-bb-repo').value = c.bitbucket.repoSlug
+    document.getElementById('cfg-minion-command').textContent = JSON.stringify(c.minionCommand, null, 1)
+    document.getElementById('cfg-timeout').value = c.timeoutMs
+    document.getElementById('cfg-db-path').value = c.dbPath
+    document.getElementById('cfg-api-port').value = c.apiPort
+    document.getElementById('cfg-poll-interval').value = c.pollIntervalMs
+    document.getElementById('src-db-path').textContent = c.dbPath
+  }
+
+  function showToast(msg) {
+    const el = document.getElementById('toast')
+    el.textContent = msg
+    el.hidden = false
+    clearTimeout(toastTimer)
+    toastTimer = setTimeout(() => { el.hidden = true }, 2600)
   }
 
   async function refresh() {
     const res = await fetch('/api/status')
     const s = await res.json()
-    renderBudgetBar(s.budget, s.budgetTotal)
-    document.getElementById('status').textContent =
-      `Stopped: ${s.stopped} | Budget: ${s.budget ?? 'unlimited'} | Ticket queued: ${s.queueTicket ?? 'none'}` +
-      ` | Minion working on: ${s.current ? `${s.current.jira_key} (since ${s.current.dispatched_at})` : 'nothing right now'}` +
-      (s.queueError ? ` | Queue read failed: ${s.queueError}` : '')
+    lastStatus = s
+    renderStatCards(s)
     renderQueue(s.queue)
-    renderHistory(s.history)
+    renderRecent(s.history)
+    if (currentTab === 'attempts') renderAttempts(s.history)
   }
 
-  document.getElementById('stop').addEventListener('click', async () => {
-    await fetch('/api/stop', { method: 'POST' })
-    refresh()
-  })
+  async function loadConfig() {
+    const res = await fetch('/api/config')
+    if (!res.ok) return
+    renderConfig(await res.json())
+  }
 
-  document.getElementById('start').addEventListener('click', async () => {
-    await fetch('/api/start', { method: 'POST' })
+  async function toggleRun() {
+    const stopped = lastStatus?.stopped ?? false
+    const endpoint = stopped ? '/api/start' : '/api/stop'
+    await fetch(endpoint, { method: 'POST' })
+    showToast(stopped ? 'POST /api/start — loop resumed' : 'POST /api/stop — dispatching halted')
     refresh()
-  })
+  }
+  document.getElementById('toggle-run').addEventListener('click', toggleRun)
+  document.getElementById('settings-toggle-run').addEventListener('click', toggleRun)
+  document.getElementById('refresh-btn').addEventListener('click', () => { refresh(); showToast('GET /api/status — refreshed') })
+  document.getElementById('go-attempts').addEventListener('click', () => setTab('attempts'))
 
-  document.getElementById('queue-ticket-form').addEventListener('submit', async (e) => {
-    e.preventDefault()
-    const input = document.getElementById('queue-ticket-input')
-    const errorEl = document.getElementById('queue-ticket-error')
+  async function submitTicket(input, errorEl) {
+    const jiraKey = input.value
     const res = await fetch('/api/queue-ticket', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ jiraKey: input.value }),
+      body: JSON.stringify({ jiraKey }),
     })
     if (res.ok) {
-      errorEl.textContent = ''
+      if (errorEl) { errorEl.hidden = true; errorEl.textContent = '' }
       input.value = ''
+      showToast('POST /api/queue-ticket — ' + jiraKey.trim().toUpperCase() + ' queued next')
     } else {
       const body = await res.json().catch(() => null)
-      errorEl.textContent = body?.error ?? `Queue failed (${res.status})`
+      const message = body?.error ?? ('Queue failed (' + res.status + ')')
+      if (errorEl) { errorEl.hidden = false; errorEl.textContent = message }
+      else showToast(message)
     }
     refresh()
+  }
+
+  document.getElementById('queue-ticket-form').addEventListener('submit', (e) => {
+    e.preventDefault()
+    submitTicket(document.getElementById('queue-ticket-input'), document.getElementById('queue-ticket-error'))
+  })
+  document.getElementById('settings-ticket-form').addEventListener('submit', (e) => {
+    e.preventDefault()
+    submitTicket(document.getElementById('settings-ticket-input'), null)
   })
 
-  document.getElementById('budget-form').addEventListener('submit', async (e) => {
-    e.preventDefault()
-    const input = document.getElementById('budget-value')
-    const budget = input.value === '' ? null : Number(input.value)
+  async function submitBudget(input) {
+    const raw = input.value.trim()
+    const budget = raw === '' ? null : Number(raw)
     await fetch('/api/budget', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ budget }),
     })
+    input.value = ''
+    showToast('POST /api/budget — ' + (budget === null ? 'unlimited' : budget + ' attempts'))
     refresh()
+  }
+  document.getElementById('budget-form').addEventListener('submit', (e) => {
+    e.preventDefault()
+    submitBudget(document.getElementById('budget-input'))
+  })
+  document.getElementById('settings-budget-form').addEventListener('submit', (e) => {
+    e.preventDefault()
+    submitBudget(document.getElementById('settings-budget-input'))
   })
 
-  document.getElementById('delete-attempts-form').addEventListener('submit', async (e) => {
+  function openClearDialog(jiraKey) {
+    pendingClearKey = jiraKey
+    document.getElementById('dialog-body').textContent =
+      'Delete all recorded attempts for ' + jiraKey + '? This can’t be undone. It resets the give-up count, making the ticket eligible for Pick again.'
+    document.getElementById('dialog-backdrop').hidden = false
+  }
+  function closeClearDialog() {
+    pendingClearKey = ''
+    document.getElementById('dialog-backdrop').hidden = true
+  }
+
+  document.getElementById('delete-attempts-form').addEventListener('submit', (e) => {
     e.preventDefault()
     const input = document.getElementById('delete-attempts-ticket')
-    const statusEl = document.getElementById('delete-attempts-status')
-    const jiraKey = input.value
-    // Deletes every recorded attempt for this ticket, not just the failed
-    // ones — it's what resets giveUpAttemptCount, since a human clicking this
-    // wants the ticket eligible again, not a partially-trimmed history.
-    if (!confirm(`Delete all recorded attempts for ${jiraKey}? This can't be undone.`)) {
-      return
-    }
+    if (!input.value.trim()) return
+    openClearDialog(input.value.trim().toUpperCase())
+  })
+  document.getElementById('dialog-cancel').addEventListener('click', closeClearDialog)
+  document.getElementById('dialog-confirm').addEventListener('click', async () => {
+    const jiraKey = pendingClearKey
+    closeClearDialog()
     const res = await fetch('/api/delete-attempts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -191,15 +729,18 @@
     })
     if (res.ok) {
       const body = await res.json()
-      statusEl.textContent = `Deleted ${body.deleted} attempt(s) for ${jiraKey}`
-      input.value = ''
+      showToast('Deleted ' + body.deleted + ' attempt(s) for ' + jiraKey)
+      document.getElementById('delete-attempts-ticket').value = ''
     } else {
       const body = await res.json().catch(() => null)
-      statusEl.textContent = body?.error ?? `Delete failed (${res.status})`
+      showToast(body?.error ?? ('Delete failed (' + res.status + ')'))
     }
     refresh()
   })
 
+  renderFilters()
+  setTab('cockpit')
+  loadConfig()
   refresh()
   setInterval(refresh, 5000)
 </script>

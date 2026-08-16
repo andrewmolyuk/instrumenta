@@ -15,6 +15,7 @@ import {
   setStopped,
 } from '../src/db/queries.mts'
 import { createApiHandler } from '../src/foreman/api.mts'
+import type { ForemanConfig } from '../src/foreman/config.mts'
 import type { BacklogItem, TaskProvider } from '../src/task-provider/types.mts'
 
 let db: Database
@@ -257,6 +258,48 @@ describe('POST /api/delete-attempts', () => {
   it('rejects a non-string jiraKey', async () => {
     const res = await handler(req('POST', '/api/delete-attempts', { jiraKey: 42 }))
     expect(res.status).toBe(400)
+  })
+})
+
+describe('GET /api/config', () => {
+  const CONFIG: ForemanConfig = {
+    dbPath: '/data/foreman.db',
+    jira: { baseUrl: 'https://acme.atlassian.net', email: 'bot@acme.io', apiToken: 'secret-jira-token', jql: 'project = PLAT' },
+    jiraAuth: { baseUrl: 'https://acme.atlassian.net', email: 'bot@acme.io', apiToken: 'secret-jira-token' },
+    bitbucket: BITBUCKET,
+    minionCommand: ['docker', 'run', '--rm', 'minion:latest'],
+    timeoutMs: 600_000,
+    pollIntervalMs: 60_000,
+    apiPort: 3000,
+  }
+
+  it('returns an allowlisted, secret-free subset of the config', async () => {
+    const withConfig = createApiHandler({ db, taskProvider, bitbucket: BITBUCKET, config: CONFIG })
+    const res = await withConfig(req('GET', '/api/config'))
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body).toEqual({
+      dbPath: '/data/foreman.db',
+      jira: { baseUrl: 'https://acme.atlassian.net', jql: 'project = PLAT', email: 'bot@acme.io' },
+      bitbucket: { workspace: BITBUCKET.workspace, repoSlug: BITBUCKET.repoSlug },
+      minionCommand: ['docker', 'run', '--rm', 'minion:latest'],
+      timeoutMs: 600_000,
+      pollIntervalMs: 60_000,
+      apiPort: 3000,
+    })
+  })
+
+  it('never includes jiraAuth.apiToken or bitbucket.token', async () => {
+    const withConfig = createApiHandler({ db, taskProvider, bitbucket: BITBUCKET, config: CONFIG })
+    const res = await withConfig(req('GET', '/api/config'))
+    const text = await res.text()
+    expect(text).not.toContain('secret-jira-token')
+    expect(text).not.toContain(BITBUCKET.token)
+  })
+
+  it('404s when no config was supplied', async () => {
+    const res = await handler(req('GET', '/api/config'))
+    expect(res.status).toBe(404)
   })
 })
 
