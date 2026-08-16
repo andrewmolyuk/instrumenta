@@ -40,6 +40,25 @@ function fakeFetch(transitions: typeof TRANSITIONS = TRANSITIONS, postOk = true)
   return { fn: fn as unknown as typeof fetch, posted }
 }
 
+/**
+ * Simulates a workflow whose GET response changes after each successful POST —
+ * `transitionsByStep[n]` is what's available from wherever the issue lands after
+ * the nth POST (`transitionsByStep[0]` is the starting status's transitions).
+ */
+function fakeFetchStateful(transitionsByStep: Array<typeof TRANSITIONS>) {
+  const posted: Array<{ url: string; body: unknown }> = []
+  let step = 0
+  const fn = vi.fn(async (url: string, init?: RequestInit) => {
+    if (!init || init.method === undefined) {
+      return { ok: true, status: 200, statusText: 'OK', json: async () => transitionsByStep[step] }
+    }
+    posted.push({ url, body: JSON.parse(init.body as string) })
+    step += 1
+    return { ok: true, status: 204, statusText: 'No Content', json: async () => ({}) }
+  })
+  return { fn: fn as unknown as typeof fetch, posted }
+}
+
 describe('JiraStatusMirror', () => {
   describe('onDispatch', () => {
     it('transitions the issue to the transition whose target status is "In Progress"', async () => {
@@ -66,6 +85,20 @@ describe('JiraStatusMirror', () => {
     it('throws when the transition POST fails', async () => {
       const { fn } = fakeFetch(TRANSITIONS, false)
       await expect(new JiraStatusMirror(CONFIG, fn).onDispatch('KAZ-1')).rejects.toThrow('Jira transition failed: 400')
+    })
+
+    it('falls back through "Approved" when "In Progress" is not a direct transition', async () => {
+      const { fn, posted } = fakeFetchStateful([
+        // from "To Do": only "Approved" is reachable directly
+        { transitions: [{ id: '11', to: { name: 'To Do' } }, { id: '15', to: { name: 'Approved' } }] },
+        // from "Approved": "In Progress" is now reachable
+        { transitions: [{ id: '15', to: { name: 'Approved' } }, { id: '21', to: { name: 'In Progress' } }] },
+      ])
+      await new JiraStatusMirror(CONFIG, fn).onDispatch('KAZ-1')
+
+      expect(posted).toHaveLength(2)
+      expect(posted[0]?.body).toEqual({ transition: { id: '15' } })
+      expect(posted[1]?.body).toEqual({ transition: { id: '21' } })
     })
   })
 

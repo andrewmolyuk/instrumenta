@@ -33,6 +33,16 @@ interface TransitionsResponse {
  * attempt status now; a ticket stays wherever `onDispatch` left it ("In
  * Progress") until a human moves it to Done themselves, after actually
  * merging the PR.
+ *
+ * Found live: some target workflows don't expose "In Progress" as a direct,
+ * one-hop transition from every starting status — Jira's transitions
+ * endpoint only ever returns the hops reachable from the issue's *current*
+ * status, so "To Do" -> "In Progress" silently does nothing if the workflow
+ * actually requires "To Do" -> "Approved" -> "In Progress". `onDispatch`
+ * gives `transitionTo` "Approved" as a fallback hop to try — only used when
+ * the direct transition isn't available — rather than generalizing to
+ * arbitrary multi-hop pathfinding, since this specific two-hop shape is the
+ * one actually observed, not a hypothetical one.
  */
 export class JiraStatusMirror implements StatusMirror {
   constructor(
@@ -41,23 +51,35 @@ export class JiraStatusMirror implements StatusMirror {
   ) {}
 
   async onDispatch(jiraKey: string): Promise<void> {
-    await this.transitionTo(jiraKey, 'In Progress')
+    await this.transitionTo(jiraKey, 'In Progress', 'Approved')
   }
 
   async onComplete(_row: TaskRow): Promise<void> {}
 
-  private async transitionTo(jiraKey: string, statusName: string): Promise<void> {
+  private async transitionTo(jiraKey: string, statusName: string, viaStatusName?: string): Promise<void> {
     const transitions = await this.listTransitions(jiraKey)
     const match = transitions.find((t) => t.to.name.toLowerCase() === statusName.toLowerCase())
-    if (!match) return
+    if (match) {
+      await this.applyTransition(jiraKey, match.id)
+      return
+    }
 
+    if (!viaStatusName) return
+    const viaMatch = transitions.find((t) => t.to.name.toLowerCase() === viaStatusName.toLowerCase())
+    if (!viaMatch) return
+
+    await this.applyTransition(jiraKey, viaMatch.id)
+    await this.transitionTo(jiraKey, statusName)
+  }
+
+  private async applyTransition(jiraKey: string, transitionId: string): Promise<void> {
     const res = await this.fetchImpl(`${this.config.baseUrl}/rest/api/3/issue/${jiraKey}/transitions`, {
       method: 'POST',
       headers: {
         Authorization: this.authHeader(),
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ transition: { id: match.id } }),
+      body: JSON.stringify({ transition: { id: transitionId } }),
     })
 
     if (!res.ok) {
