@@ -50,6 +50,29 @@ describe('createPullRequest', () => {
     expect(JSON.parse(call[1].body as string).destination.branch.name).toBe('develop')
   })
 
+  it('includes reviewers by uuid when configured', async () => {
+    const fetchImpl = fakeFetch({ links: { html: { href: 'https://x/pr/1' } } })
+    await createPullRequest(
+      { ...CONFIG, reviewers: ['{uuid-1}', '{uuid-2}'] },
+      'KAZ-1',
+      INPUT,
+      fetchImpl as unknown as typeof fetch,
+    )
+    const call = fetchImpl.mock.calls[0]
+    if (!call) throw new Error('fetch was not called')
+    const body = JSON.parse(call[1].body as string)
+    expect(body.reviewers).toEqual([{ uuid: '{uuid-1}' }, { uuid: '{uuid-2}' }])
+  })
+
+  it('omits the reviewers field entirely when none are configured', async () => {
+    const fetchImpl = fakeFetch({ links: { html: { href: 'https://x/pr/1' } } })
+    await createPullRequest(CONFIG, 'KAZ-1', INPUT, fetchImpl as unknown as typeof fetch)
+    const call = fetchImpl.mock.calls[0]
+    if (!call) throw new Error('fetch was not called')
+    const body = JSON.parse(call[1].body as string)
+    expect(body).not.toHaveProperty('reviewers')
+  })
+
   it('throws on a non-ok response, including the response body so the real reason is visible', async () => {
     const fetchImpl = fakeFetch({ error: { message: 'destination: branch not found: main' } }, false, 400)
     await expect(
