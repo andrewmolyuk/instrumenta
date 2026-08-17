@@ -248,7 +248,7 @@
         <div class="kicker">State sources</div>
         <div class="kv-row"><span>Jira &mdash; live query</span><span id="src-jira" class="tag tag-outline">OK</span></div>
         <div class="kv-row"><span>SQLite &mdash; <span id="src-db-path">/data/foreman.db</span></span><span class="tag tag-outline">OK</span></div>
-        <div class="kv-row"><span>Bitbucket &mdash; PR history</span><span class="tag tag-neutral">configured</span></div>
+        <div class="kv-row"><span>Bitbucket &mdash; PR history</span><span class="tag tag-outline">OK</span></div>
         <div class="note" style="border-top:1px solid var(--color-divider);padding-top:var(--space-3)">Give-up fires when either SQLite or Bitbucket crosses 3 attempts first.</div>
       </div>
     </div>
@@ -275,7 +275,7 @@
         </div>
         <table class="table">
           <thead>
-            <tr><th style="width:120px">Jira key</th><th style="width:80px">Attempt</th><th style="width:170px">Status</th><th style="width:70px">PR</th><th style="width:90px">Cost</th><th>Dispatched</th></tr>
+            <tr><th style="width:120px">Jira key</th><th style="width:80px">Attempt</th><th style="width:170px">Status</th><th style="width:70px">PR</th><th style="width:90px">Cost</th><th style="width:110px">Duration</th><th>Dispatched</th></tr>
           </thead>
           <tbody id="recent-body"></tbody>
         </table>
@@ -542,10 +542,13 @@
       attemptTd.classList.add('tabular')
       const costTd = td(costLabel(row.cost_usd))
       costTd.classList.add('tabular')
+      const durationTd = td(durationLabel(row.dispatched_at, row.finished_at))
+      durationTd.classList.add('tabular')
+      durationTd.style.color = 'var(--color-neutral-700)'
       const dispatchedTd = td(row.dispatched_at)
       dispatchedTd.classList.add('tabular')
       dispatchedTd.style.color = 'var(--color-neutral-700)'
-      tr.append(td(row.jira_key), attemptTd, tagCell(row.status), prCell(row.pr_url), costTd, dispatchedTd)
+      tr.append(td(row.jira_key), attemptTd, tagCell(row.status), prCell(row.pr_url), costTd, durationTd, dispatchedTd)
       tbody.append(tr)
     }
   }
