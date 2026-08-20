@@ -40,7 +40,15 @@ CREATE TABLE IF NOT EXISTS tasks (
 -- `current_dispatched_at` mirror the task the loop is inside `dispatch` for
 -- right now, if any — set just before Minion runs, cleared right after, so
 -- the API can show "what's Minion doing now" instead of only what's already
--- in `tasks`.
+-- in `tasks`. `current_summary` is that task's Jira title, copied from the
+-- BacklogItem at dispatch rather than looked up on demand: mirroring the task
+-- to "In Progress" (ADR-001) drops it out of the backlog JQL, so by the time
+-- anyone asks, the live queue no longer has a title to offer.
+-- `current_output`/`current_cost_usd` are the live side-channel Minion reports
+-- while it runs (src/minion/progress.mts) — a rolling tail of the last few
+-- things it did, and Claude Code's running cost. All three are display-only and
+-- are cleared with the rest of the current-task fields; the authoritative
+-- record of an attempt is still the `tasks` row written when it finishes.
 CREATE TABLE IF NOT EXISTS foreman_state (
   id INTEGER PRIMARY KEY CHECK (id = 1),
   stopped INTEGER NOT NULL DEFAULT 0,
@@ -48,7 +56,10 @@ CREATE TABLE IF NOT EXISTS foreman_state (
   budget_total INTEGER,
   queue_ticket TEXT,
   current_jira_key TEXT,
-  current_dispatched_at TEXT
+  current_dispatched_at TEXT,
+  current_summary TEXT,
+  current_output TEXT,
+  current_cost_usd REAL
 );
 
 INSERT OR IGNORE INTO foreman_state (id, stopped, budget, queue_ticket) VALUES (1, 0, NULL, NULL);

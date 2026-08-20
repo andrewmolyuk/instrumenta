@@ -35,6 +35,10 @@ and dated.
   from `budget_total` (a budget caps a run, not a lifetime); the loop checks the budget
   before dispatching, and a budget must be a positive integer or `null` (amends ADR-003's
   budget control)
+- [ADR-011](011-minion-reports-live-progress.md) — Minion reports live progress on stderr
+  (`@@minion-progress@@` lines) for display only, and Claude Code runs under
+  `--output-format stream-json`; Foreman's control flow still reads nothing but the single
+  result at exit (amends architecture.md's "no live-progress callback channel")
 
 ## Superseded
 

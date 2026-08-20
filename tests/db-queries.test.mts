@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import type { Database } from 'bun:sqlite'
 import { openDb, type TaskRow } from '../src/db/index.mts'
 import {
+  appendCurrentProgress,
+  CURRENT_OUTPUT_LINES,
   deleteAttempts,
   getBudget,
   getBudgetTotal,
@@ -149,10 +151,58 @@ describe('current task', () => {
     expect(getCurrentTask(db)).toBeNull()
   })
 
-  it('round-trips a jira_key and dispatched_at, including back to null', () => {
-    setCurrentTask(db, { jira_key: 'KAZ-42', dispatched_at: '2026-08-14T00:00:00Z' })
-    expect(getCurrentTask(db)).toEqual({ jira_key: 'KAZ-42', dispatched_at: '2026-08-14T00:00:00Z' })
+  it('round-trips a jira_key, summary and dispatched_at, including back to null', () => {
+    setCurrentTask(db, { jira_key: 'KAZ-42', summary: 'Fix the thing', dispatched_at: '2026-08-14T00:00:00Z' })
+    expect(getCurrentTask(db)).toEqual({
+      jira_key: 'KAZ-42',
+      summary: 'Fix the thing',
+      dispatched_at: '2026-08-14T00:00:00Z',
+      output: null,
+      cost_usd: null,
+    })
     setCurrentTask(db, null)
+    expect(getCurrentTask(db)).toBeNull()
+  })
+})
+
+describe('appendCurrentProgress', () => {
+  beforeEach(() => {
+    setCurrentTask(db, { jira_key: 'KAZ-42', summary: 'Fix the thing', dispatched_at: '2026-08-14T00:00:00Z' })
+  })
+
+  it('accumulates reported lines in order', () => {
+    appendCurrentProgress(db, { line: 'Read: src/foo.ts' })
+    appendCurrentProgress(db, { line: 'Bash: npm run lint' })
+    expect(getCurrentTask(db)?.output).toBe('Read: src/foo.ts\nBash: npm run lint')
+  })
+
+  it('keeps only the last CURRENT_OUTPUT_LINES lines', () => {
+    for (let i = 1; i <= CURRENT_OUTPUT_LINES + 5; i++) appendCurrentProgress(db, { line: 'line ' + i })
+
+    const lines = getCurrentTask(db)?.output?.split('\n') ?? []
+    expect(lines).toHaveLength(CURRENT_OUTPUT_LINES)
+    expect(lines[0]).toBe('line 6')
+    expect(lines.at(-1)).toBe('line ' + (CURRENT_OUTPUT_LINES + 5))
+  })
+
+  it('overwrites the running cost rather than accumulating it — Claude Code reports a total, not a delta', () => {
+    appendCurrentProgress(db, { cost_usd: 0.5 })
+    appendCurrentProgress(db, { cost_usd: 1.83 })
+    expect(getCurrentTask(db)?.cost_usd).toBe(1.83)
+  })
+
+  it('is dropped once the task is cleared, so a finished Minion leaves no live detail behind', () => {
+    appendCurrentProgress(db, { line: 'Read: src/foo.ts', cost_usd: 1.83 })
+    setCurrentTask(db, null)
+    setCurrentTask(db, { jira_key: 'KAZ-43', summary: 'Another', dispatched_at: '2026-08-14T01:00:00Z' })
+
+    expect(getCurrentTask(db)?.output).toBeNull()
+    expect(getCurrentTask(db)?.cost_usd).toBeNull()
+  })
+
+  it('does nothing when no task is in flight', () => {
+    setCurrentTask(db, null)
+    appendCurrentProgress(db, { line: 'stray line', cost_usd: 9 })
     expect(getCurrentTask(db)).toBeNull()
   })
 })

@@ -143,12 +143,20 @@ target project can redirect it (e.g. `instrumenta/review/`) via a small config v
 its own repository, which Minion reads at checkout alongside looking for `verify`. See
 [ADR-002](adr/002-foreman-minion-execution-boundary.md).
 
-Minion has no API of its own and doesn't push status anywhere mid-run. Foreman starts
-the container and waits synchronously for it to exit, then reads one structured result
-(status + PR url, if any). There is deliberately no live-progress callback channel here
-— that machinery is exactly the piece that never got finished in the prior art this
-design was checked against, and Foreman doesn't need it: a single result at exit is
-enough to record the outcome and decide the next Pick. Foreman enforces a timeout and
+Minion has no API of its own. Foreman starts the container and waits synchronously for
+it to exit, then reads one structured result (status + PR url, if any) from its stdout —
+and every decision Foreman makes comes from that result alone. There is deliberately no
+live-progress *callback* channel here — that machinery is exactly the piece that never
+got finished in the prior art this design was checked against, and Foreman doesn't need
+it: a single result at exit is enough to record the outcome and decide the next Pick.
+
+What Minion does report mid-run is one-directional and display-only: marker-prefixed
+lines on its own stderr — the pipe Foreman already holds — carrying what Claude Code is
+doing right now and what it has cost so far, which the Cockpit's "Minion now" card shows
+while an attempt is in flight. Dropping every one of those lines would change nothing
+about what Foreman decides or records. See
+[ADR-011](adr/011-minion-reports-live-progress.md), which argues the distinction against
+the warning above. Foreman enforces a timeout and
 kills Minion if it's exceeded, recording the run as a failed attempt directly — see
 [ADR-001](adr/001-task-state-three-sources.md) for why this specific case (a crash or
 hang with no PR ever opened) needed something beyond git/Bitbucket state to catch.

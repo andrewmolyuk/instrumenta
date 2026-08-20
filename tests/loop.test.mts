@@ -330,6 +330,63 @@ describe('runLoop', () => {
     expect(getCurrentTask(db)).toBeNull()
   })
 
+  it("records the in-flight task's Jira title, which the backlog no longer offers once it is In Progress", async () => {
+    let sawWhileDispatching = null as CurrentTask | null
+    const runner: MinionRunner = {
+      run: async () => {
+        setStopped(db, true)
+        sawWhileDispatching = getCurrentTask(db)
+        return { status: 'success', pr_url: null, output: null, cost_usd: null }
+      },
+    }
+
+    await runLoop({
+      db,
+      taskProvider: {
+        listBacklog: async () => [{ jira_key: 'KAZ-1', summary: 'Fix pagination on the device list', description: '' }],
+      },
+      bitbucket: BITBUCKET,
+      runner,
+      statusMirror: noopStatusMirror,
+      timeoutMs: 1000,
+      pollIntervalMs: 1000,
+      fetchImpl: fakeFetch(),
+      sleep: noSleep,
+    })
+
+    expect(sawWhileDispatching?.summary).toBe('Fix pagination on the device list')
+  })
+
+  it("persists Minion's live progress against the in-flight task as it arrives", async () => {
+    let sawWhileDispatching = null as CurrentTask | null
+    const runner: MinionRunner = {
+      run: async (_input, _timeoutMs, onProgress) => {
+        setStopped(db, true)
+        onProgress?.({ line: 'Read: src/foo.ts', cost_usd: 0.5 })
+        onProgress?.({ line: 'Bash: npm run lint', cost_usd: 1.83 })
+        sawWhileDispatching = getCurrentTask(db)
+        return { status: 'success', pr_url: null, output: null, cost_usd: 1.83 }
+      },
+    }
+
+    await runLoop({
+      db,
+      taskProvider: { listBacklog: async () => [{ jira_key: 'KAZ-1', summary: 's', description: '' }] },
+      bitbucket: BITBUCKET,
+      runner,
+      statusMirror: noopStatusMirror,
+      timeoutMs: 1000,
+      pollIntervalMs: 1000,
+      fetchImpl: fakeFetch(),
+      sleep: noSleep,
+    })
+
+    expect(sawWhileDispatching?.output).toBe('Read: src/foo.ts\nBash: npm run lint')
+    expect(sawWhileDispatching?.cost_usd).toBe(1.83)
+    // Cleared with the task itself — the finished attempt's record is its `tasks` row.
+    expect(getCurrentTask(db)).toBeNull()
+  })
+
   it('clears the current task even when dispatch throws', async () => {
     let calls = 0
     const runner: MinionRunner = {

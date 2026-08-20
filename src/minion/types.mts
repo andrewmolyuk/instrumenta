@@ -1,4 +1,5 @@
 import type { TaskStatus } from '../db/index.mts'
+import type { MinionProgress } from './progress.mts'
 
 /** Everything Minion needs at launch (architecture.md's Minion section). */
 export interface MinionInput {
@@ -29,5 +30,16 @@ export interface MinionResult {
 }
 
 export interface MinionRunner {
-  run(input: MinionInput, timeoutMs: number): Promise<MinionResult>
+  /**
+   * `onProgress` is optional on both sides: a runner is free to report nothing
+   * while a run is in flight (the loop just shows no live detail), and a caller
+   * that doesn't care can leave it off. It is a *side-channel* — whatever it
+   * reports is for display only, and never feeds the MinionResult this
+   * resolves to, which stays the single source of truth about the attempt.
+   */
+  run(
+    input: MinionInput,
+    timeoutMs: number,
+    onProgress?: (progress: MinionProgress) => void,
+  ): Promise<MinionResult>
 }

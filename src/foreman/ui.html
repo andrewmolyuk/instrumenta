@@ -80,7 +80,22 @@
   .note { font-size: 11px; color: var(--color-neutral-700); }
 
   .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-8); }
-  .stat-card { display: flex; flex-direction: column; gap: var(--space-2); min-height: 104px; }
+  .stat-card { display: flex; flex-direction: column; gap: var(--space-2); min-height: 104px; position: relative; }
+  .current-metrics { display: flex; gap: var(--space-4); font-size: 14px; color: var(--color-neutral-700); }
+  /* The live tail of what Minion is doing, on hover over the "Minion now" card.
+     Hover rather than always-on: ten lines of tool calls would dominate a stat
+     grid whose other three cards are single numbers, and it is a glance-at-it-
+     when-you-wonder detail, not a headline. Anchored to the card's right edge
+     and grown leftwards: this is the last of four cards in the grid, so a
+     quarter-width popover would shred every path in it, and one grown
+     rightwards would leave the viewport. */
+  .hover-log { display: none; position: absolute; top: 100%; right: -1px; left: auto;
+    width: max-content; max-width: min(460px, 80vw); z-index: 20;
+    margin-top: 4px; padding: var(--space-3); background: var(--color-bg);
+    border: 1px solid var(--color-divider); box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+    font-family: var(--font-mono, ui-monospace, monospace); font-size: 11px; line-height: 1.6;
+    white-space: pre-wrap; overflow-wrap: anywhere; max-height: 240px; overflow-y: auto; text-align: left; }
+  .stat-card:hover .hover-log.has-log { display: block; }
 
   .cockpit-grid { display: grid; grid-template-columns: 360px 1fr; gap: var(--space-8); align-items: start; }
   .col { display: flex; flex-direction: column; gap: 34px; }
@@ -200,7 +215,13 @@
       <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
       <div class="kicker">Minion now</div>
       <div class="stat" id="stat-current">&ndash;</div>
+      <div class="note" id="stat-current-summary"></div>
+      <div class="current-metrics">
+        <span class="tabular" id="stat-current-duration"></span>
+        <span class="tabular" id="stat-current-cost"></span>
+      </div>
       <div class="note" id="stat-current-note"></div>
+      <div class="hover-log" id="stat-current-log"></div>
     </div>
   </div>
 
@@ -472,14 +493,54 @@
     return cell
   }
 
-  function durationLabel(dispatchedAt, finishedAt) {
-    if (!finishedAt) return 'in progress'
-    const ms = new Date(finishedAt).getTime() - new Date(dispatchedAt).getTime()
+  function elapsedLabel(ms) {
     if (!Number.isFinite(ms) || ms < 0) return '—'
     const totalSec = Math.round(ms / 1000)
     const m = Math.floor(totalSec / 60)
     const s = totalSec % 60
     return m + 'm ' + String(s).padStart(2, '0') + 's'
+  }
+
+  function durationLabel(dispatchedAt, finishedAt) {
+    if (!finishedAt) return 'in progress'
+    return elapsedLabel(new Date(finishedAt).getTime() - new Date(dispatchedAt).getTime())
+  }
+
+  /* The in-flight attempt's dispatch timestamp, kept between /api/status polls
+     so tickCurrentDuration can advance the clock every second instead of it
+     jumping in 5-second steps with the poll. Null when nothing is in flight. */
+  let currentDispatchedAt = null
+
+  function renderCurrent(current) {
+    const summaryEl = document.getElementById('stat-current-summary')
+    const costEl = document.getElementById('stat-current-cost')
+    const noteEl = document.getElementById('stat-current-note')
+    const logEl = document.getElementById('stat-current-log')
+
+    currentDispatchedAt = current ? current.dispatched_at : null
+    document.getElementById('stat-current').textContent = current ? current.jira_key : '—'
+    // textContent, not innerHTML: a Jira summary is arbitrary text from a
+    // ticket nobody here controls, and it lands in the page verbatim.
+    summaryEl.textContent = current ? (current.summary || '') : ''
+    costEl.textContent = current && typeof current.cost_usd === 'number' ? costLabel(current.cost_usd) : ''
+    noteEl.textContent = current ? 'dispatched ' + current.dispatched_at : 'Nothing in flight'
+
+    // A Minion that has not reported a line yet leaves the card with no hover
+    // at all, rather than an empty box that looks like a rendering bug.
+    const log = current && current.output ? current.output : ''
+    logEl.textContent = log
+    logEl.classList.toggle('has-log', log.length > 0)
+
+    tickCurrentDuration()
+  }
+
+  function tickCurrentDuration() {
+    const durationEl = document.getElementById('stat-current-duration')
+    if (!currentDispatchedAt) {
+      durationEl.textContent = ''
+      return
+    }
+    durationEl.textContent = elapsedLabel(Date.now() - new Date(currentDispatchedAt).getTime())
   }
 
   function renderStatCards(s) {
@@ -497,15 +558,7 @@
 
     document.getElementById('stat-queued').textContent = s.queueTicket ?? '—'
 
-    const currentEl = document.getElementById('stat-current')
-    const currentNoteEl = document.getElementById('stat-current-note')
-    if (s.current) {
-      currentEl.textContent = s.current.jira_key
-      currentNoteEl.textContent = 'dispatched ' + s.current.dispatched_at
-    } else {
-      currentEl.textContent = '—'
-      currentNoteEl.textContent = 'Nothing in flight'
-    }
+    renderCurrent(s.current)
 
     const toggleLabel = s.stopped ? 'Start' : 'Stop'
     document.getElementById('toggle-run').textContent = toggleLabel
@@ -746,6 +799,7 @@
   loadConfig()
   refresh()
   setInterval(refresh, 5000)
+  setInterval(tickCurrentDuration, 1000)
 </script>
 </body>
 </html>

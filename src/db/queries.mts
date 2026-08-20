@@ -89,27 +89,87 @@ export function setQueueTicket(db: Database, jiraKey: string | null): void {
   db.run('UPDATE foreman_state SET queue_ticket = ? WHERE id = 1', [jiraKey])
 }
 
+/** How many lines of Minion's live output the Cockpit's "Minion now" card keeps. */
+export const CURRENT_OUTPUT_LINES = 10
+
 export interface CurrentTask {
   jira_key: string
+  /** The task's Jira title, captured at dispatch — see schema.sql on why it isn't looked up later. */
+  summary: string | null
   dispatched_at: string
+  /** The last CURRENT_OUTPUT_LINES lines Minion reported, newline-joined; null until it reports anything. */
+  output: string | null
+  /** Claude Code's running cost for the in-flight attempt; null until it reports one. */
+  cost_usd: number | null
+}
+
+interface CurrentTaskRow {
+  current_jira_key: string | null
+  current_summary: string | null
+  current_dispatched_at: string | null
+  current_output: string | null
+  current_cost_usd: number | null
 }
 
 /** The task the loop is inside `dispatch` for right now, if any (ADR-003's control surface). */
 export function getCurrentTask(db: Database): CurrentTask | null {
   const row = db
-    .query<{ current_jira_key: string | null; current_dispatched_at: string | null }, []>(
-      'SELECT current_jira_key, current_dispatched_at FROM foreman_state WHERE id = 1',
+    .query<CurrentTaskRow, []>(
+      `SELECT current_jira_key, current_summary, current_dispatched_at, current_output, current_cost_usd
+       FROM foreman_state WHERE id = 1`,
     )
     .get()
   if (!row?.current_jira_key || !row.current_dispatched_at) return null
-  return { jira_key: row.current_jira_key, dispatched_at: row.current_dispatched_at }
+  return {
+    jira_key: row.current_jira_key,
+    summary: row.current_summary ?? null,
+    dispatched_at: row.current_dispatched_at,
+    output: row.current_output ?? null,
+    cost_usd: row.current_cost_usd ?? null,
+  }
 }
 
-export function setCurrentTask(db: Database, task: CurrentTask | null): void {
-  db.run('UPDATE foreman_state SET current_jira_key = ?, current_dispatched_at = ? WHERE id = 1', [
-    task?.jira_key ?? null,
-    task?.dispatched_at ?? null,
-  ])
+/**
+ * Sets (or, with null, clears) the in-flight task. Clearing wipes the live
+ * progress fields too: they describe the attempt that just ended, and leaving
+ * them behind would have the card show a finished Minion's last line as though
+ * something were still running.
+ */
+export function setCurrentTask(db: Database, task: { jira_key: string; summary?: string | null; dispatched_at: string } | null): void {
+  db.run(
+    `UPDATE foreman_state
+     SET current_jira_key = ?, current_summary = ?, current_dispatched_at = ?, current_output = NULL, current_cost_usd = NULL
+     WHERE id = 1`,
+    [task?.jira_key ?? null, task?.summary ?? null, task?.dispatched_at ?? null],
+  )
+}
+
+/**
+ * Appends one live output line and/or a new running cost to the in-flight task,
+ * keeping only the last CURRENT_OUTPUT_LINES lines.
+ *
+ * The tail is kept in the database rather than in the loop's memory so the API
+ * has a single place to read it from — and read-modify-write is safe here
+ * because exactly one loop dispatches at a time (architecture.md: Foreman runs
+ * one Minion, synchronously). A progress update that arrives after the task was
+ * cleared updates nothing, since the WHERE clause no longer matches.
+ */
+export function appendCurrentProgress(db: Database, progress: { line?: string; cost_usd?: number }): void {
+  if (progress.line !== undefined) {
+    const row = db
+      .query<{ current_output: string | null }, []>('SELECT current_output FROM foreman_state WHERE id = 1')
+      .get()
+    const lines = row?.current_output ? row.current_output.split('\n') : []
+    lines.push(progress.line)
+    db.run('UPDATE foreman_state SET current_output = ? WHERE id = 1 AND current_jira_key IS NOT NULL', [
+      lines.slice(-CURRENT_OUTPUT_LINES).join('\n'),
+    ])
+  }
+  if (progress.cost_usd !== undefined) {
+    db.run('UPDATE foreman_state SET current_cost_usd = ? WHERE id = 1 AND current_jira_key IS NOT NULL', [
+      progress.cost_usd,
+    ])
+  }
 }
 
 /** Most recent attempts first — the history view of the control-surface API. */

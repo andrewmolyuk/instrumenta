@@ -3,6 +3,7 @@ import type { Database } from 'bun:sqlite'
 import type { BitbucketConfig } from '../src/bitbucket/closed-prs.mts'
 import { openDb } from '../src/db/index.mts'
 import {
+  appendCurrentProgress,
   getBudget,
   getBudgetTotal,
   getQueueTicket,
@@ -96,10 +97,33 @@ describe('GET /api/status', () => {
     expect(body.budget).toBe(5)
     expect(body.budgetTotal).toBe(10)
     expect(body.queueTicket).toBe('KAZ-2')
-    expect(body.current).toEqual({ jira_key: 'KAZ-1', dispatched_at: '2026-08-14T00:00:00Z' })
+    expect(body.current).toEqual({
+      jira_key: 'KAZ-1',
+      summary: null,
+      dispatched_at: '2026-08-14T00:00:00Z',
+      output: null,
+      cost_usd: null,
+    })
     expect(body.queue).toEqual(BACKLOG)
     expect(body.history).toHaveLength(1)
     expect(body.history[0]?.jira_key).toBe('KAZ-1')
+  })
+
+  it("reports the in-flight task's title and Minion's live cost and output tail", async () => {
+    setCurrentTask(db, {
+      jira_key: 'KAZ-1',
+      summary: 'Fix pagination on the device list',
+      dispatched_at: '2026-08-14T00:00:00Z',
+    })
+    appendCurrentProgress(db, { line: 'Read: src/foo.ts', cost_usd: 0.5 })
+    appendCurrentProgress(db, { line: 'Bash: npm run lint', cost_usd: 1.83 })
+
+    const res = await handler(new Request('http://x/api/status'))
+    const body = (await res.json()) as { current: { summary: string; cost_usd: number; output: string } }
+
+    expect(body.current.summary).toBe('Fix pagination on the device list')
+    expect(body.current.cost_usd).toBe(1.83)
+    expect(body.current.output).toBe('Read: src/foo.ts\nBash: npm run lint')
   })
 
   it('returns the rest of the status with an empty queue when the Task Provider fails', async () => {

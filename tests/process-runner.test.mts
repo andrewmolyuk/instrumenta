@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ProcessMinionRunner } from '../src/minion/process-runner.mts'
+import { encodeProgress, type MinionProgress } from '../src/minion/progress.mts'
 
 const INPUT = { task_id: 't1', jira_key: 'KAZ-1', description: 'do the thing', attempt_number: 1 }
 
@@ -109,5 +110,71 @@ describe('ProcessMinionRunner', () => {
     expect(result.status).toBe('timeout')
     expect(result.output).toContain('cloned repo')
     expect(result.output).toContain('still implementing...')
+  })
+})
+
+describe('ProcessMinionRunner live progress', () => {
+  /** A Minion that prints `lines` to stderr, then its structured result to stdout. */
+  function runnerPrinting(lines: string[]): ProcessMinionRunner {
+    const script = lines.map((l) => `console.error(${JSON.stringify(l)})`).join('; ')
+    return new ProcessMinionRunner([
+      'bun',
+      '-e',
+      `${script}; console.log(JSON.stringify({ status: 'success', pr_url: null }))`,
+    ])
+  }
+
+  it('reports each progress line Minion writes to stderr', async () => {
+    const seen: MinionProgress[] = []
+    const runner = runnerPrinting([
+      encodeProgress({ line: 'Read src/foo.ts', cost_usd: 0.5 }),
+      encodeProgress({ line: 'Bash: npm run lint', cost_usd: 1.25 }),
+    ])
+
+    await runner.run(INPUT, 5000, (p) => seen.push(p))
+
+    expect(seen).toEqual([
+      { line: 'Read src/foo.ts', cost_usd: 0.5 },
+      { line: 'Bash: npm run lint', cost_usd: 1.25 },
+    ])
+  })
+
+  it('keeps progress lines out of the output captured for a crash', async () => {
+    // The whole point of the captured output is the stack trace that explains
+    // the crash — hundreds of progress lines around it would bury it.
+    const runner = new ProcessMinionRunner([
+      'bun',
+      '-e',
+      `console.error(${JSON.stringify(encodeProgress({ line: 'Read src/foo.ts' }))}); console.error('TypeError: boom'); process.exit(1)`,
+    ])
+
+    const result = await runner.run(INPUT, 5000, () => {})
+
+    expect(result.status).toBe('crashed')
+    expect(result.output).toContain('TypeError: boom')
+    expect(result.output).not.toContain('Read src/foo.ts')
+  })
+
+  it('runs without an onProgress callback at all', async () => {
+    const runner = runnerPrinting([encodeProgress({ line: 'Read src/foo.ts' })])
+    await expect(runner.run(INPUT, 5000)).resolves.toMatchObject({ status: 'success' })
+  })
+
+  it('reports progress while the process is still running, not only at exit', async () => {
+    // Buffering these until exit would make them useless: an attempt runs for
+    // tens of minutes, and the card is meant to show what it is doing *now*.
+    const runner = new ProcessMinionRunner([
+      'bun',
+      '-e',
+      `console.error(${JSON.stringify(encodeProgress({ line: 'early' }))}); await Bun.sleep(400); console.log(JSON.stringify({ status: 'success', pr_url: null }))`,
+    ])
+
+    let sawEarlyLineAt = 0
+    const started = Date.now()
+    await runner.run(INPUT, 5000, () => {
+      sawEarlyLineAt ||= Date.now() - started
+    })
+
+    expect(sawEarlyLineAt).toBeLessThan(300)
   })
 })

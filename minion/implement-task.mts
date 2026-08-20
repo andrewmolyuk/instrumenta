@@ -1,3 +1,4 @@
+import { encodeProgress, type MinionProgress } from '../src/minion/progress.mts'
 import type { MinionInput } from '../src/minion/types.mts'
 import { MAX_IMPLEMENT_OUTPUT_CHARS } from './constants.mts'
 
@@ -64,8 +65,18 @@ passing only if you actually ran it and saw it pass.`
     process.env.MINION_CLAUDE_EFFORT ?? 'high',
     '-p',
     prompt,
+    // `stream-json` rather than `json` so the run reports as it goes instead of
+    // only at exit: the Cockpit's "Minion now" card shows a live cost and the
+    // last few things Claude Code did, and with `json` there is nothing at all
+    // to show until the attempt is already over — which, at ~40 minutes an
+    // attempt, is exactly when it stops being useful. `--verbose` is not
+    // optional decoration: Claude Code refuses `-p --output-format stream-json`
+    // without it. The final `result` event carries the same `.result` text and
+    // `.total_cost_usd` the single-object form did, so ADR-008's cost capture
+    // reads the same field either way.
     '--output-format',
-    'json',
+    'stream-json',
+    '--verbose',
   ]
 }
 
@@ -122,44 +133,132 @@ export async function implementTask(
 }
 
 /**
- * Claude Code's `--output-format json` prints one JSON object to stdout —
- * `.result` is its final human-readable text (used as the diagnostic output,
- * in place of the raw JSON blob) and `.total_cost_usd` is its own cost
- * estimate. Falls back to the raw combined stdout+stderr text (the pre-JSON
- * behavior) whenever stdout isn't that shape — a crash, a missing binary, or
- * a test double that doesn't speak this format all still produce something.
+ * Reads `stream` to completion, handing each complete line to `onLine` as soon
+ * as it arrives rather than after exit — the whole point of stream-json here.
+ * Returns the full text as well, so the existing fallback paths still have the
+ * raw output to fall back to.
+ */
+async function readLines(stream: ReadableStream<Uint8Array>, onLine: (line: string) => void): Promise<string> {
+  const decoder = new TextDecoder()
+  let pending = ''
+  let full = ''
+  for await (const chunk of stream) {
+    const text = decoder.decode(chunk, { stream: true })
+    full += text
+    pending += text
+    const lines = pending.split('\n')
+    pending = lines.pop() ?? ''
+    for (const line of lines) if (line.trim()) onLine(line)
+  }
+  if (pending.trim()) onLine(pending)
+  return full
+}
+
+/** Cap on the raw stdout held in memory for the fallback path — a real stream-json run is megabytes of NDJSON that the `result` event makes redundant. */
+const MAX_RAW_STDOUT_CHARS = MAX_IMPLEMENT_OUTPUT_CHARS * 2
+
+interface ClaudeEvent {
+  type?: unknown
+  subtype?: unknown
+  result?: unknown
+  total_cost_usd?: unknown
+  message?: { content?: unknown }
+}
+
+/**
+ * One short human line describing what an event means, or null for the events
+ * worth staying quiet about (tool *results*, above all — they carry whole file
+ * contents, and this line ends up in a hover tooltip). Every shape here is
+ * probed defensively: this is someone else's stream format, and an unrecognized
+ * event costs one skipped progress line, not the attempt.
+ */
+function summarizeEvent(event: ClaudeEvent): string | null {
+  if (event.type === 'system') return event.subtype === 'init' ? 'session started' : null
+  if (event.type === 'result') return typeof event.result === 'string' ? 'finished' : 'finished (no result)'
+  if (event.type !== 'assistant') return null
+
+  const content = event.message?.content
+  if (!Array.isArray(content)) return null
+  const parts: string[] = []
+  for (const block of content) {
+    if (block?.type === 'text' && typeof block.text === 'string') {
+      const firstLine = block.text.trim().split('\n')[0]
+      if (firstLine) parts.push(truncate(firstLine, 120))
+    }
+    if (block?.type === 'tool_use' && typeof block.name === 'string') {
+      const input = block.input ?? {}
+      const detail = [input.file_path, input.command, input.pattern, input.description].find(
+        (v: unknown) => typeof v === 'string' && v.length > 0,
+      )
+      parts.push(detail ? `${block.name}: ${truncate(String(detail), 100)}` : block.name)
+    }
+  }
+  return parts.length > 0 ? parts.join(' · ') : null
+}
+
+function truncate(text: string, max: number): string {
+  return text.length > max ? `${text.slice(0, max - 1)}…` : text
+}
+
+/**
+ * Runs Claude Code and reads its stream-json stdout as it arrives: each event
+ * becomes a progress line on Minion's own stderr (see src/minion/progress.mts
+ * for why stderr), while `.result` and `.total_cost_usd` from the final result
+ * event become this function's return, exactly as they did when the format was
+ * a single `json` object.
+ *
+ * Falls back to the raw combined stdout+stderr text (the pre-JSON behavior)
+ * whenever no event carried a `result` string — a crash, a missing binary, or a
+ * test double that doesn't speak this format all still produce something. A
+ * lone `{"result":…,"total_cost_usd":…}` object with no `type` is still read as
+ * that result, so the older single-object form keeps working too.
+ *
+ * stdout and stderr are drained concurrently, not one after the other: a child
+ * that fills the pipe nobody is reading blocks forever, and a 40-minute Claude
+ * Code run produces far more than a pipe buffer holds.
  */
 async function captureImplementOutput(workDir: string, command: string[]): Promise<ImplementResult> {
   try {
     const proc = Bun.spawn(command, { cwd: workDir, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' })
+
+    let resultText: string | null = null
+    let costUsd: number | null = null
+
+    const [rawStdout, rawStderr] = await Promise.all([
+      readLines(proc.stdout, (line) => {
+        let event: ClaudeEvent
+        try {
+          event = JSON.parse(line)
+        } catch {
+          return
+        }
+        if (typeof event !== 'object' || event === null) return
+
+        const progress: MinionProgress = {}
+        if (typeof event.total_cost_usd === 'number') {
+          costUsd = event.total_cost_usd
+          progress.cost_usd = costUsd
+        }
+        if (typeof event.result === 'string') resultText = event.result
+        const summary = summarizeEvent(event)
+        if (summary) progress.line = summary
+        if (progress.line !== undefined || progress.cost_usd !== undefined) console.error(encodeProgress(progress))
+      }),
+      new Response(proc.stderr).text(),
+    ])
     await proc.exited
-    const stdout = (await new Response(proc.stdout).text()).trim()
-    const stderr = (await new Response(proc.stderr).text()).trim()
 
-    const parsed = parseClaudeCodeResult(stdout)
-    const output = parsed ? [parsed.output, stderr].filter(Boolean).join('\n') : [stdout, stderr].filter(Boolean).join('\n')
-    const costUsd = parsed?.costUsd ?? null
+    const stdout = tail(rawStdout.trim(), MAX_RAW_STDOUT_CHARS)
+    const stderr = rawStderr.trim()
+    const output = resultText !== null ? [resultText, stderr].filter(Boolean).join('\n') : [stdout, stderr].filter(Boolean).join('\n')
 
-    return {
-      output:
-        output.length > MAX_IMPLEMENT_OUTPUT_CHARS
-          ? `…(truncated)…\n${output.slice(-MAX_IMPLEMENT_OUTPUT_CHARS)}`
-          : output,
-      costUsd,
-    }
+    return { output: tail(output, MAX_IMPLEMENT_OUTPUT_CHARS), costUsd }
   } catch (err) {
     // Command not available — caller doesn't treat this as fatal (see above).
     return { output: `(claude command failed to start: ${err instanceof Error ? err.message : String(err)})`, costUsd: null }
   }
 }
 
-function parseClaudeCodeResult(stdout: string): { output: string; costUsd: number | null } | null {
-  try {
-    const parsed = JSON.parse(stdout)
-    if (typeof parsed?.result !== 'string') return null
-    const costUsd = typeof parsed.total_cost_usd === 'number' ? parsed.total_cost_usd : null
-    return { output: parsed.result, costUsd }
-  } catch {
-    return null
-  }
+function tail(text: string, max: number): string {
+  return text.length > max ? `…(truncated)…\n${text.slice(-max)}` : text
 }

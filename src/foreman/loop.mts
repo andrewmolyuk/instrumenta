@@ -1,6 +1,7 @@
 import type { Database } from 'bun:sqlite'
 import type { TaskRow } from '../db/index.mts'
 import {
+  appendCurrentProgress,
   getBudget,
   getQueueTicket,
   isStopped,
@@ -103,9 +104,19 @@ export async function runLoop(deps: LoopDeps): Promise<void> {
       }
 
       await deps.statusMirror.onDispatch(task.jira_key)
-      setCurrentTask(deps.db, { jira_key: task.jira_key, dispatched_at: new Date().toISOString() })
+      setCurrentTask(deps.db, {
+        jira_key: task.jira_key,
+        summary: task.summary,
+        dispatched_at: new Date().toISOString(),
+      })
       try {
-        const row = await dispatch(deps.db, deps.runner, task, deps.timeoutMs)
+        // Minion's live progress is persisted straight through to
+        // `foreman_state` as it arrives, so the API reads it from the same
+        // place as everything else it reports. Display-only: nothing here
+        // affects the TaskRow that dispatch resolves to.
+        const row = await dispatch(deps.db, deps.runner, task, deps.timeoutMs, (progress) =>
+          appendCurrentProgress(deps.db, progress),
+        )
         recordAttempt(deps.db, row)
         await deps.statusMirror.onComplete(row)
 

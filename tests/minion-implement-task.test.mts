@@ -1,4 +1,5 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { decodeProgress, type MinionProgress } from '../src/minion/progress.mts'
 import type { MinionInput } from '../src/minion/types.mts'
 import { defaultImplementCommand, implementTask } from '../minion/implement-task.mts'
 
@@ -99,5 +100,61 @@ describe('defaultImplementCommand', () => {
   it('tells Claude Code to leave the changes uncommitted', () => {
     const prompt = promptOf(defaultImplementCommand(INPUT))
     expect(prompt).toMatch(/do not run `git commit`/i)
+  })
+})
+
+describe('implementTask stream-json progress', () => {
+  const EVENTS = [
+    { type: 'system', subtype: 'init', model: 'claude-opus-5[1m]' },
+    { type: 'assistant', message: { content: [{ type: 'tool_use', name: 'Read', input: { file_path: 'src/foo.ts' } }] } },
+    { type: 'assistant', message: { content: [{ type: 'tool_use', name: 'Bash', input: { command: 'npm run lint' } }] } },
+    { type: 'user', message: { content: [{ type: 'tool_result', content: 'a very long file dump' }] } },
+    { type: 'result', subtype: 'success', result: 'fixed the thing', total_cost_usd: 1.83 },
+  ]
+
+  /** Runs implementTask over a canned stream-json transcript, collecting what it reported. */
+  async function runOverEvents(events: unknown[]): Promise<{ result: Awaited<ReturnType<typeof implementTask>>; progress: MinionProgress[] }> {
+    const progress: MinionProgress[] = []
+    const spy = vi.spyOn(console, 'error').mockImplementation((...args: unknown[]) => {
+      const decoded = decodeProgress(String(args[0]))
+      if (decoded) progress.push(decoded)
+    })
+    try {
+      const script = events.map((e) => `console.log(${JSON.stringify(JSON.stringify(e))})`).join('; ')
+      const result = await implementTask('/tmp', INPUT, ['bun', '-e', script])
+      return { result, progress }
+    } finally {
+      spy.mockRestore()
+    }
+  }
+
+  it("takes the output text and cost from the stream's final result event", async () => {
+    const { result } = await runOverEvents(EVENTS)
+    expect(result.output).toBe('fixed the thing')
+    expect(result.costUsd).toBe(1.83)
+  })
+
+  it('reports a progress line per tool call, carrying the running cost', async () => {
+    const { progress } = await runOverEvents(EVENTS)
+    const lines = progress.map((p) => p.line).filter(Boolean)
+    expect(lines).toContain('Read: src/foo.ts')
+    expect(lines).toContain('Bash: npm run lint')
+    expect(progress.at(-1)?.cost_usd).toBe(1.83)
+  })
+
+  it('stays quiet about tool results, which carry whole file contents', async () => {
+    const { progress } = await runOverEvents(EVENTS)
+    expect(progress.map((p) => p.line).join('\n')).not.toContain('a very long file dump')
+  })
+
+  it('skips stream lines it cannot parse rather than failing the run', async () => {
+    const { result, progress } = await runOverEvents([
+      { type: 'assistant', message: { content: 'not an array' } },
+      { type: 'mystery-future-event' },
+      { type: 'result', result: 'done anyway', total_cost_usd: 0.1 },
+    ])
+    expect(result.output).toBe('done anyway')
+    expect(result.costUsd).toBe(0.1)
+    expect(progress.length).toBeGreaterThan(0)
   })
 })
