@@ -20,8 +20,14 @@ WORKDIR /app
 
 COPY --from=bun /usr/local/bin/bun /usr/local/bin/bun
 
+# `ca-certificates` is not optional: the base image ships no CA bundle at all
+# (no /etc/ssl/certs), and `--no-install-recommends` drops the one git itself
+# recommends — so every `git clone https://...` died with "server certificate
+# verification failed. CAfile: none CRLfile: none" before the attempt could
+# start. Found live on RPG-6017/6029/6036/6040/6043/6044 — eight attempts
+# crashed within a second of dispatch, each one a wasted retry.
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends git \
+  && apt-get install -y --no-install-recommends ca-certificates git \
   && rm -rf /var/lib/apt/lists/* \
   && npm install -g @anthropic-ai/claude-code
 

@@ -1,5 +1,19 @@
 import { join } from 'node:path'
 
+/**
+ * Strips the password out of any `scheme://user:password@host` URL in `text`.
+ *
+ * Every git command here is handed the clone URL with BITBUCKET_TOKEN embedded
+ * in it (buildCloneUrl), so an unredacted failure message leaks a live
+ * write-scoped credential into the `tasks.output` column, the Cockpit's Recent
+ * Attempts table, and Foreman's logs — permanently, and to anyone who can see
+ * any of the three. Applied to the whole message rather than just the echoed
+ * argv, since git repeats the remote URL back in its own output too.
+ */
+function redactCredentials(text: string): string {
+  return text.replace(/([a-z][a-z0-9+.-]*:\/\/[^\s:/@]+:)[^\s@]+@/gi, '$1***@')
+}
+
 async function run(cmd: string[], cwd?: string): Promise<void> {
   const proc = Bun.spawn(cmd, { cwd, stdout: 'pipe', stderr: 'pipe' })
   const code = await proc.exited
@@ -10,7 +24,7 @@ async function run(cmd: string[], cwd?: string): Promise<void> {
     const stdout = (await new Response(proc.stdout).text()).trim()
     const stderr = (await new Response(proc.stderr).text()).trim()
     const detail = [stdout, stderr].filter(Boolean).join('\n') || '(no output on stdout or stderr)'
-    throw new Error(`Command failed (${cmd.join(' ')}): ${detail}`)
+    throw new Error(redactCredentials(`Command failed (${cmd.join(' ')}): ${detail}`))
   }
 }
 

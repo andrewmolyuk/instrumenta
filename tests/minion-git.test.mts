@@ -120,3 +120,18 @@ describe('commitAndPush', () => {
     await expect(commitAndPush(workDir, 'KAZ-1', 'KAZ-1: no changes')).rejects.toThrow(/nothing to commit/i)
   })
 })
+
+describe('credential redaction', () => {
+  it('keeps the embedded token out of the error a failed clone throws', async () => {
+    const token = 'ATATT3xFfGF0-super-secret-token'
+    const url = `https://x-token-auth:${token}@bitbucket.org/CGS/does-not-exist.git`
+
+    // The RPG-6017 leak: every clone URL carries BITBUCKET_TOKEN, and the failure
+    // message was stored verbatim in tasks.output and rendered in the Cockpit.
+    const err = await cloneAndBranch(url, 'KAZ-1', workDir, true).catch((e: Error) => e)
+
+    expect(err).toBeInstanceOf(Error)
+    expect((err as Error).message).not.toContain(token)
+    expect((err as Error).message).toContain('x-token-auth:***@bitbucket.org')
+  })
+})
