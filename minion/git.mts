@@ -64,9 +64,25 @@ export async function writeNote(workDir: string, notesPath: string, filename: st
   await Bun.write(join(dir, filename), content)
 }
 
-/** Stages everything currently in the working tree, commits, and pushes the branch. */
-export async function commitAndPush(workDir: string, branch: string, message: string): Promise<void> {
+/** Stages everything currently in the working tree, without committing. */
+export async function stageAll(workDir: string): Promise<void> {
   await run(['git', 'add', '-A'], workDir)
-  await run(['git', 'commit', '-m', message], workDir)
+}
+
+/**
+ * Stages everything currently in the working tree, commits, and pushes the branch.
+ *
+ * `--no-verify` (ADR-009): the target project's `pre-commit` checks already ran,
+ * once, as part of the gate (`runPreCommitHook`, verify-gate.mts) — letting the
+ * commit run them a second time would repeat the project's whole lint/test
+ * toolchain for no new information, and a failure at this point is a crash with
+ * nothing pushed instead of a retryable `failed_verify`. It also skips
+ * `commit-msg` (commitlint): the message this is given is already built to
+ * conform (`fix:`/`chore:`, lowercased subject — see orchestrate.mts), and a
+ * rule it still trips can no longer take the attempt down with it.
+ */
+export async function commitAndPush(workDir: string, branch: string, message: string): Promise<void> {
+  await stageAll(workDir)
+  await run(['git', 'commit', '--no-verify', '-m', message], workDir)
   await run(['git', 'push', '-u', 'origin', branch], workDir)
 }

@@ -1,9 +1,9 @@
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { cloneAndBranch, commitAndPush, writeNote } from '../minion/git.mts'
+import { cloneAndBranch, commitAndPush, stageAll, writeNote } from '../minion/git.mts'
 
 let remoteDir: string
 let workDir: string
@@ -73,6 +73,18 @@ describe('writeNote', () => {
   })
 })
 
+describe('stageAll', () => {
+  it('stages new and untracked files without committing', async () => {
+    await cloneAndBranch(remoteDir, 'KAZ-1', workDir, true)
+    writeFileSync(join(workDir, 'new-file.txt'), 'work')
+
+    await stageAll(workDir)
+
+    expect(git(['diff', '--cached', '--name-only'], workDir)).toContain('new-file.txt')
+    expect(git(['log', '-1', '--format=%s'], workDir).trim()).toBe('initial')
+  })
+})
+
 describe('commitAndPush', () => {
   it('commits staged changes and pushes the branch to the remote', async () => {
     await cloneAndBranch(remoteDir, 'KAZ-1', workDir, true)
@@ -84,6 +96,21 @@ describe('commitAndPush', () => {
 
     const log = git(['log', 'KAZ-1', '-1', '--format=%s'], remoteDir).trim()
     expect(log).toBe('KAZ-1: add note')
+  })
+
+  it('commits despite a failing pre-commit hook — the gate already ran those checks', async () => {
+    // The KAZ-8390 crash: the target repo's Husky pre-commit hook rejected the commit
+    // (ESLint errors), commitAndPush threw, and the attempt was recorded as `crashed`
+    // with nothing pushed. runPreCommitHook now runs those same checks before this point.
+    await cloneAndBranch(remoteDir, 'KAZ-1', workDir, true)
+    const hook = join(workDir, '.git/hooks/pre-commit')
+    writeFileSync(hook, '#!/bin/sh\necho "lint failed" 1>&2\nexit 1\n')
+    chmodSync(hook, 0o755)
+    await writeNote(workDir, 'docs/todo/', 'kaz-1-given-up.md', 'note content')
+
+    await commitAndPush(workDir, 'KAZ-1', 'chore: KAZ-1: add note')
+
+    expect(git(['log', 'KAZ-1', '-1', '--format=%s'], remoteDir).trim()).toBe('chore: KAZ-1: add note')
   })
 
   it('surfaces stdout in the thrown error when a git command fails without writing to stderr', async () => {

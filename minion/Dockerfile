@@ -1,13 +1,27 @@
 # Minion: ephemeral, one per dispatched task (ADR-002). Built here rather than
-# reusing Foreman's own image since it needs git + npm (checkout, verify-gate)
-# that Foreman's container has no reason to carry. Also ships the Claude Code
-# CLI itself — implement-task.mts spawns it to do the actual task work.
-FROM oven/bun:1
+# reusing Foreman's own image since it needs git + Node/npm (checkout, verify
+# gate, and the target project's own toolchain) that Foreman's container has no
+# reason to carry. Also ships the Claude Code CLI itself — implement-task.mts
+# spawns it to do the actual task work.
+#
+# Node is the base image, with Bun copied in on top of it, rather than the other
+# way round: Debian's own `npm` package pulled Node 20, and target projects'
+# devDependencies already require >= 22.18. Found live on KAZ-8739 — the target
+# repo's ESLint died on the older runtime ("Unterminated comment" out of
+# `node_modules/lodash.merge`), so Claude Code couldn't run the project's checks
+# and neither could the gate; the attempt burned 47 minutes and produced nothing.
+# Bun comes from its own official image (Minion's own code runs under it) rather
+# than from npm, so it's the same binary `oven/bun:1` ships.
+FROM oven/bun:1 AS bun
+
+FROM node:22-bookworm-slim
 
 WORKDIR /app
 
+COPY --from=bun /usr/local/bin/bun /usr/local/bin/bun
+
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends git npm \
+  && apt-get install -y --no-install-recommends git \
   && rm -rf /var/lib/apt/lists/* \
   && npm install -g @anthropic-ai/claude-code
 

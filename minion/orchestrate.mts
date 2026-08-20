@@ -2,7 +2,7 @@ import type { MinionInput, MinionResult } from '../src/minion/types.mts'
 import { MAX_ATTEMPTS } from './constants.mts'
 import type { ImplementResult } from './implement-task.mts'
 import { blockedNoVerifyFilename, blockedNoVerifyNote, givenUpFilename, givenUpNote } from './notes.mts'
-import type { VerifyResult } from './verify-gate.mts'
+import type { PreCommitResult, VerifyResult } from './verify-gate.mts'
 
 export interface MinionDeps {
   cloneAndBranch(repoUrl: string, branch: string, workDir: string, reuseExisting: boolean): Promise<void>
@@ -10,6 +10,7 @@ export interface MinionDeps {
   implementTask(workDir: string, input: MinionInput): Promise<ImplementResult>
   hasVerifyScript(workDir: string): Promise<boolean>
   runVerify(workDir: string): Promise<VerifyResult>
+  runPreCommitChecks(workDir: string): Promise<PreCommitResult>
   writeNote(workDir: string, notesPath: string, filename: string, content: string): Promise<void>
   commitAndPush(workDir: string, branch: string, message: string): Promise<void>
   createPullRequest(branch: string, input: MinionInput): Promise<string>
@@ -40,7 +41,12 @@ function combineOutputs(...parts: (string | null | undefined)[]): string | null 
  * The subject text itself also has to avoid sentence-case (commitlint's
  * `subject-case` rule, part of the conventional-commit preset most target
  * repos use) — Jira descriptions are free text and often start capitalized,
- * so the first character is lowercased before it goes into the subject.
+ * so the first character is lowercased before it goes into the subject. Free
+ * text also means embedded newlines: a raw description turned `git commit -m`'s
+ * argument into a subject plus a body, so KAZ-8390's whole subject was
+ * `fix: KAZ-8390: steps:` (its description's first line) with the rest of the
+ * ticket dumped into the body without the blank line commitlint's
+ * `body-leading-blank` wants — see commitSubject.
  *
  * Even with that, a target repo's commit-msg hook can still reject a commit
  * for reasons this file can't predict (a different lint rule, max length,
@@ -58,6 +64,15 @@ function combineOutputs(...parts: (string | null | undefined)[]): string | null 
  * reports `crashed`; a human fixing the underlying cause can open the PR
  * from that branch by hand rather than needing a full re-run.
  *
+ * The gate has two parts (ADR-009): the target project's own `verify` script,
+ * and — since a passing `verify` doesn't mean the commit will be allowed — the
+ * `pre-commit` hook that same project would run at commit time, executed here
+ * *before* committing. Either one failing takes the same path: `failed_verify`
+ * (or `given_up` plus a note on the final attempt), nothing committed, the
+ * captured output kept for the human or the next attempt. `commitAndPush` then
+ * commits with `--no-verify`, so those checks run exactly once per attempt
+ * rather than a second time inside a commit that can only crash the run.
+ *
  * Before cloning, checks whether this jira_key's branch already has an open
  * PR — if not (the common retry-after-crash case), cloneAndBranch reuses an
  * existing remote branch of the same name instead of always branching fresh
@@ -72,8 +87,24 @@ function combineOutputs(...parts: (string | null | undefined)[]): string | null 
  * checking here too means Minion's own contract doesn't depend on Foreman
  * having done it first.
  */
-function lowercaseFirst(text: string): string {
-  return text.charAt(0).toLowerCase() + text.slice(1)
+/**
+ * Cap on the description text in a commit subject: keeps the whole header
+ * (`fix: KAZ-1234: ` plus this) inside the 100 characters commitlint's
+ * conventional preset allows by default.
+ */
+const MAX_SUBJECT_DESCRIPTION_CHARS = 72
+
+/**
+ * A Jira description turned into one commit-subject line: all whitespace
+ * (newlines included) collapsed to single spaces, first character lowercased
+ * for commitlint's `subject-case`, then truncated. Collapsing first rather
+ * than truncating first matters — the truncation then spends its budget on
+ * ticket text instead of stopping at the description's first line break.
+ */
+function commitSubject(description: string): string {
+  const oneLine = description.replace(/\s+/g, ' ').trim()
+  const lowercased = oneLine.charAt(0).toLowerCase() + oneLine.slice(1)
+  return lowercased.slice(0, MAX_SUBJECT_DESCRIPTION_CHARS).trimEnd()
 }
 
 /** Runs commitAndPush; returns the error message instead of throwing on failure. */
@@ -89,6 +120,35 @@ async function tryCommitAndPush(
   } catch (err) {
     return err instanceof Error ? err.message : String(err)
   }
+}
+
+/**
+ * A failing gate, either part of it (see runMinion): report `failed_verify` and
+ * commit nothing, or — on the final allowed attempt — write the give-up note
+ * and push that, per architecture.md's step 4.
+ */
+async function reportFailedGate(
+  deps: MinionDeps,
+  input: MinionInput,
+  workDir: string,
+  notesPath: string,
+  attempt: { isFinalAttempt: boolean; costUsd: number | null; output: string | null },
+): Promise<MinionResult> {
+  const { isFinalAttempt, costUsd, output } = attempt
+  if (!isFinalAttempt) {
+    return { status: 'failed_verify', pr_url: null, output, cost_usd: costUsd }
+  }
+  await deps.writeNote(workDir, notesPath, givenUpFilename(input.jira_key), givenUpNote(input))
+  const commitError = await tryCommitAndPush(
+    deps,
+    workDir,
+    input.jira_key,
+    `chore: ${input.jira_key}: giving up after ${MAX_ATTEMPTS} attempts`,
+  )
+  if (commitError) {
+    return { status: 'crashed', pr_url: null, output: combineOutputs(output, commitError), cost_usd: costUsd }
+  }
+  return { status: 'given_up', pr_url: null, output, cost_usd: costUsd }
 }
 
 export async function runMinion(
@@ -125,28 +185,27 @@ export async function runMinion(
 
   const verify = await deps.runVerify(workDir)
   if (!verify.passed) {
-    const output = combineOutputs(implementOutput, verify.output)
-    if (!isFinalAttempt) {
-      return { status: 'failed_verify', pr_url: null, output, cost_usd: costUsd }
-    }
-    await deps.writeNote(workDir, notesPath, givenUpFilename(input.jira_key), givenUpNote(input))
-    const commitError = await tryCommitAndPush(
-      deps,
-      workDir,
-      input.jira_key,
-      `chore: ${input.jira_key}: giving up after ${MAX_ATTEMPTS} attempts`,
-    )
-    if (commitError) {
-      return { status: 'crashed', pr_url: null, output: combineOutputs(output, commitError), cost_usd: costUsd }
-    }
-    return { status: 'given_up', pr_url: null, output, cost_usd: costUsd }
+    return await reportFailedGate(deps, input, workDir, notesPath, {
+      isFinalAttempt,
+      costUsd,
+      output: combineOutputs(implementOutput, verify.output),
+    })
+  }
+
+  const preCommit = await deps.runPreCommitChecks(workDir)
+  if (!preCommit.passed) {
+    return await reportFailedGate(deps, input, workDir, notesPath, {
+      isFinalAttempt,
+      costUsd,
+      output: combineOutputs(implementOutput, preCommit.output),
+    })
   }
 
   const commitError = await tryCommitAndPush(
     deps,
     workDir,
     input.jira_key,
-    `fix: ${input.jira_key}: ${lowercaseFirst(input.description.slice(0, 72))}`,
+    `fix: ${input.jira_key}: ${commitSubject(input.description)}`,
   )
   if (commitError) {
     return { status: 'crashed', pr_url: null, output: combineOutputs(implementOutput, commitError), cost_usd: costUsd }

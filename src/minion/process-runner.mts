@@ -38,6 +38,19 @@ export class ProcessMinionRunner implements MinionRunner {
       // by the time anyone looks, so this is the only record of how far it got.
       const stdout = (await new Response(proc.stdout).text()).trim()
       const stderr = (await new Response(proc.stderr).text()).trim()
+
+      // Minion having already printed its structured result means the attempt
+      // *finished* — the kill landed on a process that was done reporting (found
+      // live on KAZ-8390 and KAZ-8739: both recorded `timeout`, both with a
+      // complete MinionResult sitting in the captured output, including a
+      // `cost_usd` this path was otherwise throwing away and the pre-commit
+      // failure that actually explained the attempt). That result is what
+      // happened, so it wins over the timeout this race reports; a genuine hang,
+      // killed before Minion could report anything, still has nothing to parse
+      // here and stays `timeout`.
+      const reported = parseResult(stdout)
+      if (reported) return reported
+
       return { status: 'timeout', pr_url: null, output: combineOutput(stdout, stderr), cost_usd: null }
     }
 

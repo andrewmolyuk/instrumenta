@@ -27,6 +27,10 @@ and dated.
 - [ADR-008](008-capture-per-attempt-claude-cost.md) — capture Claude Code's own
   `total_cost_usd` estimate per dispatch attempt as `tasks.cost_usd` (amends ADR-001's
   schema), toward filling in vision.md's Claude-cost-per-ticket TBD
+- [ADR-009](009-gate-runs-target-pre-commit-checks.md) — the verify gate also runs the
+  target project's own `pre-commit` hook, before committing; the commit itself skips git
+  hooks (`--no-verify`), so those checks run once per attempt and a failure is a retryable
+  `failed_verify` instead of a crash
 
 ## Superseded
 

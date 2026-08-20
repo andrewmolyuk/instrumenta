@@ -71,11 +71,14 @@ _Decided in_: [ADR-001](docs/adr/001-task-state-three-sources.md).
 
 **Verify gate**:
 The `verify` mechanism a target project defines for itself and that Minion looks for before
-committing anything. Missing → Minion stops without committing and reports
-`blocked_no_verify`. Present and failing → reports `failed_verify`. Present and passing →
-commit, open the PR, report `success`.
+committing anything, together with that project's own `pre-commit` hook — the checks that
+would otherwise block the commit — which Minion runs at the same point rather than leaving
+to `git commit`. Missing `verify` → Minion stops without committing and reports
+`blocked_no_verify`. Either part failing → reports `failed_verify`. Both passing → commit
+(with `--no-verify`, since they already ran), open the PR, report `success`.
 _Decided in_: [architecture.md](docs/architecture.md#minion-container-ephemeral-one-per-dispatched-task),
-[vision.md](docs/vision.md#scope-now-mvp).
+[vision.md](docs/vision.md#scope-now-mvp),
+[ADR-009](docs/adr/009-gate-runs-target-pre-commit-checks.md).
 
 **Notes path**:
 Where Minion writes a `blocked_no_verify` note or a `given_up` note, as an ordinary file in an
@@ -87,8 +90,9 @@ _Decided in_: [ADR-002](docs/adr/002-foreman-minion-execution-boundary.md).
 **Status**:
 The outcome Minion reports at exit, one of: `success` (PR opened), `failed_verify` (gate ran
 and failed), `blocked_no_verify` (no gate found), `crashed` (exited without a structured
-result), `timeout` (Foreman killed it after its time budget), `given_up` (final allowed
-attempt still didn't succeed).
+result), `timeout` (Foreman killed it after its time budget with nothing reported — a
+kill that lands on a Minion which *had* already reported is recorded under the status it
+reported, not as a timeout), `given_up` (final allowed attempt still didn't succeed).
 _Decided in_: [architecture.md](docs/architecture.md#minion-container-ephemeral-one-per-dispatched-task),
 [ADR-001](docs/adr/001-task-state-three-sources.md).
 

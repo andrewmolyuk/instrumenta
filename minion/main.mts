@@ -1,11 +1,11 @@
 import { hasOpenPrForBranch } from '../src/bitbucket/closed-prs.mts'
 import type { MinionInput } from '../src/minion/types.mts'
 import { buildCloneUrl, createPullRequest, type BitbucketPrConfig } from './bitbucket-pr.mts'
-import { cloneAndBranch, commitAndPush, writeNote } from './git.mts'
+import { cloneAndBranch, commitAndPush, stageAll, writeNote } from './git.mts'
 import { implementTask } from './implement-task.mts'
 import type { MinionDeps } from './orchestrate.mts'
 import { runMinion } from './orchestrate.mts'
-import { hasVerifyScript, runVerify } from './verify-gate.mts'
+import { hasVerifyScript, runPreCommitHook, runVerify } from './verify-gate.mts'
 
 function requiredEnv(key: string): string {
   const value = process.env[key]
@@ -45,6 +45,14 @@ async function main(): Promise<void> {
     implementTask,
     hasVerifyScript,
     runVerify,
+    // Staged first because `lint-staged`-style pre-commit hooks only inspect the
+    // index — an unstaged tree makes them pass without checking anything. The
+    // same `git add -A` runs again inside commitAndPush, which also picks up
+    // whatever an auto-fixing hook (`eslint --fix`, prettier) just rewrote.
+    runPreCommitChecks: async (workDir) => {
+      await stageAll(workDir)
+      return await runPreCommitHook(workDir)
+    },
     writeNote,
     commitAndPush,
     createPullRequest: (branch, taskInput) => createPullRequest(bitbucket, branch, taskInput),

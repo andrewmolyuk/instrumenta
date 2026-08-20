@@ -9,6 +9,28 @@ import { MAX_IMPLEMENT_OUTPUT_CHARS } from './constants.mts'
  * confirm before proceeding — which nobody was there to answer (this is `-p`,
  * one-shot, unattended), so it made zero file changes despite doing real work.
  *
+ * The explicit "make the project's own checks pass" instruction exists because,
+ * also found live (KAZ-8390): Claude Code finished, reported "npm run lint
+ * clean" in its own summary, and the commit was then rejected by the target
+ * repo's pre-commit hook over two ESLint errors in a file it had just added —
+ * the report was simply wrong, and nothing had asked it to gate on those checks
+ * in the first place. Minion re-runs them itself before committing (ADR-009),
+ * so this is the cheap loop: fixing a lint error here costs a few tool calls,
+ * while finding it in the gate costs the whole attempt.
+ *
+ * `--model` and `--effort` are set explicitly rather than left to Claude Code's
+ * own defaults, so an unattended attempt doesn't silently change model or
+ * reasoning depth (and with it cost per attempt, ADR-008) when the CLI's default
+ * moves. `claude-opus-5[1m]` is the 1M-context variant of Opus 5 — Minion reads
+ * whole target repositories, and running out of context mid-attempt is a wasted
+ * attempt. `high` effort is one step below Claude Code's own `xhigh` default:
+ * cheaper per attempt, and still in the band Anthropic recommends for
+ * long-horizon agentic work. Both are overridable per deployment
+ * (`MINION_CLAUDE_MODEL`, `MINION_CLAUDE_EFFORT`) because which model a
+ * subscription may use, and how much reasoning a task is worth, are operational
+ * choices, not properties of Minion's contract. `--effort` needs a recent Claude
+ * Code CLI (the image installs the current one on every build).
+ *
  * The explicit "leave the commit to Minion" instruction exists because, also found
  * live: with full tool access, Claude Code sometimes committed its own changes
  * before returning. `orchestrate.mts` always runs its own `commitAndPush` afterward
@@ -25,8 +47,26 @@ questions or approve a plan. Investigate the issue and implement the fix
 directly in the codebase yourself. Do not stop to describe or propose a fix
 and ask for confirmation; make the actual code changes. Leave the changes
 uncommitted — do not run \`git commit\` yourself; committing is handled
-separately after you finish.`
-  return ['claude', '--dangerously-skip-permissions', '-p', prompt, '--output-format', 'json']
+separately after you finish.
+
+Before you finish, run this project's own checks over your changes — its
+\`verify\`/lint/test/type-check scripts, and whatever its pre-commit hook runs —
+and fix everything they report, including problems in files you added. Every one
+of those checks is run again before your work is committed, and any failure means
+no commit and no pull request, so the whole attempt is wasted. Report a check as
+passing only if you actually ran it and saw it pass.`
+  return [
+    'claude',
+    '--dangerously-skip-permissions',
+    '--model',
+    process.env.MINION_CLAUDE_MODEL ?? 'claude-opus-5[1m]',
+    '--effort',
+    process.env.MINION_CLAUDE_EFFORT ?? 'high',
+    '-p',
+    prompt,
+    '--output-format',
+    'json',
+  ]
 }
 
 /**

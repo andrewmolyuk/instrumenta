@@ -71,6 +71,31 @@ describe('ProcessMinionRunner', () => {
     expect(Date.now() - start).toBeLessThan(4000)
   })
 
+  it('reports the result Minion already printed, not timeout, when the kill lands after it finished', async () => {
+    // KAZ-8390: a 30-minute budget, a `crashed` result reported at the wire, and
+    // the whole thing recorded as `timeout` with the cost and the reason discarded.
+    const runner = new ProcessMinionRunner([
+      'bun',
+      '-e',
+      "console.log(JSON.stringify({ status: 'crashed', pr_url: null, output: 'pre-commit hook failed', cost_usd: 9.72 })); await Bun.sleep(10000)",
+    ])
+    const result = await runner.run(INPUT, 500)
+
+    expect(result).toEqual({
+      status: 'crashed',
+      pr_url: null,
+      output: 'pre-commit hook failed',
+      cost_usd: 9.72,
+    })
+  })
+
+  it('still reports timeout when the killed process never printed a result', async () => {
+    const runner = new ProcessMinionRunner(['bun', '-e', "console.log('cloned repo'); await Bun.sleep(10000)"])
+    const result = await runner.run(INPUT, 500)
+
+    expect(result.status).toBe('timeout')
+  })
+
   it('captures whatever was printed before a timeout kills the process', async () => {
     const runner = new ProcessMinionRunner([
       'bun',

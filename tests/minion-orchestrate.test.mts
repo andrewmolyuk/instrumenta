@@ -20,6 +20,7 @@ function fakeDeps(overrides: Partial<MinionDeps> = {}): MinionDeps {
     implementTask: vi.fn(async () => ({ output: '', costUsd: null })),
     hasVerifyScript: vi.fn(async () => true),
     runVerify: vi.fn(async () => ({ passed: true, output: '' })),
+    runPreCommitChecks: vi.fn(async () => ({ ran: true, passed: true, output: '' })),
     writeNote: vi.fn(async () => {}),
     commitAndPush: vi.fn(async () => {}),
     createPullRequest: vi.fn(async () => 'https://bitbucket.org/o/r/pull-requests/1'),
@@ -88,6 +89,46 @@ describe('runMinion', () => {
     )
   })
 
+  it('collapses a multi-line description into a single-line commit subject', async () => {
+    // KAZ-8390's real description, whose first line alone made the subject
+    // `fix: KAZ-8390: steps:` and pushed the rest into an unblank-lined body.
+    const deps = fakeDeps()
+    await runMinion(
+      input({ description: 'Steps:\nOpen a client, then\tpick a port\n\nExpected: it works' }),
+      'https://x/repo.git',
+      '/tmp/wd',
+      'docs/todo/',
+      deps,
+    )
+
+    expect(deps.commitAndPush).toHaveBeenCalledWith(
+      '/tmp/wd',
+      'KAZ-1',
+      'fix: KAZ-1: steps: Open a client, then pick a port Expected: it works',
+    )
+  })
+
+  it('truncates a long description at 72 characters, without a trailing space', async () => {
+    const deps = fakeDeps()
+    await runMinion(
+      input({ description: `${'a'.repeat(71)} tail that does not fit` }),
+      'https://x/repo.git',
+      '/tmp/wd',
+      'docs/todo/',
+      deps,
+    )
+
+    expect(deps.commitAndPush).toHaveBeenCalledWith('/tmp/wd', 'KAZ-1', `fix: KAZ-1: ${'a'.repeat(71)}`)
+  })
+
+  it('still produces a usable commit message when the description is blank', async () => {
+    const deps = fakeDeps()
+    await runMinion(input({ description: '   ' }), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
+
+    // Trailing space and all — `git commit` strips it from the subject itself.
+    expect(deps.commitAndPush).toHaveBeenCalledWith('/tmp/wd', 'KAZ-1', 'fix: KAZ-1: ')
+  })
+
   it('writes a blocked_no_verify note and commits it with a chore: message, without a PR, when there is no verify script', async () => {
     const deps = fakeDeps({ hasVerifyScript: vi.fn(async () => false) })
     const result = await runMinion(input({ attempt_number: 1 }), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
@@ -126,6 +167,79 @@ describe('runMinion', () => {
 
     expect(result.output).toContain('claude did something')
     expect(result.output).toContain('test 1 failed')
+  })
+
+  it('runs the pre-commit checks after verify passes and before committing', async () => {
+    const order: string[] = []
+    const deps = fakeDeps({
+      runVerify: vi.fn(async () => {
+        order.push('verify')
+        return { passed: true, output: '' }
+      }),
+      runPreCommitChecks: vi.fn(async () => {
+        order.push('pre-commit')
+        return { ran: true, passed: true, output: '' }
+      }),
+      commitAndPush: vi.fn(async () => {
+        order.push('commit')
+      }),
+    })
+    await runMinion(input(), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
+
+    expect(order).toEqual(['verify', 'pre-commit', 'commit'])
+  })
+
+  it('reports failed_verify and commits nothing when the pre-commit checks fail on a non-final attempt', async () => {
+    const deps = fakeDeps({
+      implementTask: vi.fn(async () => ({ output: 'claude did something', costUsd: 1.5 })),
+      runPreCommitChecks: vi.fn(async () => ({ ran: true, passed: false, output: 'eslint: 2 problems' })),
+    })
+    const result = await runMinion(input({ attempt_number: 1 }), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
+
+    expect(result.status).toBe('failed_verify')
+    expect(result.output).toContain('claude did something')
+    expect(result.output).toContain('eslint: 2 problems')
+    expect(result.cost_usd).toBe(1.5)
+    expect(deps.commitAndPush).not.toHaveBeenCalled()
+    expect(deps.createPullRequest).not.toHaveBeenCalled()
+  })
+
+  it('reports given_up with a note when the pre-commit checks fail on the final attempt', async () => {
+    const deps = fakeDeps({
+      runPreCommitChecks: vi.fn(async () => ({ ran: true, passed: false, output: 'eslint: 2 problems' })),
+    })
+    const result = await runMinion(input({ attempt_number: 3 }), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
+
+    expect(result).toEqual({
+      status: 'given_up',
+      pr_url: null,
+      output: 'eslint: 2 problems',
+      cost_usd: null,
+    })
+    expect(deps.writeNote).toHaveBeenCalledWith('/tmp/wd', 'docs/todo/', 'kaz-1-given-up.md', expect.any(String))
+    expect(deps.createPullRequest).not.toHaveBeenCalled()
+  })
+
+  it('commits and opens the PR when the repo has no pre-commit hook to run', async () => {
+    const deps = fakeDeps({ runPreCommitChecks: vi.fn(async () => ({ ran: false, passed: true, output: '' })) })
+    const result = await runMinion(input(), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
+
+    expect(result.status).toBe('success')
+  })
+
+  it('skips the pre-commit checks entirely when verify already failed', async () => {
+    const deps = fakeDeps({ runVerify: vi.fn(async () => ({ passed: false, output: 'test 1 failed' })) })
+    await runMinion(input({ attempt_number: 1 }), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
+
+    expect(deps.runPreCommitChecks).not.toHaveBeenCalled()
+  })
+
+  it('does not gate the note-only commits on the pre-commit checks — a give-up note has to land regardless', async () => {
+    const deps = fakeDeps({ hasVerifyScript: vi.fn(async () => false) })
+    await runMinion(input({ attempt_number: 1 }), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
+
+    expect(deps.runPreCommitChecks).not.toHaveBeenCalled()
+    expect(deps.commitAndPush).toHaveBeenCalled()
   })
 
   it('reports given_up with the captured output and a note when verify fails on the final (3rd) attempt', async () => {

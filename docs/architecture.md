@@ -124,7 +124,15 @@ Inside:
      `blocked_no_verify`.
    - Present → run it.
      - Fails → don't commit. Report `failed_verify`.
-     - Passes → commit, open the PR. Report `success` with the PR url.
+     - Passes → run the target project's own `pre-commit` hook, if it has one — the
+       checks that would otherwise block the commit — and treat it as part of the same
+       gate ([ADR-009](adr/009-gate-runs-target-pre-commit-checks.md)).
+       - Fails → don't commit. Report `failed_verify`.
+       - Passes → commit, open the PR. Report `success` with the PR url.
+
+   The commit itself is made with `--no-verify`: everything the target project enforces
+   at commit time has already run, once, in the gate above, and re-running it inside a
+   commit that can only fail costs a whole attempt (ADR-009).
 4. If this was the final allowed attempt and it still didn't succeed, Minion itself
    writes a give-up note at that same path before reporting `given_up` — the same
    PR-review path a human contributor's work would go through.
