@@ -21,9 +21,21 @@ function required(env: NodeJS.ProcessEnv, key: string): string {
   return value
 }
 
+/**
+ * Unset and set-but-empty both mean "not configured": `FOREMAN_BUDGET=` is how
+ * a human writes "no budget" in an .env file, and `Number('')` is 0 — which
+ * silently meant a budget of zero, i.e. Foreman stopping itself after a single
+ * dispatch (found live; see runLoop's budget check). A non-numeric value is a
+ * typo worth failing the boot over rather than defaulting past: `Number('30m')`
+ * is NaN, and a NaN budget or timeout fails in ways that look like anything but
+ * a config error.
+ */
 function optionalInt(env: NodeJS.ProcessEnv, key: string): number | undefined {
-  const value = env[key]
-  return value === undefined ? undefined : Number(value)
+  const value = env[key]?.trim()
+  if (!value) return undefined
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed)) throw new Error(`Environment variable ${key} must be a number, got: ${env[key]}`)
+  return parsed
 }
 
 /**

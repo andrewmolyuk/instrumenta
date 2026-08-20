@@ -54,6 +54,21 @@ describe('parseConfig', () => {
     expect(config.queueTicket).toBe('KAZ-42')
   })
 
+  it('treats a set-but-empty numeric variable as unset, not as zero', () => {
+    // `FOREMAN_BUDGET=` in an .env file is how a human writes "no budget";
+    // Number('') is 0, which used to mean "stop after one dispatch".
+    const config = parseConfig({ ...BASE_ENV, FOREMAN_BUDGET: '', MINION_TIMEOUT_MS: '  ' })
+    expect(config.budget).toBeUndefined()
+    expect(config.timeoutMs).toBe(600_000)
+  })
+
+  it.each(['FOREMAN_BUDGET', 'MINION_TIMEOUT_MS', 'FOREMAN_POLL_INTERVAL_MS', 'FOREMAN_API_PORT'])(
+    'throws on a non-numeric %s rather than defaulting past the typo',
+    (key) => {
+      expect(() => parseConfig({ ...BASE_ENV, [key]: '30m' })).toThrow(new RegExp(`${key} must be a number`))
+    },
+  )
+
   it.each([
     'JIRA_BASE_URL',
     'JIRA_EMAIL',

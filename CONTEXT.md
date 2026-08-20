@@ -105,10 +105,12 @@ _Decided in_: [ADR-003](docs/adr/003-foreman-daemon-trigger-control.md).
 
 **Start**:
 Clears the `stopped` flag, resuming normal looping — Foreman always boots stopped, so this
-is what actually gets it running. Named "Continue" in ADR-003; renamed here to match what it
-does, since a fresh boot has nothing to "continue."
+is what actually gets it running. Also refills an exhausted budget from the capacity it was
+last set to, since a budget caps a run and pressing Start begins one. Named "Continue" in
+ADR-003; renamed here to match what it does, since a fresh boot has nothing to "continue."
 _Decided in_: [ADR-003](docs/adr/003-foreman-daemon-trigger-control.md),
-[ADR-005](docs/adr/005-rename-continue-and-start-ticket.md).
+[ADR-005](docs/adr/005-rename-continue-and-start-ticket.md),
+[ADR-010](docs/adr/010-start-refills-an-exhausted-budget.md).
 
 **Queue[ticket]**:
 Dispatch a specific `jira_key` on the next iteration, bypassing normal priority ordering, for
@@ -119,8 +121,11 @@ _Decided in_: [ADR-003](docs/adr/003-foreman-daemon-trigger-control.md),
 
 **Budget**:
 An optional max-tasks-this-run counter, decremented once per completed dispatch cycle;
-reaching zero stops the loop the same way `Stop` does.
-_Decided in_: [ADR-003](docs/adr/003-foreman-daemon-trigger-control.md).
+reaching zero stops the loop the same way `Stop` does. A *run* is one Start-to-stop
+stretch, not the lifetime of the database: `Start` refills the counter from the capacity a
+human last set. Positive integers only — "no budget" is null, not zero.
+_Decided in_: [ADR-003](docs/adr/003-foreman-daemon-trigger-control.md),
+[ADR-010](docs/adr/010-start-refills-an-exhausted-budget.md).
 
 This glossary was written from the current docs (`vision.md`, `architecture.md`, ADR-001
 through ADR-003) on 2026-08-13, ahead of any application code existing. It replaces an earlier

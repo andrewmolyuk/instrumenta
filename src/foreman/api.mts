@@ -111,8 +111,18 @@ export function createApiHandler(deps: ApiDeps): (req: Request) => Promise<Respo
     }
 
     if (req.method === 'POST' && url.pathname === '/api/start') {
+      // A budget is a max-tasks-*this-run* counter (ADR-003), and pressing
+      // Start is a human authorizing another run — so an exhausted counter is
+      // refilled to the capacity they last set (ADR-010). Without this, Start
+      // on a spent budget dispatched exactly one task and stopped again, every
+      // time, since `budget` survives on the volume. Nothing to refill from
+      // (no budget, or a capacity that was never recorded) is left alone.
+      const budget = getBudget(deps.db)
+      const budgetTotal = getBudgetTotal(deps.db)
+      const refilled = budget !== null && budget <= 0 && budgetTotal !== null && budgetTotal > 0
+      if (refilled) setBudget(deps.db, budgetTotal)
       setStopped(deps.db, false)
-      return json({ stopped: false })
+      return json({ stopped: false, budget: getBudget(deps.db), budgetRefilled: refilled })
     }
 
     if (req.method === 'POST' && url.pathname === '/api/queue-ticket') {
@@ -150,8 +160,11 @@ export function createApiHandler(deps: ApiDeps): (req: Request) => Promise<Respo
     if (req.method === 'POST' && url.pathname === '/api/budget') {
       const body = await req.json().catch(() => null)
       const budget = (body as { budget?: unknown } | null)?.budget
-      if (budget !== null && typeof budget !== 'number') {
-        return json({ error: 'budget must be a number or null' }, 400)
+      if (budget !== null && (typeof budget !== 'number' || !Number.isInteger(budget) || budget < 1)) {
+        // Zero and below are rejected rather than stored: a budget of 0 is
+        // indistinguishable from an exhausted one, which /api/start would then
+        // try to refill from a capacity of 0 forever. "No budget" is null.
+        return json({ error: 'budget must be a positive integer or null' }, 400)
       }
       setBudget(deps.db, budget)
       setBudgetTotal(deps.db, budget)

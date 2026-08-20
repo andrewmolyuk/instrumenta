@@ -195,6 +195,37 @@ describe('runLoop', () => {
     expect(isStopped(db)).toBe(true)
   })
 
+  it('dispatches nothing and stops when the persisted budget is already exhausted', async () => {
+    // The "it stops after the first task" report: `budget` survives the run that
+    // spent it, and the check used to happen only after a dispatch — so every
+    // Start on a spent budget bought one more attempt. /api/start refills it
+    // when there is a capacity to refill from (ADR-010).
+    setBudget(db, 0)
+    let calls = 0
+    const taskProvider: TaskProvider = {
+      listBacklog: async () => {
+        calls += 1
+        return [{ jira_key: 'KAZ-1', summary: 's', description: '' }]
+      },
+    }
+
+    await runLoop({
+      db,
+      taskProvider,
+      bitbucket: BITBUCKET,
+      runner: fakeRunner('success'),
+      statusMirror: noopStatusMirror,
+      timeoutMs: 1000,
+      pollIntervalMs: 1,
+      fetchImpl: fakeFetch(),
+      sleep: noSleep,
+    })
+
+    expect(calls).toBe(0)
+    expect(db.query('SELECT * FROM tasks').all()).toHaveLength(0)
+    expect(isStopped(db)).toBe(true)
+  })
+
   it('runs unlimited when no budget is set, stopping only via the stopped flag', async () => {
     let calls = 0
     const taskProvider: TaskProvider = {

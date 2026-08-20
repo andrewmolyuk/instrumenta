@@ -133,6 +133,33 @@ describe('POST /api/start', () => {
     expect(res.status).toBe(200)
     expect(isStopped(db)).toBe(false)
   })
+
+  it('refills an exhausted budget from budgetTotal, so Start means another full run', async () => {
+    setStopped(db, true)
+    setBudget(db, 0)
+    setBudgetTotal(db, 3)
+
+    const res = await handler(req('POST', '/api/start'))
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ stopped: false, budget: 3, budgetRefilled: true })
+    expect(getBudget(db)).toBe(3)
+    expect(getBudgetTotal(db)).toBe(3)
+  })
+
+  it('leaves a budget with capacity left alone', async () => {
+    setStopped(db, true)
+    setBudget(db, 2)
+    setBudgetTotal(db, 3)
+
+    const res = await handler(req('POST', '/api/start'))
+    expect(await res.json()).toEqual({ stopped: false, budget: 2, budgetRefilled: false })
+  })
+
+  it('leaves an unlimited budget unlimited', async () => {
+    setStopped(db, true)
+    const res = await handler(req('POST', '/api/start'))
+    expect(await res.json()).toEqual({ stopped: false, budget: null, budgetRefilled: false })
+  })
 })
 
 describe('POST /api/queue-ticket', () => {
@@ -200,6 +227,14 @@ describe('POST /api/budget', () => {
     expect(res.status).toBe(200)
     expect(getBudget(db)).toBe(10)
     expect(getBudgetTotal(db)).toBe(10)
+  })
+
+  it.each([0, -1, 2.5])('rejects %s — "no budget" is null, not a non-positive number', async (budget) => {
+    setBudget(db, 4)
+    setBudgetTotal(db, 4)
+    const res = await handler(req('POST', '/api/budget', { budget }))
+    expect(res.status).toBe(400)
+    expect(getBudget(db)).toBe(4)
   })
 
   it('rejects a non-numeric, non-null budget', async () => {

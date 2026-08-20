@@ -39,7 +39,7 @@ All of these are required unless marked optional — see
 | `MINION_TIMEOUT_MS` *(optional, default `600000`)* | Kill a Minion run past this |
 | `FOREMAN_POLL_INTERVAL_MS` *(optional, default `60000`)* | Sleep between Picks when the queue is empty |
 | `FOREMAN_API_PORT` *(optional, default `3000`)* | Control API + Web UI |
-| `FOREMAN_BUDGET` *(optional)* | Max tasks this run — also settable live via the API/UI |
+| `FOREMAN_BUDGET` *(optional)* | Max tasks this run — also settable live via the API/UI. A *run* is one Start-to-stop stretch: Start refills an exhausted budget from the capacity last set (ADR-010). Leave it unset (or commented out) for unlimited; an empty value counts as unset, and a non-numeric one fails the boot |
 | `FOREMAN_QUEUE_TICKET` *(optional)* | Seed `queue[ticket]` on first boot |
 
 `MINION_COMMAND` is a JSON array, not a shell string, so it can carry arbitrary argv

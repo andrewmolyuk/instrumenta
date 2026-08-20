@@ -31,6 +31,10 @@ and dated.
   target project's own `pre-commit` hook, before committing; the commit itself skips git
   hooks (`--no-verify`), so those checks run once per attempt and a failure is a retryable
   `failed_verify` instead of a crash
+- [ADR-010](010-start-refills-an-exhausted-budget.md) — Start refills an exhausted budget
+  from `budget_total` (a budget caps a run, not a lifetime); the loop checks the budget
+  before dispatching, and a budget must be a positive integer or `null` (amends ADR-003's
+  budget control)
 
 ## Superseded
 

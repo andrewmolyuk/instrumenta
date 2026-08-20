@@ -75,6 +75,18 @@ export async function runLoop(deps: LoopDeps): Promise<void> {
 
   while (!isStopped(deps.db)) {
     try {
+      // An already-exhausted budget stops the loop *before* dispatching, not
+      // after. `budget` is persisted, so a run that spent it leaves 0 behind —
+      // and with the check only after a dispatch, every Start on that state
+      // spent one more attempt before stopping again ("it stops after the first
+      // task", found live). /api/start refills an exhausted budget from
+      // `budget_total` (ADR-010), so reaching this branch means there is no
+      // capacity to refill from.
+      if (remainingBudget !== null && remainingBudget <= 0) {
+        setStopped(deps.db, true)
+        break
+      }
+
       let task = null
       const queueTicket = getQueueTicket(deps.db)
       if (queueTicket) {
