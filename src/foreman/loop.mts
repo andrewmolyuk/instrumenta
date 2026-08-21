@@ -52,11 +52,21 @@ export interface LoopDeps {
  * set. `budget` and `queue_ticket` live in the same table (ADR-003's control
  * surface, exposed over the API — see api.mts) rather than being fixed
  * arguments here, since a human can change either while this is already
- * running. `budget` is read once per call (a "max-tasks-*this run*" counter,
- * per ADR-003's own wording) and persisted back on each decrement so the API
- * can show live remaining budget; hitting zero sets `stopped` — "the same way
- * the stopped flag does" (ADR-003) — rather than exiting the process, since
- * Foreman's API/UI needs to keep running regardless. `queue_ticket` (ADR-005,
+ * running. `budget` (a "max-tasks-*this run*" counter, per ADR-003's own
+ * wording) is therefore re-read from the database every iteration, not cached
+ * across the call, and persisted back on each decrement so the API can show
+ * live remaining budget; hitting zero sets `stopped` — "the same way the
+ * stopped flag does" (ADR-003) — rather than exiting the process, since
+ * Foreman's API/UI needs to keep running regardless.
+ *
+ * Re-reading is the whole point rather than an implementation detail. Reported
+ * live as "unlimited budget stopped execution": the budget used to be read once
+ * on entry, so a human lifting it — to unlimited, or just to a bigger number —
+ * while a dispatch was in flight changed nothing. The loop counted its stale
+ * copy down to zero and stopped, and its own decrement wrote that finite number
+ * back over the null the human had set, so even the UI disagreed with them. An
+ * attempt runs for tens of minutes, which makes "while this is already running"
+ * the normal case for a budget change, not an edge one. `queue_ticket` (ADR-005,
  * amending ADR-003's start[ticket]) is re-read and consumed every iteration,
  * not just the first, so a human can queue one at any point during a
  * long-running loop.
@@ -72,10 +82,10 @@ export interface LoopDeps {
 export async function runLoop(deps: LoopDeps): Promise<void> {
   const sleep = deps.sleep ?? ((ms: number) => Bun.sleep(ms))
   const onIterationError = deps.onIterationError ?? ((err) => console.error('runLoop iteration failed:', err))
-  let remainingBudget = getBudget(deps.db)
 
   while (!isStopped(deps.db)) {
     try {
+      const remainingBudget = getBudget(deps.db)
       // An already-exhausted budget stops the loop *before* dispatching, not
       // after. `budget` is persisted, so a run that spent it leaves 0 behind —
       // and with the check only after a dispatch, every Start on that state
@@ -120,10 +130,15 @@ export async function runLoop(deps: LoopDeps): Promise<void> {
         recordAttempt(deps.db, row)
         await deps.statusMirror.onComplete(row)
 
-        if (remainingBudget !== null) {
-          remainingBudget -= 1
-          setBudget(deps.db, remainingBudget)
-          if (remainingBudget <= 0) {
+        // Read again rather than decrementing the value from the top of the
+        // iteration: the dispatch above just took tens of minutes, which is
+        // ample time for a human to have changed the budget — including to
+        // unlimited, in which case there is nothing left to count down.
+        const budgetAfterDispatch = getBudget(deps.db)
+        if (budgetAfterDispatch !== null) {
+          const remaining = budgetAfterDispatch - 1
+          setBudget(deps.db, remaining)
+          if (remaining <= 0) {
             setStopped(deps.db, true)
             break
           }

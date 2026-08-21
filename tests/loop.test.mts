@@ -252,6 +252,73 @@ describe('runLoop', () => {
     expect(getBudget(db)).toBeNull()
   })
 
+  it('keeps running when a human lifts the budget to unlimited mid-run', async () => {
+    // Reported live: "unlimited budget stopped execution." The budget was read
+    // once when runLoop was entered, so setting it to unlimited while a dispatch
+    // was already in flight changed nothing — the loop kept counting its stale
+    // copy down to zero and stopped, and its own decrement wrote a finite
+    // number back over the null the human had just set.
+    setBudget(db, 2)
+    let dispatches = 0
+    const runner: MinionRunner = {
+      run: async () => {
+        dispatches += 1
+        if (dispatches === 1) setBudget(db, null)
+        if (dispatches >= 4) setStopped(db, true)
+        return { status: 'success', pr_url: null, output: null, cost_usd: null }
+      },
+    }
+
+    await runLoop({
+      db,
+      taskProvider: {
+        listBacklog: async () => [{ jira_key: 'KAZ-' + dispatches, summary: 's', description: '' }],
+      },
+      bitbucket: BITBUCKET,
+      runner,
+      statusMirror: noopStatusMirror,
+      timeoutMs: 1000,
+      pollIntervalMs: 1000,
+      fetchImpl: fakeFetch(),
+      sleep: noSleep,
+    })
+
+    expect(dispatches).toBe(4)
+    expect(getBudget(db)).toBeNull()
+    expect(isStopped(db)).toBe(true)
+  })
+
+  it('picks up a budget a human raises mid-run, rather than its stale copy', async () => {
+    setBudget(db, 1)
+    let dispatches = 0
+    const runner: MinionRunner = {
+      run: async () => {
+        dispatches += 1
+        if (dispatches === 1) setBudget(db, 3)
+        return { status: 'success', pr_url: null, output: null, cost_usd: null }
+      },
+    }
+
+    await runLoop({
+      db,
+      taskProvider: {
+        listBacklog: async () => [{ jira_key: 'KAZ-' + dispatches, summary: 's', description: '' }],
+      },
+      bitbucket: BITBUCKET,
+      runner,
+      statusMirror: noopStatusMirror,
+      timeoutMs: 1000,
+      pollIntervalMs: 1000,
+      fetchImpl: fakeFetch(),
+      sleep: noSleep,
+    })
+
+    // Raised to 3 during the first dispatch, so that dispatch and two more.
+    expect(dispatches).toBe(3)
+    expect(getBudget(db)).toBe(0)
+    expect(isStopped(db)).toBe(true)
+  })
+
   it('idle iterations do not count against budget', async () => {
     setBudget(db, 1)
     let calls = 0
