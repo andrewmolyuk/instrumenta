@@ -220,6 +220,13 @@ describe('listAttempts', () => {
     expect(listAttempts(db, 10)).toEqual([])
   })
 
+  it('returns every attempt when the limit is null', () => {
+    for (let i = 1; i <= 60; i++) {
+      recordAttempt(db, attempt({ task_id: 't' + i, dispatched_at: '2026-08-13T00:00:0' + (i % 10) + 'Z' }))
+    }
+    expect(listAttempts(db, null)).toHaveLength(60)
+  })
+
   it('round-trips a failed attempt\'s captured output, and leaves it null when absent', () => {
     recordAttempt(db, attempt({ task_id: 't1', status: 'failed_verify', output: 'test 1 failed' }))
     recordAttempt(db, attempt({ task_id: 't2', status: 'success', output: null }))

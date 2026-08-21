@@ -172,11 +172,15 @@ export function appendCurrentProgress(db: Database, progress: { line?: string; c
   }
 }
 
-/** Most recent attempts first — the history view of the control-surface API. */
-export function listAttempts(db: Database, limit: number): TaskRow[] {
+/**
+ * Most recent attempts first — the history view of the control-surface API.
+ * A null `limit` means every attempt ever recorded: SQLite reads a negative
+ * LIMIT as no limit, which keeps this one query rather than two.
+ */
+export function listAttempts(db: Database, limit: number | null): TaskRow[] {
   return db
     .query<TaskRow, [number]>('SELECT * FROM tasks ORDER BY dispatched_at DESC LIMIT ?')
-    .all(limit)
+    .all(limit ?? -1)
 }
 
 /**

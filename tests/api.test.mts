@@ -320,6 +320,60 @@ describe('POST /api/delete-attempts', () => {
   })
 })
 
+describe('GET /api/attempts', () => {
+  it('returns every attempt, past the 50 that /api/status caps at', async () => {
+    // The bug this endpoint exists for: the Attempts tab rendered
+    // /api/status's `history`, so it showed 50 rows and no more — and its
+    // "N attempts · $X total" summary was computed from that same slice, so
+    // both the count and the cost were quietly wrong.
+    for (let i = 1; i <= 60; i++) {
+      recordAttempt(db, {
+        task_id: 't' + i,
+        jira_key: 'KAZ-' + i,
+        attempt_number: 1,
+        status: 'success',
+        pr_url: null,
+        output: null,
+        cost_usd: 1,
+        dispatched_at: '2026-08-' + String((i % 28) + 1).padStart(2, '0') + 'T00:00:00Z',
+        finished_at: null,
+      })
+    }
+
+    const statusBody = (await (await handler(new Request('http://x/api/status'))).json()) as {
+      history: unknown[]
+    }
+    const attemptsBody = (await (await handler(new Request('http://x/api/attempts'))).json()) as {
+      attempts: unknown[]
+    }
+
+    expect(statusBody.history).toHaveLength(50)
+    expect(attemptsBody.attempts).toHaveLength(60)
+  })
+
+  it('returns an empty list rather than failing when nothing has been attempted', async () => {
+    const res = await handler(new Request('http://x/api/attempts'))
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ attempts: [] })
+  })
+
+  it('orders most recent first, like the history it replaces', async () => {
+    recordAttempt(db, {
+      task_id: 'old', jira_key: 'KAZ-1', attempt_number: 1, status: 'success', pr_url: null,
+      output: null, cost_usd: null, dispatched_at: '2026-08-01T00:00:00Z', finished_at: null,
+    })
+    recordAttempt(db, {
+      task_id: 'new', jira_key: 'KAZ-2', attempt_number: 1, status: 'success', pr_url: null,
+      output: null, cost_usd: null, dispatched_at: '2026-08-20T00:00:00Z', finished_at: null,
+    })
+
+    const body = (await (await handler(new Request('http://x/api/attempts'))).json()) as {
+      attempts: Array<{ task_id: string }>
+    }
+    expect(body.attempts.map((a) => a.task_id)).toEqual(['new', 'old'])
+  })
+})
+
 describe('GET /api/config', () => {
   const CONFIG: ForemanConfig = {
     dbPath: '/data/foreman.db',

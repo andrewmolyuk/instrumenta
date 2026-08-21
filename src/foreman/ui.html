@@ -462,7 +462,10 @@
     document.getElementById('panel-cockpit').hidden = tab !== 'cockpit'
     document.getElementById('panel-attempts').hidden = tab !== 'attempts'
     document.getElementById('panel-settings').hidden = tab !== 'settings'
-    if (tab === 'attempts' && lastStatus) renderAttempts(lastStatus.history)
+    if (tab === 'attempts') {
+      if (allAttempts) renderAttempts(allAttempts)
+      loadAttempts()
+    }
   }
 
   for (const btn of document.querySelectorAll('.tab-btn')) {
@@ -618,10 +621,22 @@
       btn.addEventListener('click', () => {
         currentFilter = status
         renderFilters()
-        if (lastStatus) renderAttempts(lastStatus.history)
+        if (allAttempts) renderAttempts(allAttempts)
       })
       wrap.append(btn)
     }
+  }
+
+  /* Every attempt ever recorded, from GET /api/attempts — deliberately not the
+     `history` in /api/status, which is capped at 50 for the Cockpit's
+     five-row Recent Attempts panel. Null until the tab is first opened. */
+  let allAttempts = null
+
+  async function loadAttempts() {
+    const res = await fetch('/api/attempts')
+    if (!res.ok) return
+    allAttempts = (await res.json()).attempts
+    renderAttempts(allAttempts)
   }
 
   function renderAttempts(history) {
@@ -686,7 +701,7 @@
     renderStatCards(s)
     renderQueue(s.queue)
     renderRecent(s.history)
-    if (currentTab === 'attempts') renderAttempts(s.history)
+    if (currentTab === 'attempts') await loadAttempts()
   }
 
   async function loadConfig() {

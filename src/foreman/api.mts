@@ -28,6 +28,7 @@ export interface ApiDeps {
   bitbucket: BitbucketConfig
   /** Powers GET /api/config (the Settings tab). Omit to 404 that route — every other route works without it. */
   config?: ForemanConfig
+  /** Caps the `history` in GET /api/status only (default 50). GET /api/attempts is never capped. */
   historyLimit?: number
   fetchImpl?: typeof fetch
 }
@@ -46,7 +47,8 @@ function json(body: unknown, status = 200): Response {
  * later to give a human a way to force a given-up ticket eligible again
  * (deleteAttempts, db/queries.mts) without wiping the whole database, and
  * GET /api/config, a read-only allowlisted subset of ForemanConfig for the
- * UI's Settings tab (never the auth secrets). A plain fetch handler, not
+ * UI's Settings tab (never the auth secrets), and GET /api/attempts, the
+ * complete attempt history the Attempts tab needs. A plain fetch handler, not
  * bound to a port, so it's testable directly with constructed Request
  * objects; startApiServer wraps it with Bun.serve. No separate CLI artifact
  * (architecture.md) — this JSON API is the only scriptable surface, and the
@@ -85,6 +87,17 @@ export function createApiHandler(deps: ApiDeps): (req: Request) => Promise<Respo
         queueError,
         history: listAttempts(deps.db, deps.historyLimit ?? 50),
       })
+    }
+
+    if (req.method === 'GET' && url.pathname === '/api/attempts') {
+      // The whole history, uncapped — separate from /api/status rather than
+      // lifting that endpoint's cap, because the UI polls /api/status every 5
+      // seconds and every attempt row can carry up to 16KB of `output`
+      // (MAX_CAPTURED_OUTPUT_CHARS). Sending all of it on every poll to keep a
+      // table nobody is looking at up to date is the cost this split avoids:
+      // the Attempts tab fetches this when it's actually open, and the Cockpit's
+      // Recent Attempts panel only ever shows five rows.
+      return json({ attempts: listAttempts(deps.db, null) })
     }
 
     if (req.method === 'GET' && url.pathname === '/api/config') {
