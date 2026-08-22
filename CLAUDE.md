@@ -28,6 +28,10 @@ check it before introducing new terminology.
 - **No Co-Authored-By trailers.** Not used in this repository, even added by hand — blocked
   by `.claude/hooks/block-co-authored-by.mts`.
 - **Keep history linear.** No merge commits, on any branch: `git merge` requires
-  `--ff-only`; `gh pr merge` requires `--rebase` — anything else (a bare invocation, or one
-  with `--merge`/`--squash`) is blocked, since it can still leave a merge commit. Blocked by
+  `--ff-only`. Anything that can leave a merge commit is blocked by
   `.claude/hooks/block-merge-commit.mts`.
+- **Local git only — never `gh`.** Don't push, open, review, or merge pull requests, and
+  don't call the GitHub API. Work on a local branch and stop there; a human takes it from
+  the branch. This overrides the default guidance to reach for the `gh` CLI. (The merge
+  hook still refuses `gh pr merge` as a backstop, but the rule is broader than the hook:
+  no `gh` at all.)
