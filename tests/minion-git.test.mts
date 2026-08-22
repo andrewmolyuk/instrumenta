@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { chmodSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -196,6 +196,43 @@ describe('cloneAndBranch through the git cache', () => {
 
     const mirrorPath = join(cacheDir, readdirSync(cacheDir)[0]!)
     expect(readFileSync(join(mirrorPath, 'config'), 'utf-8')).not.toMatch(/:[^/@\s]+@/)
+  })
+
+  it('rebuilds a half-written mirror instead of failing against it forever', async () => {
+    // Building a mirror takes minutes, so being killed part-way through is the
+    // realistic failure. Left in place, the directory exists but no fetch can
+    // succeed against it, and every later attempt falls back to a direct clone.
+    const mirrorPath = join(cacheDir, 'localhost-' + 'x'.repeat(4) + '.git')
+    mkdirSync(mirrorPath, { recursive: true })
+    writeFileSync(join(mirrorPath, 'HEAD'), 'garbage')
+
+    await cloneAndBranch(remoteDir, 'KAZ-1', workDir, true)
+
+    const built = readdirSync(cacheDir).filter((d) => !d.startsWith('localhost-'))
+    expect(built).toHaveLength(1)
+    expect(git(['rev-parse', '--is-bare-repository'], join(cacheDir, built[0]!)).trim()).toBe('true')
+    expect(git(['branch', '--show-current'], workDir).trim()).toBe('KAZ-1')
+  })
+
+  it('replaces a corrupt mirror sitting at the real path', async () => {
+    await cloneAndBranch(remoteDir, 'KAZ-1', workDir, true)
+    const mirrorPath = join(cacheDir, readdirSync(cacheDir)[0]!)
+    rmSync(join(mirrorPath, 'objects'), { recursive: true, force: true })
+
+    const second = join(mkdtempSync(join(tmpdir(), 'minion-git-work3-')), 'repo')
+    await cloneAndBranch(remoteDir, 'KAZ-2', second, true)
+
+    expect(git(['branch', '--show-current'], second).trim()).toBe('KAZ-2')
+    rmSync(join(second, '..'), { recursive: true, force: true })
+  })
+
+  it('leaves no half-built mirror at the real path when the clone fails', async () => {
+    await expect(
+      cloneAndBranch(join(cacheDir, 'no-such-remote'), 'KAZ-1', workDir, true),
+    ).rejects.toThrow()
+
+    // A `.partial-*` leftover is fine — one at the real path is not.
+    expect(readdirSync(cacheDir).filter((d) => d.endsWith('.git'))).toEqual([])
   })
 
   it('falls back to a direct clone when the cache cannot be used', async () => {

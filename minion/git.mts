@@ -1,4 +1,5 @@
 import { existsSync } from 'node:fs'
+import { rename, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { redactCredentials } from './redact.mts'
 
@@ -63,15 +64,44 @@ function withoutCredentials(repoUrl: string): string {
  * `origin/<jira_key>` for work that no longer exists.
  */
 async function updateMirror(mirrorPath: string, repoUrl: string): Promise<void> {
-  if (!existsSync(mirrorPath)) {
-    await run(['git', 'clone', '--mirror', repoUrl, mirrorPath])
+  if (await isUsableMirror(mirrorPath)) {
+    await run(['git', '-C', mirrorPath, 'fetch', '--prune', repoUrl, '+refs/heads/*:refs/heads/*'])
+    return
+  }
+
+  // Anything already at the path is unusable — a mirror half-written by an
+  // attempt that was killed, most likely, since building one takes minutes.
+  // Left in place it would poison every later attempt: the path exists, the
+  // fetch into it fails, and each attempt falls back to a direct clone forever.
+  await rm(mirrorPath, { recursive: true, force: true })
+
+  // Built under a temporary name and renamed into place, so the mirror only
+  // ever appears at its real path complete. A kill part-way through leaves
+  // behind a `.partial-*` directory that no later attempt will mistake for a
+  // mirror, rather than a broken one that every attempt will.
+  const staging = `${mirrorPath}.partial-${crypto.randomUUID()}`
+  try {
+    await run(['git', 'clone', '--mirror', repoUrl, staging])
     // Scrub the token `--mirror` just wrote into the mirror's config. The
     // mirror outlives the container on a shared volume; a credential in its
     // config would outlive it too.
-    await run(['git', '-C', mirrorPath, 'remote', 'set-url', 'origin', withoutCredentials(repoUrl)])
-    return
+    await run(['git', '-C', staging, 'remote', 'set-url', 'origin', withoutCredentials(repoUrl)])
+    await rename(staging, mirrorPath)
+  } catch (err) {
+    await rm(staging, { recursive: true, force: true })
+    throw err
   }
-  await run(['git', '-C', mirrorPath, 'fetch', '--prune', repoUrl, '+refs/heads/*:refs/heads/*'])
+}
+
+/** True if `mirrorPath` holds a bare repository git will actually fetch into. */
+async function isUsableMirror(mirrorPath: string): Promise<boolean> {
+  if (!existsSync(mirrorPath)) return false
+  const proc = Bun.spawn(['git', '-C', mirrorPath, 'rev-parse', '--is-bare-repository'], {
+    stdout: 'pipe',
+    stderr: 'ignore',
+  })
+  if ((await proc.exited) !== 0) return false
+  return (await new Response(proc.stdout).text()).trim() === 'true'
 }
 
 /**
