@@ -90,8 +90,15 @@ export function setQueueTicket(db: Database, jiraKey: string | null): void {
   db.run('UPDATE foreman_state SET queue_ticket = ? WHERE id = 1', [jiraKey])
 }
 
-/** How many lines of Minion's live output the Cockpit's "Minion now" card keeps. */
-export const CURRENT_OUTPUT_LINES = 10
+/**
+ * How many lines of Minion's live output are kept for the Cockpit.
+ *
+ * Was 10, when this fed a hover tooltip on a stat card and had to stay glanceable.
+ * It now opens in a near-fullscreen, live-updating modal meant for working out
+ * what a running agent is doing, and ten lines is a keyhole. Still bounded —
+ * this is rewritten in SQLite on every progress line.
+ */
+export const CURRENT_OUTPUT_LINES = 200
 
 export interface CurrentTask {
   jira_key: string

@@ -82,20 +82,6 @@
   .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-8); }
   .stat-card { display: flex; flex-direction: column; gap: var(--space-2); min-height: 104px; position: relative; }
   .current-metrics { display: flex; gap: var(--space-4); font-size: 14px; color: var(--color-neutral-700); }
-  /* The live tail of what Minion is doing, on hover over the "Minion now" card.
-     Hover rather than always-on: ten lines of tool calls would dominate a stat
-     grid whose other three cards are single numbers, and it is a glance-at-it-
-     when-you-wonder detail, not a headline. Anchored to the card's right edge
-     and grown leftwards: this is the last of four cards in the grid, so a
-     quarter-width popover would shred every path in it, and one grown
-     rightwards would leave the viewport. */
-  .hover-log { display: none; position: absolute; top: 100%; right: -1px; left: auto;
-    width: max-content; max-width: min(460px, 80vw); z-index: 20;
-    margin-top: 4px; padding: var(--space-3); background: var(--color-bg);
-    border: 1px solid var(--color-divider); box-shadow: 0 8px 24px rgba(0,0,0,0.18);
-    font-family: var(--font-mono, ui-monospace, monospace); font-size: 11px; line-height: 1.6;
-    white-space: pre-wrap; overflow-wrap: anywhere; max-height: 240px; overflow-y: auto; text-align: left; }
-  .stat-card:hover .hover-log.has-log { display: block; }
 
   .cockpit-grid { display: grid; grid-template-columns: 360px 1fr; gap: var(--space-8); align-items: start; }
   .col { display: flex; flex-direction: column; gap: 34px; }
@@ -231,9 +217,9 @@
       <div class="current-metrics">
         <span class="tabular" id="stat-current-duration"></span>
         <span class="tabular" id="stat-current-cost"></span>
+        <a href="#" class="detail-link" id="stat-current-log" hidden>LOG</a>
       </div>
       <div class="note" id="stat-current-note"></div>
-      <div class="hover-log" id="stat-current-log"></div>
     </div>
   </div>
 
@@ -533,14 +519,33 @@
     return cell
   }
 
-  function openDetail(title, text) {
+  /* Whether the open modal is following the running Minion (true) or showing a
+     finished attempt's stored text (false). Only the former is rewritten by the
+     status poll. */
+  let liveDetail = false
+
+  function openDetail(title, text, live = false) {
+    liveDetail = live
     document.getElementById('detail-title').textContent = title
-    document.getElementById('detail-body').textContent = text
-    document.getElementById('detail-body').scrollTop = 0
+    const body = document.getElementById('detail-body')
+    body.textContent = text
+    body.scrollTop = live ? body.scrollHeight : 0
     document.getElementById('detail-modal').hidden = false
   }
 
+  function updateDetailBody(text, title) {
+    const body = document.getElementById('detail-body')
+    if (body.textContent === text) return
+    // Follow the tail only while the reader is already at the bottom — scrolling
+    // up to read something is exactly when being yanked back down is worst.
+    const atBottom = body.scrollHeight - body.scrollTop - body.clientHeight < 40
+    body.textContent = text
+    document.getElementById('detail-title').textContent = title
+    if (atBottom) body.scrollTop = body.scrollHeight
+  }
+
   function closeDetail() {
+    liveDetail = false
     document.getElementById('detail-modal').hidden = true
   }
 
@@ -585,14 +590,32 @@
     costEl.textContent = current && typeof current.cost_usd === 'number' ? costLabel(current.cost_usd) : ''
     noteEl.textContent = current ? 'dispatched ' + current.dispatched_at : 'Nothing in flight'
 
-    // A Minion that has not reported a line yet leaves the card with no hover
-    // at all, rather than an empty box that looks like a rendering bug.
+    // No link at all until the Minion has reported something, rather than one
+    // that opens an empty box.
     const log = current && current.output ? current.output : ''
-    logEl.textContent = log
-    logEl.classList.toggle('has-log', log.length > 0)
+    logEl.hidden = log.length === 0
+
+    // The live half of the modal: a snapshot of a finished attempt never
+    // changes, but this one is being written to while it is open, so every
+    // poll pushes the new tail in. Without this the modal would freeze at
+    // whatever the agent had done at the moment it was opened.
+    if (liveDetail) {
+      if (log.length === 0 && !current) closeDetail()
+      else updateDetailBody(log, liveTitle(current))
+    }
 
     tickCurrentDuration()
   }
+
+  function liveTitle(current) {
+    return current ? 'Live — ' + current.jira_key + (current.summary ? ' · ' + current.summary : '') : 'Live'
+  }
+
+  document.getElementById('stat-current-log').addEventListener('click', (e) => {
+    e.preventDefault()
+    const current = lastStatus?.current
+    openDetail(liveTitle(current), current?.output ?? '', true)
+  })
 
   function tickCurrentDuration() {
     const durationEl = document.getElementById('stat-current-duration')
