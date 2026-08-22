@@ -26,8 +26,17 @@ COPY --from=bun /usr/local/bin/bun /usr/local/bin/bun
 # verification failed. CAfile: none CRLfile: none" before the attempt could
 # start. Found live on RPG-6017/6029/6036/6040/6043/6044 — eight attempts
 # crashed within a second of dispatch, each one a wasted retry.
+#
+# `chromium` (with fonts) is here because most of this pipeline's tickets are UI
+# bugs reported as a screenshot, and without a browser the agent cannot see what
+# it is fixing. Found live on RPG-5427: it tried PIL, ImageMagick, ffmpeg, sharp
+# and four ways of locating a headless browser, found none, and hand-wrote a
+# PNG inflater in Node to measure the attachment — a dozen turns to get pixel
+# geometry it could have rendered directly, and still no way to check its own
+# fix. `fonts-liberation` is not optional either: headless Chromium with no
+# fonts renders text as empty boxes, which is worthless for a text-alignment bug.
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends ca-certificates git \
+  && apt-get install -y --no-install-recommends ca-certificates chromium fonts-liberation git \
   && rm -rf /var/lib/apt/lists/* \
   && npm install -g @anthropic-ai/claude-code
 
@@ -64,5 +73,10 @@ COPY --chown=minion:minion minion/agent-home/CLAUDE.md /home/minion/.claude/CLAU
 
 USER minion
 ENV HOME=/home/minion
+# So a target project's own tooling finds the browser already in the image
+# instead of downloading a second copy of it mid-attempt.
+ENV CHROME_BIN=/usr/bin/chromium \
+    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium \
+    PUPPETEER_SKIP_DOWNLOAD=1
 
 ENTRYPOINT ["bun", "minion/main.mts"]

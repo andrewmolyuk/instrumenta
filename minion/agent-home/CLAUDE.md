@@ -44,6 +44,28 @@ Check how this codebase already solves the problem before designing anything.
 A fix that matches an existing pattern is worth more than a better one that
 introduces a second way of doing things.
 
+## You have a browser — use it for visual bugs
+
+Chromium is installed (`chromium`, also `$CHROME_BIN`), with fonts. In this
+container it needs two flags:
+
+```
+chromium --headless --no-sandbox --disable-dev-shm-usage \
+  --screenshot=/tmp/out.png --window-size=1280,800 file:///path/to/page.html
+```
+
+`--dump-dom` runs page scripts and prints the result, so you can measure real
+geometry — `getBoundingClientRect()` on the element you suspect — rather than
+inferring it from a screenshot's pixels.
+
+For a layout or styling ticket this beats reasoning about CSS. Reproduce the
+broken rendering first, confirm it matches the reported symptom, then check your
+fix against it. A CSS change that looks right in the stylesheet and was never
+rendered is a guess.
+
+Puppeteer, if the target project has it, will find this browser through
+`PUPPETEER_EXECUTABLE_PATH` — do not let it download another.
+
 ## Done means verified, not written
 
 - "It should work" is not done. Run the project's own checks and watch them pass.
