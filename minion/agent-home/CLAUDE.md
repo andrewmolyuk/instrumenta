@@ -95,11 +95,18 @@ use, so its config may not even load against them.
 
 ## Done means verified, not written
 
-- "It should work" is not done. Run the project's own checks and watch them pass.
+- "It should work" is not done. Run the gate's command and watch it pass.
 - Report a check as passing only if you actually ran it and saw it pass. A
   confident summary that turns out to be wrong costs the entire attempt, because
   the gate runs those same checks again before anything is committed.
-- Fix what the checks report, including in files you added.
+- Fix what those checks report, including in files you added.
+- Run the gate's checks, and no others. A repository can hold config for tools
+  its own pipeline never runs — a `.stylelintrc` in a workspace whose scripts do
+  not call stylelint, a test runner wired up for one app and not another. Those
+  tools cannot block your work. Running one anyway means installing it, waiting
+  for it, and then reading failures that were there before you arrived: measured
+  once at five minutes to discover thirteen pre-existing errors in a file, and
+  one caused by the change. Mention what you saw; do not chase it.
 
 ## When you are unsure
 

@@ -18,6 +18,15 @@ function promptOf(command: string[]): string {
   return command[command.indexOf('-p') + 1] as string
 }
 
+/**
+ * The prompt with its line wrapping flattened. Phrase assertions kept breaking
+ * whenever a reword moved a line break into the middle of them, which tested
+ * the wrapping rather than the wording.
+ */
+function flowed(command: string[]): string {
+  return promptOf(command).replace(/\s+/g, ' ')
+}
+
 function flagValue(command: string[], flag: string): string | undefined {
   const index = command.indexOf(flag)
   return index === -1 ? undefined : command[index + 1]
@@ -99,13 +108,17 @@ describe('defaultImplementCommand', () => {
   })
 
   it('tells Claude Code to run the project\'s own checks and fix what they report', () => {
-    const prompt = promptOf(defaultImplementCommand(INPUT, TICKET, SHOTS))
+    const prompt = flowed(defaultImplementCommand(INPUT, TICKET, SHOTS))
     expect(prompt).toMatch(/pre-commit hook/i)
-    expect(prompt).toMatch(/fix\s+everything they report/i)
+    expect(prompt).toMatch(/fix what they report/i)
     // The exact gate command, so the agent runs what the gate will run rather
     // than guessing at "the project's checks" (ADR-009's whole point).
     expect(prompt).toContain(verifyCommand())
     expect(prompt).toMatch(/no commit and no pull request/i)
+    // Scoped to the gate: a repository can hold config for tools its own
+    // pipeline never runs, and chasing those costs minutes and finds
+    // pre-existing failures.
+    expect(prompt).toMatch(/Do not go looking for other linters/i)
   })
 
   it("names the deployment's overridden gate command, when there is one", () => {

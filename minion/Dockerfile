@@ -49,7 +49,7 @@ COPY --from=bun /usr/local/bin/bun /usr/local/bin/bun
 RUN apt-get update \
   && apt-get install -y --no-install-recommends ca-certificates chromium ffmpeg fonts-liberation git python3 \
   && rm -rf /var/lib/apt/lists/* \
-  && npm install -g @anthropic-ai/claude-code sass clean-css
+  && npm install -g @anthropic-ai/claude-code sass clean-css stylelint stylelint-config-standard-scss
 
 COPY package.json bun.lock ./
 RUN bun install --frozen-lockfile --production
@@ -69,12 +69,22 @@ COPY src/bitbucket/closed-prs.mts ./src/bitbucket/closed-prs.mts
 # own `npm install` can reach for global-ish packages (e.g. turbo) as part of
 # their own toolchain, and that path is root-owned by default (it's where
 # `npm install -g @anthropic-ai/claude-code` above just wrote, as root).
-# `sass` and `clean-css` ship with the image because a fresh clone has no
-# node_modules and the agent needs them before it can render anything. Measured
-# on an RPG-5427 attempt: it spent 300s installing sass, another 300s on
-# clean-css and 600s on stylelint, all into /tmp, before the target repo's own
-# `npm install` had even been run. clean-css is a library rather than a CLI, so
-# NODE_PATH below is what makes `require('clean-css')` resolve from any cwd.
+# `sass`, `clean-css` and `stylelint` ship with the image because a fresh clone
+# has no node_modules and the agent needs them before it can render or check
+# anything. Measured across two attempts: 300s installing sass, 300s on
+# clean-css, and 300-600s on stylelint, every time, into /tmp. clean-css is a
+# library rather than a CLI, so NODE_PATH below is what makes
+# `require('clean-css')` resolve from any cwd — and it is also what lets
+# stylelint find `stylelint-config-standard-scss` when a target's `.stylelintrc`
+# extends it, which otherwise fails with "Could not find" unless every
+# invocation remembers `--config-basedir`.
+#
+# These are the image's versions, not the target's, and they can differ by a
+# major: the image carries stylelint 17 / stylelint-config-standard-scss 17,
+# while CGS/webui pins ^16.9.0 and ^13.1.0. A rule set moves between majors, so
+# these are for a quick look, not for deciding whether work passes. Where the
+# project installs its own, use those — and what actually gates a commit is
+# MINION_VERIFY_COMMAND plus the pre-commit hook, nothing found lying around.
 #
 # /cache is where the git mirror volume mounts (ADR-013). Created here, owned by
 # minion, because Docker copies an image directory's ownership onto a fresh named

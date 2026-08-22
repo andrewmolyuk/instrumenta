@@ -148,8 +148,8 @@ your report. It is not part of this ticket, and a human will decide whether it
 is worth its own one. A diff a reviewer can read in a minute is worth more here
 than a thorough one they will not read at all.
 
-Before you finish, run this project's own checks over your changes and fix
-everything they report, including problems in files you added.
+Before you finish, run the project's checks over your changes and fix what they
+report, including problems in files you added.
 
 The gate that decides whether your work is committed runs exactly this, from the
 repository root:
@@ -160,6 +160,13 @@ plus whatever the project's pre-commit hook runs. Run that same command yourself
 and see it pass. Any failure there means no commit and no pull request, so the
 whole attempt is wasted. Report a check as passing only if you actually ran it
 and watched it pass — not because it ought to.
+
+That command and the pre-commit hook are the whole obligation. Do not go looking
+for other linters or test runners in the repository and run those too. A tool
+the gate does not run cannot block your work, its failures are usually
+pre-existing and none of your business, and installing it costs minutes you do
+not have. If such a tool reports something you think matters, put it in your
+report instead of fixing it.
 
 End your reply with a report in exactly this form, and write nothing after it.
 It becomes the description of the pull request a human reviews, so write it for
