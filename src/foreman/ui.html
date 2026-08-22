@@ -297,7 +297,7 @@
         </div>
         <table class="table">
           <thead>
-            <tr><th style="width:120px">Jira key</th><th style="width:80px">Attempt</th><th style="width:170px">Status</th><th style="width:70px">PR</th><th style="width:90px">Cost</th><th style="width:110px">Duration</th><th>Dispatched</th></tr>
+            <tr><th style="width:120px">Jira key</th><th style="width:170px">Status</th><th style="width:70px">PR</th><th style="width:90px">Cost</th><th style="width:110px">Duration</th><th>Dispatched</th></tr>
           </thead>
           <tbody id="recent-body"></tbody>
         </table>
@@ -320,8 +320,8 @@
     <table class="table">
       <thead>
         <tr>
-          <th style="width:120px">Jira key</th><th style="width:80px">Attempt</th><th style="width:170px">Status</th>
-          <th style="width:70px">PR</th><th style="width:90px">Cost</th><th style="width:170px">Dispatched</th>
+          <th style="width:120px">Jira key</th><th style="width:170px">Status</th>
+          <th style="width:130px">PR &middot; Branch</th><th style="width:90px">Cost</th><th style="width:170px">Dispatched</th>
           <th style="width:110px">Duration</th><th style="width:110px">Detail</th>
         </tr>
       </thead>
@@ -498,6 +498,8 @@
      Foreman started without config, which 404s the route) — keys then render as
      plain text rather than as dead links. */
   let jiraBaseUrl = null
+  /* {workspace, repoSlug} from GET /api/config, for linking to a branch. */
+  let bitbucketRepo = null
 
   function keyNode(jiraKey) {
     if (!jiraBaseUrl) {
@@ -584,6 +586,39 @@
   function closeDetail() {
     liveDetail = false
     document.getElementById('detail-modal').hidden = true
+  }
+
+  /* PR and branch side by side. The branch is named after the jira_key
+     (cloneAndBranch), so the URL is derivable — but whether it exists is not:
+     an attempt that failed before pushing leaves none, and this row cannot tell.
+     The link is offered anyway, because the case it is for is exactly the one
+     with no PR to click: a given_up note, or a crash after the push. */
+  function prAndBranchCell(row) {
+    const cell = document.createElement('td')
+    if (typeof row.pr_url === 'string' && /^https?:\/\//.test(row.pr_url)) {
+      const a = document.createElement('a')
+      a.href = row.pr_url
+      a.target = '_blank'
+      a.rel = 'noopener noreferrer'
+      a.textContent = 'PR'
+      cell.append(a)
+    }
+    if (bitbucketRepo) {
+      if (cell.childNodes.length) cell.append(document.createTextNode(' · '))
+      const b = document.createElement('a')
+      b.href =
+        'https://bitbucket.org/' +
+        encodeURIComponent(bitbucketRepo.workspace) +
+        '/' +
+        encodeURIComponent(bitbucketRepo.repoSlug) +
+        '/branch/' +
+        encodeURIComponent(row.jira_key)
+      b.target = '_blank'
+      b.rel = 'noopener noreferrer'
+      b.textContent = 'BRANCH'
+      cell.append(b)
+    }
+    return cell
   }
 
   function tagCell(status) {
@@ -719,8 +754,6 @@
     tbody.replaceChildren()
     for (const row of history.slice(0, 5)) {
       const tr = document.createElement('tr')
-      const attemptTd = td(String(row.attempt_number))
-      attemptTd.classList.add('tabular')
       const costTd = td(costLabel(row.cost_usd))
       costTd.classList.add('tabular')
       const durationTd = td(durationLabel(row.dispatched_at, row.finished_at))
@@ -729,7 +762,7 @@
       const dispatchedTd = td(row.dispatched_at)
       dispatchedTd.classList.add('tabular')
       dispatchedTd.style.color = 'var(--color-neutral-700)'
-      tr.append(keyCell(row.jira_key), attemptTd, tagCell(row.status), prCell(row.pr_url), costTd, durationTd, dispatchedTd)
+      tr.append(keyCell(row.jira_key), tagCell(row.status), prCell(row.pr_url), costTd, durationTd, dispatchedTd)
       tbody.append(tr)
     }
   }
@@ -774,8 +807,6 @@
     tbody.replaceChildren()
     for (const row of filtered) {
       const tr = document.createElement('tr')
-      const attemptTd = td(String(row.attempt_number))
-      attemptTd.classList.add('tabular')
       const costTd = td(costLabel(row.cost_usd))
       costTd.classList.add('tabular')
       const dispatchedTd = td(row.dispatched_at)
@@ -785,7 +816,7 @@
       durationTd.classList.add('tabular')
       durationTd.style.color = 'var(--color-neutral-700)'
       const detailTd = detailCell(row)
-      tr.append(keyCell(row.jira_key), attemptTd, tagCell(row.status), prCell(row.pr_url), costTd, dispatchedTd, durationTd, detailTd)
+      tr.append(keyCell(row.jira_key), tagCell(row.status), prAndBranchCell(row), costTd, dispatchedTd, durationTd, detailTd)
       tbody.append(tr)
     }
   }
@@ -828,6 +859,7 @@
     if (!res.ok) return
     const config = await res.json()
     jiraBaseUrl = config.jira?.baseUrl ?? null
+    bitbucketRepo = config.bitbucket?.workspace && config.bitbucket?.repoSlug ? config.bitbucket : null
     renderConfig(config)
     // Config resolves after the first status poll, so anything already drawn
     // was drawn without a base URL. Redraw it, or the keys stay plain until the
