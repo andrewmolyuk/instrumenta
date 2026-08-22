@@ -18,7 +18,7 @@ import {
 } from '../db/queries.mts'
 import type { TaskProvider } from '../task-provider/types.mts'
 import type { ForemanConfig } from './config.mts'
-import { GIVE_UP_THRESHOLD, isGivenUp } from './pick.mts'
+import { branchesWithBlockingPr, hasBlockingPrForBranch } from '../bitbucket/closed-prs.mts'
 
 const UI_HTML = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'ui.html'), 'utf-8')
 
@@ -31,6 +31,8 @@ export interface ApiDeps {
   /** Caps the `history` in GET /api/status only (default 50). GET /api/attempts is never capped. */
   historyLimit?: number
   fetchImpl?: typeof fetch
+  /** Injectable clock, so the blocking-PR cache is testable without waiting a minute. */
+  now?: () => number
 }
 
 function json(body: unknown, status = 200): Response {
@@ -54,7 +56,28 @@ function json(body: unknown, status = 200): Response {
  * (architecture.md) — this JSON API is the only scriptable surface, and the
  * only thing the UI itself calls.
  */
+/**
+ * How long the set of branches with an open or merged PR is reused for.
+ *
+ * The UI polls /api/status every five seconds and the queue is filtered against
+ * this set, so without a cache every poll would re-sweep every PR in the repo.
+ * A minute is well inside how fast a backlog changes, and the authoritative
+ * check still runs per-ticket at Pick and at queue time — this only decides
+ * what a human is shown.
+ */
+const BLOCKING_PR_CACHE_MS = 60_000
+
 export function createApiHandler(deps: ApiDeps): (req: Request) => Promise<Response> {
+  // Per-handler, not module-level, so tests get a fresh cache each time.
+  let cached: { at: number; branches: Set<string> } | null = null
+  const blockingBranches = async (): Promise<Set<string>> => {
+    const now = deps.now?.() ?? Date.now()
+    if (cached && now - cached.at < BLOCKING_PR_CACHE_MS) return cached.branches
+    const branches = await branchesWithBlockingPr(deps.bitbucket, deps.fetchImpl)
+    cached = { at: now, branches }
+    return branches
+  }
+
   return async (req: Request): Promise<Response> => {
     const url = new URL(req.url)
 
@@ -73,6 +96,13 @@ export function createApiHandler(deps: ApiDeps): (req: Request) => Promise<Respo
       let queueError: string | undefined
       try {
         queue = await deps.taskProvider.listBacklog()
+        // Filtered to what Pick would actually consider: a ticket whose branch
+        // already has an open or merged PR is not going to be dispatched, and
+        // showing it in the queue invites someone to wonder why it never runs.
+        // Deliberately not filtered on given-up — that one a human can override
+        // by queueing the ticket by name, so it stays visible.
+        const blocked = await blockingBranches()
+        queue = queue.filter((item) => !blocked.has(item.jira_key))
       } catch (err) {
         queueError = err instanceof Error ? err.message : String(err)
       }
@@ -152,10 +182,14 @@ export function createApiHandler(deps: ApiDeps): (req: Request) => Promise<Respo
       if (!backlog.some((item) => item.jira_key === jiraKey)) {
         return json({ error: `${jiraKey} is not in the live backlog (doesn't match the configured JQL)` }, 404)
       }
-      if (await isGivenUp(deps.db, deps.bitbucket, jiraKey, deps.fetchImpl)) {
+      // Given-up is deliberately *not* checked here: queueing a ticket by name
+      // is the human overriding that verdict, and it is the only way back for a
+      // ticket retired by a closed PR — delete-attempts clears SQLite but has
+      // no reach into Bitbucket.
+      if (await hasBlockingPrForBranch(deps.bitbucket, jiraKey, deps.fetchImpl)) {
         return json(
           {
-            error: `${jiraKey} has already been given up on (${GIVE_UP_THRESHOLD}+ failed attempts or closed PRs)`,
+            error: `${jiraKey} already has an open or merged PR — review, close or unmerge it before running this ticket again`,
           },
           409,
         )

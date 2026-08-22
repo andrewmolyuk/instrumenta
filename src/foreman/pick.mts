@@ -1,5 +1,5 @@
 import type { Database } from 'bun:sqlite'
-import { closedPrCountForBranch, hasOpenPrForBranch, type BitbucketConfig } from '../bitbucket/closed-prs.mts'
+import { closedPrCountForBranch, hasBlockingPrForBranch, type BitbucketConfig } from '../bitbucket/closed-prs.mts'
 import { giveUpAttemptCount, hasNoChangeAttempt } from '../db/queries.mts'
 import type { BacklogItem, TaskProvider } from '../task-provider/types.mts'
 
@@ -46,7 +46,7 @@ async function isEligible(
   // part of the give-up count — without this the ticket stays in the backlog
   // with no PR and Pick selects it again on the next iteration, indefinitely.
   if (hasNoChangeAttempt(db, jiraKey)) return false
-  if (await hasOpenPrForBranch(bitbucket, jiraKey, fetchImpl)) return false
+  if (await hasBlockingPrForBranch(bitbucket, jiraKey, fetchImpl)) return false
   return true
 }
 
@@ -89,6 +89,14 @@ export async function pickSpecific(
   const backlog = await taskProvider.listBacklog()
   const item = backlog.find((candidate) => candidate.jira_key === jiraKey)
   if (!item) return null
-  if (!(await isEligible(db, bitbucket, item.jira_key, fetchImpl))) return null
+  // Deliberately not the give-up check: naming a ticket by hand *is* the
+  // override. Without this the ticket is unreachable — deleteAttempts clears
+  // SQLite but cannot clear the Bitbucket half, so one declined PR retires a
+  // ticket for good (ADR-015 put the threshold at 1), with no way back.
+  //
+  // The open-or-merged guard stays. Neither is a judgement about the work's
+  // quality: an open PR is unreviewed commits on the branch that a redispatch
+  // would push over, and a merged one is work already delivered.
+  if (await hasBlockingPrForBranch(bitbucket, item.jira_key, fetchImpl)) return null
   return item
 }

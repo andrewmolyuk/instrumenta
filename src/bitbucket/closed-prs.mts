@@ -9,6 +9,78 @@ interface SearchPullRequestsResponse {
 }
 
 /**
+ * A PR in either of these states means the ticket should not be run again:
+ * OPEN is work a human still has to review, MERGED is work already delivered.
+ * DECLINED is deliberately absent — that is the give-up signal
+ * (closedPrCountForBranch), and a human queueing the ticket by name is
+ * overruling it.
+ *
+ * Approval is not a state in Bitbucket, it is a flag on a participant, so an
+ * approved-but-unmerged PR is still OPEN and is covered here.
+ */
+const BLOCKING_STATES = 'state="OPEN" OR state="MERGED"'
+
+async function search(config: BitbucketConfig, query: string, fetchImpl: typeof fetch, fields?: string): Promise<unknown> {
+  const params = new URLSearchParams({ q: query, pagelen: '100' })
+  if (fields) params.set('fields', fields)
+  const url = `https://api.bitbucket.org/2.0/repositories/${config.workspace}/${config.repoSlug}/pullrequests?${params}`
+  const res = await fetchImpl(url, { headers: { Authorization: `Bearer ${config.token}` } })
+  if (!res.ok) throw new Error(`Bitbucket search failed: ${res.status} ${res.statusText}`)
+  return await res.json()
+}
+
+/** True if this branch has a PR that is open or already merged. */
+export async function hasBlockingPrForBranch(
+  config: BitbucketConfig,
+  branchName: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<boolean> {
+  const data = (await search(
+    config,
+    `source.branch.name="${branchName}" AND (${BLOCKING_STATES})`,
+    fetchImpl,
+    'size',
+  )) as SearchPullRequestsResponse
+  return data.size > 0
+}
+
+/**
+ * Every branch name that has an open or merged PR, for filtering a whole
+ * backlog at once.
+ *
+ * One paginated sweep rather than a query per ticket: the queue is re-read on
+ * every status poll, and a backlog of a few hundred tickets would otherwise be
+ * a few hundred Bitbucket requests every five seconds. Callers are expected to
+ * cache the result — see createApiHandler.
+ */
+export async function branchesWithBlockingPr(
+  config: BitbucketConfig,
+  fetchImpl: typeof fetch = fetch,
+): Promise<Set<string>> {
+  const params = new URLSearchParams({
+    q: `(${BLOCKING_STATES})`,
+    pagelen: '100',
+    fields: 'values.source.branch.name,next',
+  })
+  let url: string | undefined = `https://api.bitbucket.org/2.0/repositories/${config.workspace}/${config.repoSlug}/pullrequests?${params}`
+
+  const branches = new Set<string>()
+  // Bounded so a pathological repo cannot spin here; 50 pages of 100 is 5000
+  // PRs, far past anything this is aimed at.
+  for (let page = 0; url && page < 50; page++) {
+    const res = await fetchImpl(url, { headers: { Authorization: `Bearer ${config.token}` } })
+    if (!res.ok) throw new Error(`Bitbucket search failed: ${res.status} ${res.statusText}`)
+    const data = (await res.json()) as { values?: Array<{ source?: { branch?: { name?: string } } }>; next?: string }
+    for (const pr of data.values ?? []) {
+      const name = pr.source?.branch?.name
+      if (name) branches.add(name)
+    }
+    url = data.next
+  }
+  return branches
+}
+
+/**
  * The Bitbucket half of ADR-001's give-up check: declined (closed, non-merged)
  * PRs whose source branch matches `jiraKey`. Bitbucket's PR states are OPEN,
  * MERGED, DECLINED, SUPERSEDED — DECLINED is the direct analog of GitHub's

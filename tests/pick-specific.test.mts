@@ -43,8 +43,25 @@ describe('pickSpecific', () => {
     expect(result).toBeNull()
   })
 
-  it('returns null when the requested key is already given up', async () => {
+  it('returns a key that automatic Pick has given up on — naming it is the override', async () => {
+    // A declined PR retires a ticket for automatic Pick, and deleteAttempts
+    // cannot clear that (it only reaches SQLite). Queueing by name is the only
+    // way back, so it must not re-apply the verdict it exists to overrule.
     const result = await pickSpecific(db, fakeTaskProvider(BACKLOG), BITBUCKET, 'KAZ-2', fakeBitbucketFetch({ 'KAZ-2': 3 }))
+    expect(result?.jira_key).toBe('KAZ-2')
+  })
+
+  it('still returns null when the key has an open PR, approved or not', async () => {
+    // Not a verdict on the work — a collision. Approval is a participant flag
+    // in Bitbucket, not a state, so an approved-but-unmerged PR is still OPEN
+    // and lands here too.
+    const result = await pickSpecific(
+      db,
+      fakeTaskProvider(BACKLOG),
+      BITBUCKET,
+      'KAZ-2',
+      fakeBitbucketFetch({ 'KAZ-2': 3 }, { 'KAZ-2': 1 }),
+    )
     expect(result).toBeNull()
   })
 

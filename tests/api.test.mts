@@ -422,3 +422,106 @@ describe('unknown routes', () => {
     expect(res.status).toBe(404)
   })
 })
+
+describe('queue filtering by PR state', () => {
+  /** Answers both shapes: the bulk sweep (values) and a single-branch check (size). */
+  function bitbucketWith(blockedBranches: string[]) {
+    return vi.fn(async (url: string) => {
+      const q = new URL(url).searchParams.get('q') ?? ''
+      const branch = q.match(/source\.branch\.name="([^"]+)"/)?.[1]
+      if (branch) {
+        const blocking = /state="OPEN" OR state="MERGED"/.test(q)
+        const size = blocking && blockedBranches.includes(branch) ? 1 : 0
+        return { ok: true, status: 200, statusText: 'OK', json: async () => ({ size }) }
+      }
+      return {
+        ok: true,
+        status: 200,
+        statusText: 'OK',
+        json: async () => ({ values: blockedBranches.map((b) => ({ source: { branch: { name: b } } })) }),
+      }
+    }) as unknown as typeof fetch
+  }
+
+  const twoTickets: TaskProvider = {
+    listBacklog: async () => [
+      { jira_key: 'KAZ-1', summary: 'do the thing' },
+      { jira_key: 'KAZ-2', summary: 'do the other thing' },
+    ],
+  }
+
+  function handlerFor(fetchImpl: typeof fetch, now?: () => number) {
+    return createApiHandler({ db, taskProvider: twoTickets, bitbucket: BITBUCKET, fetchImpl, now })
+  }
+
+  async function queueKeys(h: ReturnType<typeof createApiHandler>): Promise<string[]> {
+    const body = (await (await h(req('GET', '/api/status'))).json()) as { queue: Array<{ jira_key: string }> }
+    return body.queue.map((i) => i.jira_key)
+  }
+
+  it('hides tickets whose branch already has an open or merged PR', async () => {
+    const h = handlerFor(bitbucketWith(['KAZ-1']))
+    expect(await queueKeys(h)).toEqual(['KAZ-2'])
+  })
+
+  it('leaves the queue alone when nothing is blocked', async () => {
+    const h = handlerFor(bitbucketWith([]))
+    expect(await queueKeys(h)).toEqual(['KAZ-1', 'KAZ-2'])
+  })
+
+  it('sweeps Bitbucket once a minute, not once a poll', async () => {
+    // The UI polls every five seconds; re-listing every PR in the repo that
+    // often would be hundreds of requests a minute.
+    let clock = 1_000_000
+    const fetchImpl = bitbucketWith(['KAZ-1'])
+    const h = handlerFor(fetchImpl, () => clock)
+
+    await queueKeys(h)
+    const afterFirst = (fetchImpl as unknown as { mock: { calls: unknown[] } }).mock.calls.length
+    clock += 5_000
+    await queueKeys(h)
+    expect((fetchImpl as unknown as { mock: { calls: unknown[] } }).mock.calls.length).toBe(afterFirst)
+
+    clock += 60_000
+    expect(await queueKeys(h)).toEqual(['KAZ-2'])
+    expect((fetchImpl as unknown as { mock: { calls: unknown[] } }).mock.calls.length).toBeGreaterThan(afterFirst)
+  })
+})
+
+describe('POST /api/queue-ticket and PR state', () => {
+  function bitbucketWith(blockedBranches: string[], declined: Record<string, number> = {}) {
+    return vi.fn(async (url: string) => {
+      const q = new URL(url).searchParams.get('q') ?? ''
+      const branch = q.match(/source\.branch\.name="([^"]+)"/)?.[1] ?? ''
+      if (/state="DECLINED"/.test(q)) {
+        return { ok: true, status: 200, statusText: 'OK', json: async () => ({ size: declined[branch] ?? 0 }) }
+      }
+      const size = blockedBranches.includes(branch) ? 1 : 0
+      return { ok: true, status: 200, statusText: 'OK', json: async () => ({ size, values: [] }) }
+    }) as unknown as typeof fetch
+  }
+
+  it('refuses a ticket whose branch has an open or merged PR', async () => {
+    const h = createApiHandler({ db, taskProvider, bitbucket: BITBUCKET, fetchImpl: bitbucketWith(['KAZ-1']) })
+    const res = await h(req('POST', '/api/queue-ticket', { jiraKey: 'KAZ-1' }))
+
+    expect(res.status).toBe(409)
+    expect(((await res.json()) as { error: string }).error).toContain('open or merged PR')
+  })
+
+  it('accepts a ticket that was given up on — queueing by name is the override', async () => {
+    // The reported dead end: a declined PR retired the ticket, delete-attempts
+    // cannot clear the Bitbucket half, and queueing was refused too — so there
+    // was no way to run it ever again.
+    const h = createApiHandler({
+      db,
+      taskProvider,
+      bitbucket: BITBUCKET,
+      fetchImpl: bitbucketWith([], { 'KAZ-1': 5 }),
+    })
+    const res = await h(req('POST', '/api/queue-ticket', { jiraKey: 'KAZ-1' }))
+
+    expect(res.status).toBe(200)
+    expect(getQueueTicket(db)).toBe('KAZ-1')
+  })
+})
