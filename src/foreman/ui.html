@@ -322,7 +322,7 @@
         <tr>
           <th style="width:120px">Jira key</th><th style="width:170px">Status</th>
           <th style="width:130px">PR &middot; Branch</th><th style="width:90px">Cost</th><th style="width:170px">Dispatched</th>
-          <th style="width:110px">Duration</th><th style="width:110px">Detail</th>
+          <th style="width:170px">Finished</th><th style="width:110px">Duration</th><th style="width:110px">Detail</th>
         </tr>
       </thead>
       <tbody id="attempts-body"></tbody>
@@ -797,11 +797,38 @@
     renderAttempts(allAttempts)
   }
 
+  /* Hours for a total that runs to days, minutes and seconds for one attempt.
+     "2471m 03s" is technically the same number and useless to read. */
+  function spanLabel(ms) {
+    if (!Number.isFinite(ms) || ms <= 0) return '—'
+    const totalMin = Math.round(ms / 60000)
+    if (totalMin < 60) return elapsedLabel(ms)
+    return Math.floor(totalMin / 60) + 'h ' + String(totalMin % 60).padStart(2, '0') + 'm'
+  }
+
+  /* Averages are taken over the attempts that actually have the value, not over
+     all of them: a crash before Claude Code reported anything has a null cost,
+     and an attempt still in flight has no finish time. Dividing by the full row
+     count would quietly understate both. */
+  function summarise(rows) {
+    const costs = rows.map((r) => r.cost_usd).filter((c) => typeof c === 'number')
+    const spans = rows
+      .filter((r) => r.finished_at)
+      .map((r) => new Date(r.finished_at).getTime() - new Date(r.dispatched_at).getTime())
+      .filter((ms) => Number.isFinite(ms) && ms >= 0)
+
+    const totalCost = costs.reduce((a, c) => a + c, 0)
+    const totalMs = spans.reduce((a, ms) => a + ms, 0)
+
+    const parts = [rows.length + (rows.length === 1 ? ' attempt' : ' attempts')]
+    if (costs.length) parts.push('$' + totalCost.toFixed(2) + ' · avg $' + (totalCost / costs.length).toFixed(2))
+    if (spans.length) parts.push(spanLabel(totalMs) + ' · avg ' + spanLabel(totalMs / spans.length))
+    return parts.join('  ·  ')
+  }
+
   function renderAttempts(history) {
     const filtered = currentFilter === 'all' ? history : history.filter((r) => r.status === currentFilter)
-    const totalCost = filtered.reduce((a, r) => a + (r.cost_usd || 0), 0)
-    document.getElementById('attempts-summary').textContent =
-      filtered.length + ' attempts · $' + totalCost.toFixed(2) + ' total'
+    document.getElementById('attempts-summary').textContent = summarise(filtered)
 
     const tbody = document.getElementById('attempts-body')
     tbody.replaceChildren()
@@ -812,11 +839,23 @@
       const dispatchedTd = td(row.dispatched_at)
       dispatchedTd.classList.add('tabular')
       dispatchedTd.style.color = 'var(--color-neutral-700)'
+      const finishedTd = td(row.finished_at ?? '—')
+      finishedTd.classList.add('tabular')
+      finishedTd.style.color = 'var(--color-neutral-700)'
       const durationTd = td(durationLabel(row.dispatched_at, row.finished_at))
       durationTd.classList.add('tabular')
       durationTd.style.color = 'var(--color-neutral-700)'
       const detailTd = detailCell(row)
-      tr.append(keyCell(row.jira_key), tagCell(row.status), prAndBranchCell(row), costTd, dispatchedTd, durationTd, detailTd)
+      tr.append(
+        keyCell(row.jira_key),
+        tagCell(row.status),
+        prAndBranchCell(row),
+        costTd,
+        dispatchedTd,
+        finishedTd,
+        durationTd,
+        detailTd,
+      )
       tbody.append(tr)
     }
   }
