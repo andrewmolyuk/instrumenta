@@ -16,7 +16,7 @@ export function extractReport(output: string): string | null {
   const report = output.slice(at + REPORT_MARKER.length).trim()
   return report.length > 0 ? report : null
 }
-import { MAX_IMPLEMENT_OUTPUT_CHARS, MAX_STEP_CHARS, SHOT_NAMES } from './constants.mts'
+import { MAX_IMPLEMENT_OUTPUT_CHARS, MAX_RESULT_CHARS, MAX_STEP_CHARS, SHOT_NAMES } from './constants.mts'
 
 /** The model and effort an attempt runs under — resolved once, so the argv and the session report can't disagree. */
 export function claudeModel(): string {
@@ -319,6 +319,29 @@ interface ClaudeEvent {
 }
 
 /**
+ * What a tool actually returned, trimmed to both ends.
+ *
+ * These were dropped entirely at first, on the grounds that they carry whole
+ * file contents. That left a transcript of what the agent *did* with no trace
+ * of what it *learned* — every conclusion in it resting on output nobody could
+ * see. A few hundred characters is enough to tell a grep that found something
+ * from one that found nothing, which is most of the value.
+ */
+function toolResult(block: { content?: unknown; is_error?: unknown }): string {
+  const raw = Array.isArray(block.content)
+    ? block.content
+        .map((part: { type?: unknown; text?: unknown }) => (part?.type === 'text' ? String(part.text ?? '') : ''))
+        .join('')
+    : String(block.content ?? '')
+  const text = raw.replace(/\s+/g, ' ').trim()
+  if (!text) return block.is_error === true ? '⚠ (no output)' : '(no output)'
+
+  const half = Math.floor(MAX_RESULT_CHARS / 2)
+  const body = text.length > MAX_RESULT_CHARS ? `${text.slice(0, half)} … ${text.slice(-half)}` : text
+  return `${block.is_error === true ? '⚠ ' : ''}${body}`
+}
+
+/**
  * One short human line describing what an event means, or null for the events
  * worth staying quiet about (tool *results*, above all — they carry whole file
  * contents, and this line ends up in a hover tooltip). Every shape here is
@@ -328,10 +351,18 @@ interface ClaudeEvent {
 function summarizeEvent(event: ClaudeEvent): string | null {
   if (event.type === 'system') return event.subtype === 'init' ? 'session started' : null
   if (event.type === 'result') return typeof event.result === 'string' ? 'finished' : 'finished (no result)'
-  if (event.type !== 'assistant') return null
 
   const content = event.message?.content
   if (!Array.isArray(content)) return null
+
+  // `user` events carry tool results — what the commands above actually returned.
+  if (event.type === 'user') {
+    const results = content
+      .filter((block) => block?.type === 'tool_result')
+      .map((block) => `→ ${toolResult(block)}`)
+    return results.length > 0 ? results.join(' · ') : null
+  }
+  if (event.type !== 'assistant') return null
   const parts: string[] = []
   for (const block of content) {
     if (block?.type === 'text' && typeof block.text === 'string') {
@@ -359,6 +390,15 @@ function summarizeEvent(event: ClaudeEvent): string | null {
  */
 function step(text: string): string {
   return truncate(text.replace(/\s+/g, ' ').trim(), MAX_STEP_CHARS)
+}
+
+/** `[04:12]`, or `[1:04:12]` once an attempt passes the hour. */
+function elapsed(ms: number): string {
+  const total = Math.floor(ms / 1000)
+  const mm = String(Math.floor(total / 60) % 60).padStart(2, '0')
+  const ss = String(total % 60).padStart(2, '0')
+  const hours = Math.floor(total / 3600)
+  return hours > 0 ? `[${hours}:${mm}:${ss}]` : `[${mm}:${ss}]`
 }
 
 function truncate(text: string, max: number): string {
@@ -389,6 +429,9 @@ async function captureImplementOutput(workDir: string, command: string[]): Promi
     let resultText: string | null = null
     let costUsd: number | null = null
     const transcript: string[] = []
+    // Elapsed rather than wall-clock: the question a transcript has to answer
+    // is where a forty-minute attempt went, and offsets answer it at a glance.
+    const startedAt = Date.now()
 
     const [rawStdout, rawStderr] = await Promise.all([
       readLines(proc.stdout, (line) => {
@@ -408,8 +451,9 @@ async function captureImplementOutput(workDir: string, command: string[]): Promi
         if (typeof event.result === 'string') resultText = event.result
         const summary = summarizeEvent(event)
         if (summary) {
-          progress.line = summary
-          transcript.push(summary)
+          const stamped = `${elapsed(Date.now() - startedAt)} ${summary}`
+          progress.line = stamped
+          transcript.push(stamped)
         }
         if (progress.line !== undefined || progress.cost_usd !== undefined) console.error(encodeProgress(progress))
       }),

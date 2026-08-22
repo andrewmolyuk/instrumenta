@@ -66,6 +66,18 @@ rendered is a guess.
 Puppeteer, if the target project has it, will find this browser through
 `PUPPETEER_EXECUTABLE_PATH` — do not let it download another.
 
+`sass` and `clean-css` are installed globally, so you can compile stylesheets
+without installing anything: `sass --no-source-map --load-path=<src> file.scss`,
+and `require('clean-css')` resolves from any directory.
+
+## The clone has no node_modules
+
+You are given a bare checkout. If you need the project's *own* toolchain — its
+linter, its test runner, its type checker — run its install once, up front, and
+use the versions it pins. Installing individual tools ad hoc as you discover you
+need them costs several minutes each and gives you versions the project does not
+use, so its config may not even load against them.
+
 ## Done means verified, not written
 
 - "It should work" is not done. Run the project's own checks and watch them pass.

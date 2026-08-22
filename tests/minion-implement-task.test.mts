@@ -9,6 +9,9 @@ const INPUT: MinionInput = { task_id: 't1', jira_key: 'KAZ-1', attempt_number: 1
 const TICKET: JiraTicket = { summary: 'Fix the thing', description: 'Fix the thing', attachments: [] }
 const SHOTS = '/tmp/minion-t1-shots'
 
+/** Strips the `[mm:ss] ` elapsed prefix every step carries. */
+const unstamped = (line?: string) => (line ?? '').replace(/^\[\d+:?\d*:?\d*\]\s/, '')
+
 /** The prompt is the argument after `-p`, wherever the flags around it end up. */
 function promptOf(command: string[]): string {
   return command[command.indexOf('-p') + 1] as string
@@ -140,15 +143,18 @@ describe('implementTask stream-json progress', () => {
 
   it('reports a progress line per tool call, carrying the running cost', async () => {
     const { progress } = await runOverEvents(EVENTS)
-    const lines = progress.map((p) => p.line).filter(Boolean)
+    const lines = progress.map((p) => unstamped(p.line)).filter(Boolean)
     expect(lines).toContain('Read: src/foo.ts')
     expect(lines).toContain('Bash: npm run lint')
     expect(progress.at(-1)?.cost_usd).toBe(1.83)
   })
 
-  it('stays quiet about tool results, which carry whole file contents', async () => {
+  it('records tool results, trimmed rather than dropped', async () => {
+    // Originally these were dropped entirely as too bulky. That left no trace
+    // of what any command returned, so nothing in the transcript could be
+    // checked. They are trimmed to both ends instead.
     const { progress } = await runOverEvents(EVENTS)
-    expect(progress.map((p) => p.line).join('\n')).not.toContain('a very long file dump')
+    expect(progress.map((p) => p.line).join('\n')).toContain('a very long file dump')
   })
 
   it('skips stream lines it cannot parse rather than failing the run', async () => {
@@ -259,7 +265,7 @@ describe('a step in the transcript', () => {
       { type: 'assistant', message: { content: [{ type: 'tool_use', name: 'Bash', input: { command } }] } },
     ])
 
-    expect(progress[0]?.line).toBe('Bash: ' + command)
+    expect(unstamped(progress[0]?.line)).toBe('Bash: ' + command)
     expect(progress[0]?.line).not.toContain('…')
   })
 
@@ -276,7 +282,7 @@ describe('a step in the transcript', () => {
     ])
 
     expect(progress[0]?.line).not.toContain('\n')
-    expect(progress[0]?.line).toBe("Bash: cat > f.scss <<'EOF' .a { b: c; } EOF")
+    expect(unstamped(progress[0]?.line)).toBe("Bash: cat > f.scss <<'EOF' .a { b: c; } EOF")
   })
 
   it('still caps a single runaway step so it cannot swallow the record', async () => {
@@ -284,7 +290,7 @@ describe('a step in the transcript', () => {
       { type: 'assistant', message: { content: [{ type: 'text', text: 'x'.repeat(5_000) }] } },
     ])
 
-    expect(progress[0]?.line?.length).toBeLessThanOrEqual(MAX_STEP_CHARS)
+    expect(unstamped(progress[0]?.line).length).toBeLessThanOrEqual(MAX_STEP_CHARS)
     expect(progress[0]?.line).toContain('…')
   })
 
@@ -293,6 +299,55 @@ describe('a step in the transcript', () => {
       { type: 'assistant', message: { content: [{ type: 'text', text: 'I traced the bug.\nThe hr is 2px.' }] } },
     ])
 
-    expect(progress[0]?.line).toBe('I traced the bug. The hr is 2px.')
+    expect(unstamped(progress[0]?.line)).toBe('I traced the bug. The hr is 2px.')
+  })
+})
+
+describe('what the transcript records', () => {
+  it('records what a tool returned, not only what was run', async () => {
+    // These were dropped at first, leaving a transcript of actions whose every
+    // conclusion rested on output nobody could see.
+    const { progress } = await runOverEvents([
+      { type: 'assistant', message: { content: [{ type: 'tool_use', name: 'Bash', input: { command: 'grep float x.css' } }] } },
+      { type: 'user', message: { content: [{ type: 'tool_result', content: '412:  float: left;' }] } },
+    ])
+
+    expect(progress.map((p) => p.line).join('\n')).toContain('→ 412: float: left;')
+  })
+
+  it('marks a failed tool call', async () => {
+    const { progress } = await runOverEvents([
+      { type: 'user', message: { content: [{ type: 'tool_result', content: 'command not found: sass', is_error: true }] } },
+    ])
+
+    expect(progress[0]?.line).toContain('⚠')
+    expect(progress[0]?.line).toContain('command not found')
+  })
+
+  it('keeps both ends of a long result, since which end matters varies', async () => {
+    const long = 'FIRST' + 'x'.repeat(5_000) + 'LAST'
+    const { progress } = await runOverEvents([
+      { type: 'user', message: { content: [{ type: 'tool_result', content: long }] } },
+    ])
+
+    expect(progress[0]?.line).toContain('FIRST')
+    expect(progress[0]?.line).toContain('LAST')
+    expect(progress[0]?.line!.length).toBeLessThan(long.length)
+  })
+
+  it('handles a result delivered as content blocks rather than a string', async () => {
+    const { progress } = await runOverEvents([
+      { type: 'user', message: { content: [{ type: 'tool_result', content: [{ type: 'text', text: 'two matches' }] }] } },
+    ])
+
+    expect(progress[0]?.line).toContain('two matches')
+  })
+
+  it('stamps every step with elapsed time, so a long attempt can be read', async () => {
+    const { progress } = await runOverEvents([
+      { type: 'assistant', message: { content: [{ type: 'text', text: 'looking' }] } },
+    ])
+
+    expect(progress[0]?.line).toMatch(/^\[\d{2}:\d{2}\] looking$/)
   })
 })

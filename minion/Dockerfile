@@ -38,7 +38,7 @@ COPY --from=bun /usr/local/bin/bun /usr/local/bin/bun
 RUN apt-get update \
   && apt-get install -y --no-install-recommends ca-certificates chromium fonts-liberation git \
   && rm -rf /var/lib/apt/lists/* \
-  && npm install -g @anthropic-ai/claude-code
+  && npm install -g @anthropic-ai/claude-code sass clean-css
 
 COPY package.json bun.lock ./
 RUN bun install --frozen-lockfile --production
@@ -58,6 +58,13 @@ COPY src/bitbucket/closed-prs.mts ./src/bitbucket/closed-prs.mts
 # own `npm install` can reach for global-ish packages (e.g. turbo) as part of
 # their own toolchain, and that path is root-owned by default (it's where
 # `npm install -g @anthropic-ai/claude-code` above just wrote, as root).
+# `sass` and `clean-css` ship with the image because a fresh clone has no
+# node_modules and the agent needs them before it can render anything. Measured
+# on an RPG-5427 attempt: it spent 300s installing sass, another 300s on
+# clean-css and 600s on stylelint, all into /tmp, before the target repo's own
+# `npm install` had even been run. clean-css is a library rather than a CLI, so
+# NODE_PATH below is what makes `require('clean-css')` resolve from any cwd.
+#
 # /cache is where the git mirror volume mounts (ADR-013). Created here, owned by
 # minion, because Docker copies an image directory's ownership onto a fresh named
 # volume mounted over it — without this the volume arrives root-owned and the
@@ -77,6 +84,7 @@ ENV HOME=/home/minion
 # instead of downloading a second copy of it mid-attempt.
 ENV CHROME_BIN=/usr/bin/chromium \
     PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium \
-    PUPPETEER_SKIP_DOWNLOAD=1
+    PUPPETEER_SKIP_DOWNLOAD=1 \
+    NODE_PATH=/usr/local/lib/node_modules
 
 ENTRYPOINT ["bun", "minion/main.mts"]

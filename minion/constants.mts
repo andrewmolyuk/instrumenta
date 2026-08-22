@@ -45,3 +45,13 @@ export const MAX_STEP_CHARS = 600
  * commit them into the pull request.
  */
 export const SHOT_NAMES = ['before.png', 'after.png'] as const
+
+/**
+ * Cap on one tool *result* in the transcript, split head and tail.
+ *
+ * Much tighter than a step: results are file dumps, greps over ten-thousand-line
+ * stylesheets, whole test runs. Head and tail rather than head alone because
+ * which end matters depends on the tool — a grep's first hits, a failing test
+ * run's last lines.
+ */
+export const MAX_RESULT_CHARS = 400
