@@ -56,4 +56,26 @@ export class JiraTaskProvider implements TaskProvider {
     const data = (await res.json()) as JiraSearchResponse
     return data.issues.map((issue) => ({ jira_key: issue.key, summary: issue.fields.summary }))
   }
+
+  /**
+   * Jira's own count for the configured JQL.
+   *
+   * A separate endpoint because /rest/api/3/search/jql does not report one —
+   * its response carries `issues`, `nextPageToken` and `isLast`, and nothing
+   * else. Counting the issues it returns gives `maxResults`, which is how the
+   * Cockpit came to claim a 121-ticket backlog held 50.
+   *
+   * Approximate by name and by nature: Jira computes it from an index and says
+   * so. It is a backlog size on a dashboard, not something anything branches on.
+   */
+  async backlogCount(): Promise<number> {
+    const auth = Buffer.from(`${this.config.email}:${this.config.apiToken}`).toString('base64')
+    const res = await this.fetchImpl(`${this.config.baseUrl}/rest/api/3/search/approximate-count`, {
+      method: 'POST',
+      headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jql: this.config.jql }),
+    })
+    if (!res.ok) throw new Error(`Jira count failed: ${res.status} ${res.statusText}`)
+    return ((await res.json()) as { count: number }).count
+  }
 }

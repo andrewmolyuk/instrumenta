@@ -745,12 +745,15 @@
      is the interesting number, so it goes in the heading. */
   const QUEUE_PREVIEW = 5
 
-  function renderQueue(queue) {
+  function renderQueue(queue, total) {
+    // `total` is the whole backlog as the source counts it; queue.length is one
+    // page of it, already filtered. Showing the page size as the total is how
+    // this came to report 50 for a backlog of 121.
+    const backlog = typeof total === 'number' ? total : queue.length
+    const shown = Math.min(queue.length, QUEUE_PREVIEW)
     const countEl = document.getElementById('queue-count')
     countEl.textContent =
-      queue.length > QUEUE_PREVIEW
-        ? QUEUE_PREVIEW + ' of ' + queue.length
-        : String(queue.length) + (queue.length === 1 ? ' ticket' : ' tickets')
+      shown < backlog ? shown + ' of ' + backlog : String(backlog) + (backlog === 1 ? ' ticket' : ' tickets')
 
     const tbody = document.getElementById('queue-body')
     tbody.replaceChildren()
@@ -900,7 +903,7 @@
     const s = await res.json()
     lastStatus = s
     renderStatCards(s)
-    renderQueue(s.queue)
+    renderQueue(s.queue, s.queueTotal)
     renderRecent(s.history)
     if (currentTab === 'attempts') await loadAttempts()
   }
@@ -917,7 +920,7 @@
     // next five-second tick.
     if (lastStatus) {
       renderStatCards(lastStatus)
-      renderQueue(lastStatus.queue)
+      renderQueue(lastStatus.queue, lastStatus.queueTotal)
       renderRecent(lastStatus.history)
       if (allAttempts) renderAttempts(allAttempts)
     }

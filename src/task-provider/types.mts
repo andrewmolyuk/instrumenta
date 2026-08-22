@@ -18,4 +18,11 @@ export interface BacklogItem {
 export interface TaskProvider {
   /** The live, ordered backlog — read fresh on every call, never cached (architecture.md). */
   listBacklog(): Promise<BacklogItem[]>
+  /**
+   * How many tasks match the source's query in total, which `listBacklog` does
+   * not say: it returns one page, so counting its result reports the page size.
+   * Optional — a source that cannot answer cheaply should leave it out rather
+   * than paginate the whole backlog to produce a number for a dashboard.
+   */
+  backlogCount?(): Promise<number>
 }

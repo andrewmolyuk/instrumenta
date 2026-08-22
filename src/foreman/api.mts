@@ -93,6 +93,7 @@ export function createApiHandler(deps: ApiDeps): (req: Request) => Promise<Respo
       // unreachable Jira URL, this endpoint returned Bun's raw error page
       // instead of JSON before this was added.
       let queue: Awaited<ReturnType<TaskProvider['listBacklog']>> = []
+      let queueTotal: number | undefined
       let queueError: string | undefined
       try {
         queue = await deps.taskProvider.listBacklog()
@@ -103,6 +104,10 @@ export function createApiHandler(deps: ApiDeps): (req: Request) => Promise<Respo
         // by queueing the ticket by name, so it stays visible.
         const blocked = await blockingBranches()
         queue = queue.filter((item) => !blocked.has(item.jira_key))
+        // The whole backlog, not the page listBacklog returned — a source that
+        // cannot say cheaply leaves the count out and the UI falls back to the
+        // page size.
+        queueTotal = (await deps.taskProvider.backlogCount?.()) ?? undefined
       } catch (err) {
         queueError = err instanceof Error ? err.message : String(err)
       }
@@ -114,6 +119,7 @@ export function createApiHandler(deps: ApiDeps): (req: Request) => Promise<Respo
         queueTicket: getQueueTicket(deps.db),
         current: getCurrentTask(deps.db),
         queue,
+        queueTotal,
         queueError,
         history: listAttempts(deps.db, deps.historyLimit ?? 50),
       })

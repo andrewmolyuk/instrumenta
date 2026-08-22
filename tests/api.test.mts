@@ -525,3 +525,26 @@ describe('POST /api/queue-ticket and PR state', () => {
     expect(getQueueTicket(db)).toBe('KAZ-1')
   })
 })
+
+describe('backlog total', () => {
+  it('reports the whole backlog, not the page listBacklog returned', async () => {
+    // Jira's /search/jql carries no total at all — counting its issues yields
+    // maxResults, which is how the Cockpit came to show "5 of 50" for a
+    // backlog of 121.
+    const provider: TaskProvider = {
+      listBacklog: async () => Array.from({ length: 50 }, (_, i) => ({ jira_key: 'KAZ-' + i, summary: 's' })),
+      backlogCount: async () => 121,
+    }
+    const h = createApiHandler({ db, taskProvider: provider, bitbucket: BITBUCKET, fetchImpl: fakeBitbucketFetch() })
+
+    const body = (await (await h(req('GET', '/api/status'))).json()) as { queue: unknown[]; queueTotal?: number }
+    expect(body.queue).toHaveLength(50)
+    expect(body.queueTotal).toBe(121)
+  })
+
+  it('leaves the total out for a source that cannot count cheaply', async () => {
+    // backlogCount is optional; the UI falls back to the page size.
+    const body = (await (await handler(req('GET', '/api/status'))).json()) as { queueTotal?: number }
+    expect(body.queueTotal).toBeUndefined()
+  })
+})
