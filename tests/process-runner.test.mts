@@ -169,12 +169,17 @@ describe('ProcessMinionRunner live progress', () => {
       `console.error(${JSON.stringify(encodeProgress({ line: 'early' }))}); await Bun.sleep(400); console.log(JSON.stringify({ status: 'success', pr_url: null }))`,
     ])
 
-    let sawEarlyLineAt = 0
-    const started = Date.now()
+    let progressAt = 0
     await runner.run(INPUT, 5000, () => {
-      sawEarlyLineAt ||= Date.now() - started
+      progressAt ||= Date.now()
     })
+    const resolvedAt = Date.now()
 
-    expect(sawEarlyLineAt).toBeLessThan(300)
+    // Compared against when the run resolved, not against an absolute wall-clock
+    // budget: the child sleeps 400ms after printing, so a live report lands well
+    // before the result. An absolute bound made this fail under suite load
+    // while still passing alone, which tested the machine rather than the code.
+    expect(progressAt).toBeGreaterThan(0)
+    expect(resolvedAt - progressAt).toBeGreaterThanOrEqual(200)
   })
 })

@@ -55,6 +55,10 @@ and dated.
   skips the ticket) and explained to a human in a Jira comment, since the pipeline cannot
   verify the agent's claim itself (amends ADR-001's status vocabulary)
 
+- [ADR-015](015-one-attempt-per-ticket.md) — one attempt per ticket: the give-up threshold
+  drops from 3 to 1 (amends ADR-001), which also makes `failed_verify` and
+  `blocked_no_verify` unreachable and retires a ticket on a single closed PR
+
 ## Superseded
 
 None yet.

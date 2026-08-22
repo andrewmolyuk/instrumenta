@@ -271,7 +271,7 @@
         <div class="kv-row"><span>Jira &mdash; live query</span><span id="src-jira" class="tag tag-outline">OK</span></div>
         <div class="kv-row"><span>SQLite &mdash; <span id="src-db-path">/data/foreman.db</span></span><span class="tag tag-outline">OK</span></div>
         <div class="kv-row"><span>Bitbucket &mdash; PR history</span><span class="tag tag-outline">OK</span></div>
-        <div class="note" style="border-top:1px solid var(--color-divider);padding-top:var(--space-3)">Give-up fires when either SQLite or Bitbucket crosses 3 attempts first.</div>
+        <div class="note" style="border-top:1px solid var(--color-divider);padding-top:var(--space-3)">Give-up fires on the first failed attempt, or the first closed PR &mdash; whichever comes first. A retry costs another full attempt to usually fail the same way.</div>
       </div>
     </div>
 

@@ -3,8 +3,16 @@ import { closedPrCountForBranch, hasOpenPrForBranch, type BitbucketConfig } from
 import { giveUpAttemptCount, hasNoChangeAttempt } from '../db/queries.mts'
 import type { BacklogItem, TaskProvider } from '../task-provider/types.mts'
 
-/** ADR-001: given up the moment either source crosses this, whichever happens first. */
-const GIVE_UP_THRESHOLD = 3
+/**
+ * Given up the moment either source reaches this, whichever happens first
+ * (ADR-001, lowered from 3 to 1 by ADR-015).
+ *
+ * At 1 this also means a single closed PR retires the ticket: a human who
+ * declined the agent's work should not have it redone unasked.
+ *
+ * Must stay equal to MAX_ATTEMPTS in minion/constants.mts; a test asserts it.
+ */
+export const GIVE_UP_THRESHOLD = 1
 
 /**
  * Both sources are checked on every call — Bitbucket isn't a fallback used

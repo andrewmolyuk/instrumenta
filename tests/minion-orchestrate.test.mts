@@ -148,12 +148,15 @@ describe('runMinion', () => {
     expect(deps.commitAndPush).toHaveBeenCalledWith('/tmp/wd', 'KAZ-1', 'fix: KAZ-1: ')
   })
 
-  it('writes a blocked_no_verify note and commits it with a chore: message, without a PR, when there is no verify script', async () => {
+  it('writes a note and commits it with a chore: message, without a PR, when there is no verify script', async () => {
+    // At MAX_ATTEMPTS = 1 (ADR-015) the first attempt is also the last, so this
+    // reports given_up rather than blocked_no_verify — there is no later
+    // attempt for which the ticket could still be merely blocked.
     const deps = fakeDeps({ hasVerifyScript: vi.fn(async () => false) })
     const result = await runMinion(input({ attempt_number: 1 }), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
 
     expect(result).toEqual({
-      status: 'blocked_no_verify',
+      status: 'given_up',
       pr_url: null,
       output: null,
       cost_usd: null,
@@ -174,19 +177,21 @@ describe('runMinion', () => {
     expect(result.output).toBe('claude: nothing to change here')
   })
 
-  it('reports failed_verify with the captured output and commits nothing on a non-final attempt', async () => {
+  it('reports given_up with the captured output and writes a note when the gate fails', async () => {
+    // ADR-015: one attempt, so a failing gate is terminal immediately. The note
+    // is written and pushed because it is the record a human is left with.
     const deps = fakeDeps({ runVerify: vi.fn(async () => ({ passed: false, output: 'test 1 failed' })) })
     const result = await runMinion(input({ attempt_number: 1 }), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
 
     expect(result).toEqual({
-      status: 'failed_verify',
+      status: 'given_up',
       pr_url: null,
       output: 'test 1 failed',
       cost_usd: null,
       session: expect.any(String),
     })
-    expect(deps.commitAndPush).not.toHaveBeenCalled()
-    expect(deps.writeNote).not.toHaveBeenCalled()
+    expect(deps.writeNote).toHaveBeenCalledWith('/tmp/wd', 'docs/todo/', 'kaz-1-given-up.md', expect.any(String))
+    expect(deps.createPullRequest).not.toHaveBeenCalled()
   })
 
   it('combines implementTask output with verify output on failed_verify when there was both', async () => {
@@ -220,18 +225,20 @@ describe('runMinion', () => {
     expect(order).toEqual(['verify', 'pre-commit', 'commit'])
   })
 
-  it('reports failed_verify and commits nothing when the pre-commit checks fail on a non-final attempt', async () => {
+  it('reports given_up when the pre-commit checks fail', async () => {
     const deps = fakeDeps({
       implementTask: vi.fn(async () => ({ output: 'claude did something', costUsd: 1.5, transcript: [] })),
       runPreCommitChecks: vi.fn(async () => ({ ran: true, passed: false, output: 'eslint: 2 problems' })),
     })
     const result = await runMinion(input({ attempt_number: 1 }), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
 
-    expect(result.status).toBe('failed_verify')
+    expect(result.status).toBe('given_up')
     expect(result.output).toContain('claude did something')
     expect(result.output).toContain('eslint: 2 problems')
     expect(result.cost_usd).toBe(1.5)
-    expect(deps.commitAndPush).not.toHaveBeenCalled()
+    // The give-up note is committed and pushed — at one attempt (ADR-015) this
+    // is terminal, and the note is the record a human is left with.
+    expect(deps.commitAndPush).toHaveBeenCalledWith('/tmp/wd', 'KAZ-1', expect.stringMatching(/^chore: KAZ-1: giving up/))
     expect(deps.createPullRequest).not.toHaveBeenCalled()
   })
 
@@ -399,7 +406,7 @@ describe('runMinion when the agent changed nothing', () => {
     const deps = noChangeDeps({ runVerify: vi.fn(async () => ({ passed: false, output: 'test 1 failed' })) })
     const result = await runMinion(input(), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
 
-    expect(result.status).toBe('failed_verify')
+    expect(result.status).toBe('given_up')
     expect(deps.commentOnTicket).not.toHaveBeenCalled()
   })
 })

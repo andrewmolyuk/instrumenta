@@ -3,7 +3,7 @@ import { MAX_ATTEMPTS } from './constants.mts'
 import { extractReport, type ImplementResult } from './implement-task.mts'
 import type { JiraTicket } from './jira.mts'
 import { buildSessionRecord } from './session.mts'
-import { blockedNoVerifyFilename, blockedNoVerifyNote, givenUpFilename, givenUpNote } from './notes.mts'
+import { attempts, blockedNoVerifyFilename, blockedNoVerifyNote, givenUpFilename, givenUpNote } from './notes.mts'
 import type { PreCommitResult, VerifyResult } from './verify-gate.mts'
 
 export interface MinionDeps {
@@ -151,7 +151,7 @@ async function reportFailedGate(
     deps,
     workDir,
     input.jira_key,
-    `chore: ${input.jira_key}: giving up after ${MAX_ATTEMPTS} attempts`,
+    `chore: ${input.jira_key}: giving up after ${attempts(MAX_ATTEMPTS)}`,
   )
   if (commitError) {
     return { status: 'crashed', pr_url: null, output: combineOutputs(output, commitError), cost_usd: costUsd, session }

@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Database } from 'bun:sqlite'
 import { openDb, type TaskRow } from '../src/db/index.mts'
 import { giveUpAttemptCount, recordAttempt } from '../src/db/queries.mts'
-import { isGivenUp, pick } from '../src/foreman/pick.mts'
+import { MAX_ATTEMPTS } from '../minion/constants.mts'
+import { GIVE_UP_THRESHOLD, isGivenUp, pick } from '../src/foreman/pick.mts'
 import type { BitbucketConfig } from '../src/bitbucket/closed-prs.mts'
 import type { BacklogItem, TaskProvider } from '../src/task-provider/types.mts'
 
@@ -57,9 +58,19 @@ function fakeTaskProvider(items: BacklogItem[]): TaskProvider {
 
 describe('isGivenUp', () => {
   it('is false when both sources are below the threshold', async () => {
-    recordAttempt(db, attempt({ status: 'crashed' }))
-    const result = await isGivenUp(db, BITBUCKET, 'KAZ-1', fakeBitbucketFetch({ 'KAZ-1': 1 }))
+    // ADR-015 put the threshold at 1, so "below" is zero on both sides: no
+    // recorded failure and no closed PR.
+    const result = await isGivenUp(db, BITBUCKET, 'KAZ-1', fakeBitbucketFetch({ 'KAZ-1': 0 }))
     expect(result).toBe(false)
+  })
+
+  it('is true from a single failed attempt, with no retry (ADR-015)', async () => {
+    recordAttempt(db, attempt({ status: 'crashed' }))
+    expect(await isGivenUp(db, BITBUCKET, 'KAZ-1', fakeBitbucketFetch({ 'KAZ-1': 0 }))).toBe(true)
+  })
+
+  it('is true from a single closed PR — a human declined this work once', async () => {
+    expect(await isGivenUp(db, BITBUCKET, 'KAZ-1', fakeBitbucketFetch({ 'KAZ-1': 1 }))).toBe(true)
   })
 
   it('is true from SQLite alone, even with zero closed PRs', async () => {
@@ -143,5 +154,14 @@ describe('pick and a no_change conclusion', () => {
       recordAttempt(db, attempt({ task_id: 'n' + i, jira_key: 'KAZ-9', status: 'no_change' }))
     }
     expect(giveUpAttemptCount(db, 'KAZ-9')).toBe(0)
+  })
+})
+
+describe('the give-up threshold', () => {
+  it('is the same on both sides of the container boundary', () => {
+    // Minion enforces it as MAX_ATTEMPTS, Foreman as GIVE_UP_THRESHOLD, from
+    // two constants that cannot import each other — the images are built from
+    // different subsets of this repo. Nothing but this test stops them drifting.
+    expect(GIVE_UP_THRESHOLD).toBe(MAX_ATTEMPTS)
   })
 })

@@ -27,12 +27,17 @@ defined one (see vision.md's Scope). Add a \`"verify"\` script under \`scripts\`
 `
 }
 
+/** "1 attempt" / "3 attempts" — the threshold is configurable, the grammar should follow it. */
+export function attempts(n: number): string {
+  return `${n} attempt${n === 1 ? '' : 's'}`
+}
+
 export function givenUpNote(input: MinionInput): string {
   return `${frontmatter(input.task_id)}
-# Gave up on ${input.jira_key} after ${MAX_ATTEMPTS} attempts
+# Gave up on ${input.jira_key} after ${attempts(MAX_ATTEMPTS)}
 
-Minion attempted this task ${MAX_ATTEMPTS} times without a passing \`verify\` run. See
-the attempt history in Foreman for what happened on each try. Needs a human to look at
+Minion attempted this task ${attempts(MAX_ATTEMPTS)} without a passing \`verify\` run. See
+the attempt history in Foreman for what happened. Needs a human to look at
 ${input.jira_key} directly.
 `
 }

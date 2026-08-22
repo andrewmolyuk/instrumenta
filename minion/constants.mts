@@ -1,5 +1,13 @@
-/** ADR-001's give-up threshold — the attempt number at which Minion self-reports given_up. */
-export const MAX_ATTEMPTS = 3
+/**
+ * The give-up threshold: the attempt number at which Minion self-reports
+ * given_up. Lowered from ADR-001's 3 to 1 by ADR-015 — an attempt costs real
+ * money and the same model rereading the same code tends to fail the same way,
+ * so a retry mostly buys a second bill.
+ *
+ * Must stay equal to GIVE_UP_THRESHOLD in src/foreman/pick.mts, which enforces
+ * the same rule independently; a test asserts they agree.
+ */
+export const MAX_ATTEMPTS = 1
 
 /** Cap on captured verify output stored per attempt — keeps the tail, where failures are summarized. */
 export const MAX_VERIFY_OUTPUT_CHARS = 16000

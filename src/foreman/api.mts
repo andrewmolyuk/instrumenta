@@ -18,7 +18,7 @@ import {
 } from '../db/queries.mts'
 import type { TaskProvider } from '../task-provider/types.mts'
 import type { ForemanConfig } from './config.mts'
-import { isGivenUp } from './pick.mts'
+import { GIVE_UP_THRESHOLD, isGivenUp } from './pick.mts'
 
 const UI_HTML = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'ui.html'), 'utf-8')
 
@@ -153,7 +153,12 @@ export function createApiHandler(deps: ApiDeps): (req: Request) => Promise<Respo
         return json({ error: `${jiraKey} is not in the live backlog (doesn't match the configured JQL)` }, 404)
       }
       if (await isGivenUp(deps.db, deps.bitbucket, jiraKey, deps.fetchImpl)) {
-        return json({ error: `${jiraKey} has already been given up on (3+ failed attempts or closed PRs)` }, 409)
+        return json(
+          {
+            error: `${jiraKey} has already been given up on (${GIVE_UP_THRESHOLD}+ failed attempts or closed PRs)`,
+          },
+          409,
+        )
       }
 
       setQueueTicket(deps.db, jiraKey)
