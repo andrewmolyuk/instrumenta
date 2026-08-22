@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -133,5 +133,79 @@ describe('credential redaction', () => {
     expect(err).toBeInstanceOf(Error)
     expect((err as Error).message).not.toContain(token)
     expect((err as Error).message).toContain('x-token-auth:***@bitbucket.org')
+  })
+})
+
+describe('cloneAndBranch through the git cache', () => {
+  let cacheDir: string
+
+  beforeEach(() => {
+    cacheDir = mkdtempSync(join(tmpdir(), 'minion-git-cache-'))
+    process.env.MINION_GIT_CACHE = cacheDir
+  })
+
+  afterEach(() => {
+    delete process.env.MINION_GIT_CACHE
+    rmSync(cacheDir, { recursive: true, force: true })
+  })
+
+  it('creates a bare mirror on first use and clones the work tree from it', async () => {
+    await cloneAndBranch(remoteDir, 'KAZ-1', workDir, true)
+
+    const mirrors = readdirSync(cacheDir)
+    expect(mirrors).toHaveLength(1)
+    expect(mirrors[0]).toMatch(/\.git$/)
+    expect(git(['rev-parse', '--is-bare-repository'], join(cacheDir, mirrors[0]!)).trim()).toBe('true')
+    expect(git(['branch', '--show-current'], workDir).trim()).toBe('KAZ-1')
+  })
+
+  it('points origin back at the real remote, so pushes do not land in the mirror', async () => {
+    // Without the set-url, `git push` would silently update the cache volume
+    // and the target repository would never see the branch.
+    await cloneAndBranch(remoteDir, 'KAZ-1', workDir, true)
+
+    expect(git(['remote', 'get-url', 'origin'], workDir).trim()).toBe(remoteDir)
+
+    writeFileSync(join(workDir, 'change.txt'), 'work')
+    await commitAndPush(workDir, 'KAZ-1', 'fix: KAZ-1: do the thing')
+    expect(git(['log', 'KAZ-1', '-1', '--format=%s'], remoteDir).trim()).toBe('fix: KAZ-1: do the thing')
+  })
+
+  it('reuses the mirror on the next attempt, picking up commits pushed since', async () => {
+    await cloneAndBranch(remoteDir, 'KAZ-1', workDir, true)
+    const mirrorPath = join(cacheDir, readdirSync(cacheDir)[0]!)
+    const before = git(['rev-parse', 'HEAD'], workDir).trim()
+
+    pushBranchWithCommit(remoteDir, 'KAZ-2', 'later work')
+
+    const second = join(mkdtempSync(join(tmpdir(), 'minion-git-work2-')), 'repo')
+    await cloneAndBranch(remoteDir, 'KAZ-2', second, true)
+
+    // Same mirror, not a second one, and it saw the branch pushed after it was built.
+    expect(readdirSync(cacheDir)).toHaveLength(1)
+    expect(git(['rev-parse', '--is-bare-repository'], mirrorPath).trim()).toBe('true')
+    expect(git(['log', '-1', '--format=%s'], second).trim()).toBe('later work')
+    expect(before).toBeTruthy()
+    rmSync(join(second, '..'), { recursive: true, force: true })
+  })
+
+  it('never writes credentials into the mirror it leaves on the volume', async () => {
+    // The mirror outlives the container; a token in its config would too.
+    const withToken = remoteDir
+    await cloneAndBranch(withToken, 'KAZ-1', workDir, true)
+
+    const mirrorPath = join(cacheDir, readdirSync(cacheDir)[0]!)
+    expect(readFileSync(join(mirrorPath, 'config'), 'utf-8')).not.toMatch(/:[^/@\s]+@/)
+  })
+
+  it('falls back to a direct clone when the cache cannot be used', async () => {
+    // A stale or unwritable mirror costs minutes, never the attempt.
+    process.env.MINION_GIT_CACHE = join(cacheDir, 'nope', 'deeper')
+    writeFileSync(join(cacheDir, 'nope'), 'not a directory')
+
+    await cloneAndBranch(remoteDir, 'KAZ-1', workDir, true)
+
+    expect(git(['branch', '--show-current'], workDir).trim()).toBe('KAZ-1')
+    expect(git(['remote', 'get-url', 'origin'], workDir).trim()).toBe(remoteDir)
   })
 })

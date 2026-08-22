@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { redactCredentials } from './redact.mts'
 
@@ -12,6 +13,96 @@ async function run(cmd: string[], cwd?: string): Promise<void> {
     const stderr = (await new Response(proc.stderr).text()).trim()
     const detail = [stdout, stderr].filter(Boolean).join('\n') || '(no output on stdout or stderr)'
     throw new Error(redactCredentials(`Command failed (${cmd.join(' ')}): ${detail}`))
+  }
+}
+
+/**
+ * Where this repo's bare mirror lives inside the cache volume.
+ *
+ * Derived from the URL's host and path via `new URL`, which drops any
+ * `user:password@` for us — the mirror's directory name must not carry the
+ * token, and neither must anything written inside it (see updateMirror).
+ */
+function mirrorPathFor(cacheDir: string, repoUrl: string): string {
+  // `new URL` drops any `user:password@` for us, which is the point — but it
+  // throws on anything that isn't a URL, and a repo "url" is a plain path in
+  // the tests and for anyone pointing Minion at a local remote. Falling back to
+  // sanitising the raw string keeps both working; there are no credentials in a
+  // path to leak.
+  let slug: string
+  try {
+    const { host, pathname } = new URL(repoUrl)
+    slug = `${host}${pathname}`
+  } catch {
+    slug = repoUrl
+  }
+  return join(cacheDir, `${slug.replace(/\.git$/, '').replace(/[^a-zA-Z0-9.-]+/g, '-')}.git`)
+}
+
+/** The remote with any `user:password@` removed; unchanged if it isn't a URL. */
+function withoutCredentials(repoUrl: string): string {
+  try {
+    const { origin, pathname } = new URL(repoUrl)
+    return `${origin}${pathname}`
+  } catch {
+    return repoUrl
+  }
+}
+
+/**
+ * Brings the bare mirror at `mirrorPath` up to date, creating it if absent.
+ *
+ * The credentials are passed on the command line every time rather than stored
+ * in the mirror's config, so a volume that outlives the container never holds a
+ * token. That is also why the fetch names its refspec explicitly: with no
+ * `remote.origin.url` to lean on, `git fetch <url>` alone would only update
+ * FETCH_HEAD.
+ *
+ * `--prune` matters more than it looks: without it, a branch deleted on the
+ * remote lives forever in the mirror, and `reuseExisting` would keep finding
+ * `origin/<jira_key>` for work that no longer exists.
+ */
+async function updateMirror(mirrorPath: string, repoUrl: string): Promise<void> {
+  if (!existsSync(mirrorPath)) {
+    await run(['git', 'clone', '--mirror', repoUrl, mirrorPath])
+    // Scrub the token `--mirror` just wrote into the mirror's config. The
+    // mirror outlives the container on a shared volume; a credential in its
+    // config would outlive it too.
+    await run(['git', '-C', mirrorPath, 'remote', 'set-url', 'origin', withoutCredentials(repoUrl)])
+    return
+  }
+  await run(['git', '-C', mirrorPath, 'fetch', '--prune', repoUrl, '+refs/heads/*:refs/heads/*'])
+}
+
+/**
+ * Clones the target repo, through a persistent bare mirror when one is
+ * configured (`MINION_GIT_CACHE`, ADR-013).
+ *
+ * A full clone of the target repository was measured at five to seven minutes —
+ * roughly a quarter of a 25-minute attempt — repeated in full on every attempt,
+ * because Minion's container is `--rm` and takes its clone with it. Cloning from
+ * a local mirror instead is seconds: git hardlinks the objects rather than
+ * copying them, so it costs almost no disk either.
+ *
+ * `origin` is repointed at the real remote afterwards. Without that, the work
+ * tree's origin is a path on the cache volume and `git push` would quietly
+ * update the mirror instead of Bitbucket.
+ *
+ * Falls back to a direct clone whenever the cache is unset or unusable: a stale,
+ * corrupt or unwritable mirror must cost an attempt some minutes, never the
+ * attempt itself.
+ */
+async function cloneViaCache(repoUrl: string, workDir: string, cacheDir: string): Promise<void> {
+  try {
+    const mirrorPath = mirrorPathFor(cacheDir, repoUrl)
+    await updateMirror(mirrorPath, repoUrl)
+    await run(['git', 'clone', mirrorPath, workDir])
+    await run(['git', '-C', workDir, 'remote', 'set-url', 'origin', repoUrl])
+  } catch (err) {
+    console.error(
+      `Git cache unusable (${redactCredentials(err instanceof Error ? err.message : String(err))}) — cloning directly.`,
+    )
+    await run(['git', 'clone', repoUrl, workDir])
   }
 }
 
@@ -47,7 +138,10 @@ export async function cloneAndBranch(
   workDir: string,
   reuseExisting: boolean,
 ): Promise<void> {
-  await run(['git', 'clone', repoUrl, workDir])
+  const cacheDir = process.env.MINION_GIT_CACHE
+  if (cacheDir) await cloneViaCache(repoUrl, workDir, cacheDir)
+  else await run(['git', 'clone', repoUrl, workDir])
+
   if (reuseExisting && (await remoteBranchExists(workDir, branch))) {
     await run(['git', 'checkout', branch], workDir)
   } else {

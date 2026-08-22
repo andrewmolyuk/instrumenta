@@ -49,8 +49,13 @@ COPY src/bitbucket/closed-prs.mts ./src/bitbucket/closed-prs.mts
 # own `npm install` can reach for global-ish packages (e.g. turbo) as part of
 # their own toolchain, and that path is root-owned by default (it's where
 # `npm install -g @anthropic-ai/claude-code` above just wrote, as root).
+# /cache is where the git mirror volume mounts (ADR-013). Created here, owned by
+# minion, because Docker copies an image directory's ownership onto a fresh named
+# volume mounted over it — without this the volume arrives root-owned and the
+# non-root user below cannot write the mirror.
 RUN useradd --create-home --shell /bin/bash minion \
-  && chown -R minion:minion /app /usr/local/lib/node_modules /usr/local/bin
+  && mkdir -p /cache \
+  && chown -R minion:minion /app /usr/local/lib/node_modules /usr/local/bin /cache
 USER minion
 ENV HOME=/home/minion
 

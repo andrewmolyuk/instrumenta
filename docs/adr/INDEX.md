@@ -45,6 +45,11 @@ and dated.
   the identity of the attempt and `BacklogItem` to key + title (amends ADR-002's
   credential boundary and architecture.md's Minion contract)
 
+- [ADR-013](013-minion-clones-through-a-shared-git-mirror.md) — Minion clones the target
+  repo through a persistent bare mirror on a shared volume (`MINION_GIT_CACHE`), turning a
+  measured 5–7 minute clone into seconds; falls back to a direct clone on any cache
+  failure (qualifies ADR-002's "ephemeral, sandboxed" Minion)
+
 ## Superseded
 
 None yet.

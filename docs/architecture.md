@@ -151,6 +151,11 @@ target project can redirect it (e.g. `instrumenta/review/`) via a small config v
 its own repository, which Minion reads at checkout alongside looking for `verify`. See
 [ADR-002](adr/002-foreman-minion-execution-boundary.md).
 
+Minion clones the target repository through a persistent bare mirror on a shared volume
+when one is configured ([ADR-013](adr/013-minion-clones-through-a-shared-git-mirror.md)) —
+a full clone was measured at 5–7 minutes of every attempt, repeated because the container
+is `--rm`. The work tree the agent sees is an ordinary full clone either way.
+
 Minion is handed only the identity of the attempt — `task_id`, `jira_key`,
 `attempt_number` — and reads the ticket itself: summary, description, and attachments,
 downloaded beside the work tree so the agent can open the screenshot that is, for a UI

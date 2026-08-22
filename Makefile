@@ -2,6 +2,7 @@ MINION_IMAGE := minion:latest
 FOREMAN_IMAGE := foreman:latest
 ENV_FILE := .env
 DB_VOLUME := instrumenta-foreman-db
+CACHE_VOLUME := instrumenta-minion-git-cache
 
 .PHONY: build build-minion build-foreman dev check clean clean-db
 
@@ -27,6 +28,7 @@ dev: build
 		exit 1; \
 	}
 	docker volume create $(DB_VOLUME) >/dev/null
+	docker volume create $(CACHE_VOLUME) >/dev/null
 	docker run --rm -i \
 		-p 3000:3000 \
 		-v /var/run/docker.sock:/var/run/docker.sock \
@@ -46,3 +48,9 @@ clean:
 # persisting it in the first place. Explicit opt-in only.
 clean-db:
 	docker volume rm -f $(DB_VOLUME) 2>/dev/null || true
+
+# Drops the shared git mirror (ADR-013). Safe at any time — the next attempt
+# re-clones it — but the first attempt after this pays the full clone again.
+.PHONY: clean-cache
+clean-cache:
+	docker volume rm -f $(CACHE_VOLUME) 2>/dev/null || true
