@@ -66,7 +66,7 @@ describe('runLoop', () => {
       listBacklog: async () => {
         calls += 1
         if (calls <= 2) throw new Error('Jira unreachable')
-        return [{ jira_key: 'KAZ-1', summary: 's', description: '' }]
+        return [{ jira_key: 'KAZ-1', summary: 's' }]
       },
     }
     const errors: unknown[] = []
@@ -101,7 +101,7 @@ describe('runLoop', () => {
     const taskProvider: TaskProvider = {
       listBacklog: async () => {
         calls += 1
-        return calls === 1 ? [] : [{ jira_key: 'KAZ-1', summary: 's', description: '' }]
+        return calls === 1 ? [] : [{ jira_key: 'KAZ-1', summary: 's' }]
       },
     }
     const sleepCalls: number[] = []
@@ -127,8 +127,8 @@ describe('runLoop', () => {
   it('dispatches until budget reaches zero, recording each attempt and mirroring status', async () => {
     setBudget(db, 2)
     const backlog: BacklogItem[] = [
-      { jira_key: 'KAZ-1', summary: 's1', description: '' },
-      { jira_key: 'KAZ-2', summary: 's2', description: '' },
+      { jira_key: 'KAZ-1', summary: 's1' },
+      { jira_key: 'KAZ-2', summary: 's2' },
     ]
     let call = 0
     const taskProvider: TaskProvider = {
@@ -169,7 +169,7 @@ describe('runLoop', () => {
 
   it('persists remaining budget after each dispatch and sets stopped at zero', async () => {
     setBudget(db, 2)
-    const backlog: BacklogItem[] = [{ jira_key: 'KAZ-1', summary: 's', description: '' }]
+    const backlog: BacklogItem[] = [{ jira_key: 'KAZ-1', summary: 's' }]
     const seenBudgets: Array<number | null> = []
     const taskProvider: TaskProvider = {
       listBacklog: async () => {
@@ -205,7 +205,7 @@ describe('runLoop', () => {
     const taskProvider: TaskProvider = {
       listBacklog: async () => {
         calls += 1
-        return [{ jira_key: 'KAZ-1', summary: 's', description: '' }]
+        return [{ jira_key: 'KAZ-1', summary: 's' }]
       },
     }
 
@@ -232,7 +232,7 @@ describe('runLoop', () => {
       listBacklog: async () => {
         calls += 1
         if (calls >= 3) setStopped(db, true)
-        return [{ jira_key: `KAZ-${calls}`, summary: 's', description: '' }]
+        return [{ jira_key: `KAZ-${calls}`, summary: 's' }]
       },
     }
 
@@ -272,7 +272,7 @@ describe('runLoop', () => {
     await runLoop({
       db,
       taskProvider: {
-        listBacklog: async () => [{ jira_key: 'KAZ-' + dispatches, summary: 's', description: '' }],
+        listBacklog: async () => [{ jira_key: 'KAZ-' + dispatches, summary: 's' }],
       },
       bitbucket: BITBUCKET,
       runner,
@@ -302,7 +302,7 @@ describe('runLoop', () => {
     await runLoop({
       db,
       taskProvider: {
-        listBacklog: async () => [{ jira_key: 'KAZ-' + dispatches, summary: 's', description: '' }],
+        listBacklog: async () => [{ jira_key: 'KAZ-' + dispatches, summary: 's' }],
       },
       bitbucket: BITBUCKET,
       runner,
@@ -325,7 +325,7 @@ describe('runLoop', () => {
     const taskProvider: TaskProvider = {
       listBacklog: async () => {
         calls += 1
-        return calls <= 2 ? [] : [{ jira_key: 'KAZ-1', summary: 's', description: '' }]
+        return calls <= 2 ? [] : [{ jira_key: 'KAZ-1', summary: 's' }]
       },
     }
 
@@ -358,7 +358,7 @@ describe('runLoop', () => {
 
     await runLoop({
       db,
-      taskProvider: { listBacklog: async () => [{ jira_key: 'KAZ-1', summary: 's', description: '' }] },
+      taskProvider: { listBacklog: async () => [{ jira_key: 'KAZ-1', summary: 's' }] },
       bitbucket: BITBUCKET,
       runner: fakeRunner('success'),
       statusMirror,
@@ -383,7 +383,7 @@ describe('runLoop', () => {
 
     await runLoop({
       db,
-      taskProvider: { listBacklog: async () => [{ jira_key: 'KAZ-1', summary: 's', description: '' }] },
+      taskProvider: { listBacklog: async () => [{ jira_key: 'KAZ-1', summary: 's' }] },
       bitbucket: BITBUCKET,
       runner,
       statusMirror: noopStatusMirror,
@@ -410,7 +410,7 @@ describe('runLoop', () => {
     await runLoop({
       db,
       taskProvider: {
-        listBacklog: async () => [{ jira_key: 'KAZ-1', summary: 'Fix pagination on the device list', description: '' }],
+        listBacklog: async () => [{ jira_key: 'KAZ-1', summary: 'Fix pagination on the device list' }],
       },
       bitbucket: BITBUCKET,
       runner,
@@ -438,7 +438,7 @@ describe('runLoop', () => {
 
     await runLoop({
       db,
-      taskProvider: { listBacklog: async () => [{ jira_key: 'KAZ-1', summary: 's', description: '' }] },
+      taskProvider: { listBacklog: async () => [{ jira_key: 'KAZ-1', summary: 's' }] },
       bitbucket: BITBUCKET,
       runner,
       statusMirror: noopStatusMirror,
@@ -467,7 +467,7 @@ describe('runLoop', () => {
 
     await runLoop({
       db,
-      taskProvider: { listBacklog: async () => [{ jira_key: 'KAZ-1', summary: 's', description: '' }] },
+      taskProvider: { listBacklog: async () => [{ jira_key: 'KAZ-1', summary: 's' }] },
       bitbucket: BITBUCKET,
       runner,
       statusMirror: noopStatusMirror,
@@ -484,8 +484,8 @@ describe('runLoop', () => {
     setBudget(db, 2)
     setQueueTicket(db, 'KAZ-2')
     const backlog: BacklogItem[] = [
-      { jira_key: 'KAZ-1', summary: 'normal order first', description: '' },
-      { jira_key: 'KAZ-2', summary: 'requested via queue[ticket]', description: '' },
+      { jira_key: 'KAZ-1', summary: 'normal order first' },
+      { jira_key: 'KAZ-2', summary: 'requested via queue[ticket]' },
     ]
     const completed: string[] = []
     const statusMirror: StatusMirror = {
@@ -514,7 +514,7 @@ describe('runLoop', () => {
   it('clears queue_ticket even if the requested task turns out ineligible', async () => {
     setBudget(db, 1)
     setQueueTicket(db, 'KAZ-999')
-    const backlog: BacklogItem[] = [{ jira_key: 'KAZ-1', summary: 's', description: '' }]
+    const backlog: BacklogItem[] = [{ jira_key: 'KAZ-1', summary: 's' }]
 
     await runLoop({
       db,

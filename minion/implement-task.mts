@@ -1,5 +1,21 @@
 import { encodeProgress, type MinionProgress } from '../src/minion/progress.mts'
 import type { MinionInput } from '../src/minion/types.mts'
+import type { JiraTicket } from './jira.mts'
+
+/**
+ * Delimits the agent's closing report inside its final message. Extracted
+ * rather than using the whole reply: the reply opens with whatever narration
+ * the run produced, and a pull request description should start at the report.
+ */
+export const REPORT_MARKER = '<!-- minion-report -->'
+
+/** The agent's closing report, or null when it did not produce one in the requested form. */
+export function extractReport(output: string): string | null {
+  const at = output.lastIndexOf(REPORT_MARKER)
+  if (at === -1) return null
+  const report = output.slice(at + REPORT_MARKER.length).trim()
+  return report.length > 0 ? report : null
+}
 import { MAX_IMPLEMENT_OUTPUT_CHARS } from './constants.mts'
 
 /** The model and effort an attempt runs under — resolved once, so the argv and the session report can't disagree. */
@@ -9,6 +25,27 @@ export function claudeModel(): string {
 
 export function claudeEffort(): string {
   return process.env.MINION_CLAUDE_EFFORT ?? 'high'
+}
+
+/**
+ * Points the agent at the ticket's attachments by absolute path.
+ *
+ * Claude Code can open image files, so a bug reported only as a screenshot —
+ * which is most UI bugs, and was RPG-5427 — is now something the agent can
+ * actually look at rather than something silently dropped before it ever saw
+ * the ticket. Paths are absolute and outside the work tree; saying so stops the
+ * agent hunting for them in the repository or committing them.
+ */
+function attachmentSection(ticket: JiraTicket): string {
+  if (ticket.attachments.length === 0) return ''
+  const list = ticket.attachments.map((a) => `- ${a.path} (${a.filename}, ${a.mimeType})`).join('\n')
+  return `
+This ticket has attachments. They are already downloaded, outside the repository
+— read them before you start, especially if the description is thin or refers to
+something shown rather than written. Do not copy them into the repository.
+
+${list}
+`
 }
 
 /**
@@ -49,8 +86,11 @@ export function claudeEffort(): string {
  * orchestrate.mts reports as `crashed` even though the real work had already
  * landed in a commit — a false crash on a fully successful attempt.
  */
-export function defaultImplementCommand(input: MinionInput): string[] {
-  const prompt = `${input.jira_key}: ${input.description}
+export function defaultImplementCommand(input: MinionInput, ticket: JiraTicket): string[] {
+  const prompt = `${input.jira_key}: ${ticket.summary}
+
+${ticket.description || '(this ticket has no text description)'}
+${attachmentSection(ticket)}
 
 This is an unattended, one-shot run — there is no human available to answer
 questions or approve a plan. Investigate the issue and implement the fix
@@ -64,7 +104,31 @@ Before you finish, run this project's own checks over your changes — its
 and fix everything they report, including problems in files you added. Every one
 of those checks is run again before your work is committed, and any failure means
 no commit and no pull request, so the whole attempt is wasted. Report a check as
-passing only if you actually ran it and saw it pass.`
+passing only if you actually ran it and saw it pass.
+
+End your reply with a report in exactly this form, and write nothing after it.
+It becomes the description of the pull request a human reviews, so write it for
+that reader: brief, concrete, no restating of these instructions.
+
+${REPORT_MARKER}
+## What changed
+
+Two to five sentences: what you changed, how, and why. Name the files that
+matter. If you could not do what the ticket asked, say that instead of
+describing something else you did.
+
+## Questions for a human
+
+Anything you would have asked had someone been available — an ambiguity in the
+ticket, a missing reproduction step, a design choice that was not yours to make.
+One bullet each. Write "None." only if there were genuinely none.
+
+## Decisions taken without review
+
+Judgement calls you made alone, and what you assumed in making them: a guess at
+intent, a chosen approach where others existed, anything a reviewer should check
+rather than take on trust. One bullet each. Write "None." only if there were
+none.`
   return [
     'claude',
     '--dangerously-skip-permissions',
@@ -142,7 +206,8 @@ export interface ImplementResult {
 export async function implementTask(
   workDir: string,
   input: MinionInput,
-  command: string[] = defaultImplementCommand(input),
+  ticket: JiraTicket,
+  command: string[] = defaultImplementCommand(input, ticket),
 ): Promise<ImplementResult> {
   const result = await captureImplementOutput(workDir, command)
   if (result.output) console.error(`--- Claude Code output (${input.jira_key}) ---\n${result.output}`)
@@ -169,6 +234,26 @@ async function readLines(stream: ReadableStream<Uint8Array>, onLine: (line: stri
   }
   if (pending.trim()) onLine(pending)
   return full
+}
+
+/**
+ * The environment the agent runs in: this process's, minus the Jira
+ * credentials.
+ *
+ * Minion needs them to read its ticket (ADR-012), but it has finished doing
+ * that before this runs, and the agent has no reason to reach Jira at all.
+ * Withholding them keeps write-capable credentials out of the environment of a
+ * process running `--dangerously-skip-permissions` with full tool access —
+ * which can read its own environment and call any endpoint it likes.
+ *
+ * Deliberately narrow: BITBUCKET_TOKEN and CLAUDE_CODE_OAUTH_TOKEN stay, since
+ * the agent's own toolchain needs them (git operations against the target repo,
+ * and Claude Code's own auth). This closes the credential this change opened,
+ * not every credential in the container.
+ */
+function agentEnv(): Record<string, string | undefined> {
+  const { JIRA_BASE_URL, JIRA_EMAIL, JIRA_API_TOKEN, ...rest } = process.env
+  return rest
 }
 
 /** Cap on the raw stdout held in memory for the fallback path — a real stream-json run is megabytes of NDJSON that the `result` event makes redundant. */
@@ -236,7 +321,7 @@ function truncate(text: string, max: number): string {
  */
 async function captureImplementOutput(workDir: string, command: string[]): Promise<ImplementResult> {
   try {
-    const proc = Bun.spawn(command, { cwd: workDir, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' })
+    const proc = Bun.spawn(command, { cwd: workDir, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe', env: agentEnv() })
 
     let resultText: string | null = null
     let costUsd: number | null = null

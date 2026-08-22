@@ -3,6 +3,7 @@ import type { MinionInput } from '../src/minion/types.mts'
 import { buildCloneUrl, createPullRequest, type BitbucketPrConfig } from './bitbucket-pr.mts'
 import { cloneAndBranch, commitAndPush, stageAll, writeNote } from './git.mts'
 import { implementTask } from './implement-task.mts'
+import { fetchTicket, type MinionJiraConfig } from './jira.mts'
 import type { MinionDeps } from './orchestrate.mts'
 import { runMinion } from './orchestrate.mts'
 import { hasVerifyScript, runPreCommitHook, runVerify } from './verify-gate.mts'
@@ -39,9 +40,18 @@ async function main(): Promise<void> {
   }
   const repoUrl = buildCloneUrl(bitbucket)
 
+  // Minion reads its own ticket (ADR-012), so it needs Jira credentials of its
+  // own — passed through MINION_COMMAND's `-e` list like every other secret here.
+  const jira: MinionJiraConfig = {
+    baseUrl: requiredEnv('JIRA_BASE_URL'),
+    email: requiredEnv('JIRA_EMAIL'),
+    apiToken: requiredEnv('JIRA_API_TOKEN'),
+  }
+
   const deps: MinionDeps = {
     cloneAndBranch,
     hasOpenPrForBranch: (branch) => hasOpenPrForBranch(bitbucket, branch),
+    fetchTicket: (jiraKey, attachmentDir) => fetchTicket(jira, jiraKey, attachmentDir),
     implementTask,
     hasVerifyScript,
     runVerify,
@@ -55,7 +65,8 @@ async function main(): Promise<void> {
     },
     writeNote,
     commitAndPush,
-    createPullRequest: (branch, taskInput) => createPullRequest(bitbucket, branch, taskInput),
+    createPullRequest: (branch, taskInput, ticket, agentReport) =>
+      createPullRequest(bitbucket, branch, taskInput, ticket, agentReport),
   }
 
   const result = await runMinion(input, repoUrl, workDir, notesPath, deps)

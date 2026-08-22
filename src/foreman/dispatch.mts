@@ -23,7 +23,7 @@ export async function dispatch(
   const dispatched_at = new Date().toISOString()
 
   const result = await runner.run(
-    { task_id, jira_key: task.jira_key, description: task.description, attempt_number },
+    { task_id, jira_key: task.jira_key, attempt_number },
     timeoutMs,
     onProgress,
   )

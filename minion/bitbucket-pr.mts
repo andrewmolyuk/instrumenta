@@ -1,4 +1,6 @@
 import type { MinionInput } from '../src/minion/types.mts'
+import type { JiraTicket } from './jira.mts'
+import { buildPrDescription } from './session.mts'
 
 export interface BitbucketPrConfig {
   workspace: string
@@ -30,6 +32,8 @@ export async function createPullRequest(
   config: BitbucketPrConfig,
   branch: string,
   input: MinionInput,
+  ticket: JiraTicket,
+  agentReport: string | null,
   fetchImpl: typeof fetch = fetch,
 ): Promise<string> {
   const res = await fetchImpl(
@@ -41,10 +45,14 @@ export async function createPullRequest(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        title: `${branch}: ${input.description.slice(0, 72)}`,
+        // Title from the summary, not the description: a description can be
+        // empty (RPG-5427's is one screenshot), and a PR titled `RPG-5427: `
+        // with an empty body is what that produced. A Jira summary is always
+        // present, and is the one-line statement of the task anyway.
+        title: `${branch}: ${ticket.summary}`.slice(0, 255),
         source: { branch: { name: branch } },
         destination: { branch: { name: config.base ?? 'main' } },
-        description: input.description,
+        description: buildPrDescription(ticket, agentReport),
         ...(config.reviewers?.length ? { reviewers: config.reviewers.map((uuid) => ({ uuid })) } : {}),
       }),
     },

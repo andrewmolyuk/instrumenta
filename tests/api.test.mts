@@ -23,7 +23,7 @@ let db: Database
 let taskProvider: TaskProvider
 let handler: (req: Request) => Promise<Response>
 
-const BACKLOG: BacklogItem[] = [{ jira_key: 'KAZ-1', summary: 'do the thing', description: '' }]
+const BACKLOG: BacklogItem[] = [{ jira_key: 'KAZ-1', summary: 'do the thing' }]
 const BITBUCKET: BitbucketConfig = { workspace: 'andrewmolyuk', repoSlug: 'target-project', token: 'bb-token' }
 
 function fakeBitbucketFetch(counts: Record<string, number> = {}) {

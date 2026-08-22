@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { MinionInput } from '../src/minion/types.mts'
+import type { JiraTicket } from '../minion/jira.mts'
 import type { MinionDeps } from '../minion/orchestrate.mts'
 import { runMinion } from '../minion/orchestrate.mts'
 
@@ -7,15 +8,19 @@ function input(overrides: Partial<MinionInput> = {}): MinionInput {
   return {
     task_id: 't1',
     jira_key: 'KAZ-1',
-    description: 'Fix the thing',
     attempt_number: 1,
     ...overrides,
   }
 }
 
+function ticket(overrides: Partial<JiraTicket> = {}): JiraTicket {
+  return { summary: 'Fix the thing', description: 'Fix the thing', attachments: [], ...overrides }
+}
+
 function fakeDeps(overrides: Partial<MinionDeps> = {}): MinionDeps {
   return {
     cloneAndBranch: vi.fn(async () => {}),
+    fetchTicket: vi.fn(async () => ticket()),
     hasOpenPrForBranch: vi.fn(async () => false),
     implementTask: vi.fn(async () => ({ output: '', costUsd: null, transcript: [] })),
     hasVerifyScript: vi.fn(async () => true),
@@ -34,7 +39,11 @@ describe('runMinion', () => {
     await runMinion(input(), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
 
     expect(deps.cloneAndBranch).toHaveBeenCalledWith('https://x/repo.git', 'KAZ-1', '/tmp/wd', true)
-    expect(deps.implementTask).toHaveBeenCalledWith('/tmp/wd', expect.objectContaining({ jira_key: 'KAZ-1' }))
+    expect(deps.implementTask).toHaveBeenCalledWith(
+      '/tmp/wd',
+      expect.objectContaining({ jira_key: 'KAZ-1' }),
+      expect.objectContaining({ summary: 'Fix the thing' }),
+    )
   })
 
   it('checks for an open PR on this jira_key before cloning', async () => {
@@ -65,7 +74,12 @@ describe('runMinion', () => {
       session: expect.any(String),
     })
     expect(deps.commitAndPush).toHaveBeenCalledWith('/tmp/wd', 'KAZ-1', expect.stringMatching(/^fix: KAZ-1:/))
-    expect(deps.createPullRequest).toHaveBeenCalledWith('KAZ-1', expect.objectContaining({ jira_key: 'KAZ-1' }))
+    expect(deps.createPullRequest).toHaveBeenCalledWith(
+      'KAZ-1',
+      expect.objectContaining({ jira_key: 'KAZ-1' }),
+      expect.objectContaining({ summary: 'Fix the thing' }),
+      null,
+    )
   })
 
   it('carries implementTask\'s reported cost through to a successful result', async () => {
@@ -76,9 +90,9 @@ describe('runMinion', () => {
   })
 
   it('lowercases the first letter of the description in the commit subject, to satisfy commitlint subject-case', async () => {
-    const deps = fakeDeps()
+    const deps = fakeDeps({ fetchTicket: vi.fn(async () => ticket({ summary: 'In previous versions checking the terms and conditions once was enough' })) })
     await runMinion(
-      input({ description: 'In previous versions checking the terms and conditions once was enough' }),
+      input(),
       'https://x/repo.git',
       '/tmp/wd',
       'docs/todo/',
@@ -95,9 +109,9 @@ describe('runMinion', () => {
   it('collapses a multi-line description into a single-line commit subject', async () => {
     // KAZ-8390's real description, whose first line alone made the subject
     // `fix: KAZ-8390: steps:` and pushed the rest into an unblank-lined body.
-    const deps = fakeDeps()
+    const deps = fakeDeps({ fetchTicket: vi.fn(async () => ticket({ summary: 'Steps:\nOpen a client, then\tpick a port\n\nExpected: it works' })) })
     await runMinion(
-      input({ description: 'Steps:\nOpen a client, then\tpick a port\n\nExpected: it works' }),
+      input(),
       'https://x/repo.git',
       '/tmp/wd',
       'docs/todo/',
@@ -112,9 +126,9 @@ describe('runMinion', () => {
   })
 
   it('truncates a long description at 72 characters, without a trailing space', async () => {
-    const deps = fakeDeps()
+    const deps = fakeDeps({ fetchTicket: vi.fn(async () => ticket({ summary: `${'a'.repeat(71)} tail that does not fit` })) })
     await runMinion(
-      input({ description: `${'a'.repeat(71)} tail that does not fit` }),
+      input(),
       'https://x/repo.git',
       '/tmp/wd',
       'docs/todo/',
@@ -124,9 +138,9 @@ describe('runMinion', () => {
     expect(deps.commitAndPush).toHaveBeenCalledWith('/tmp/wd', 'KAZ-1', `fix: KAZ-1: ${'a'.repeat(71)}`)
   })
 
-  it('still produces a usable commit message when the description is blank', async () => {
-    const deps = fakeDeps()
-    await runMinion(input({ description: '   ' }), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
+  it('still produces a usable commit message when the summary is blank', async () => {
+    const deps = fakeDeps({ fetchTicket: vi.fn(async () => ticket({ summary: '   ' })) })
+    await runMinion(input(), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
 
     // Trailing space and all — `git commit` strips it from the subject itself.
     expect(deps.commitAndPush).toHaveBeenCalledWith('/tmp/wd', 'KAZ-1', 'fix: KAZ-1: ')

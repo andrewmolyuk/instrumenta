@@ -79,8 +79,8 @@ describe('isGivenUp', () => {
 describe('pick', () => {
   it('returns the first backlog item that is not given up', async () => {
     const backlog = [
-      { jira_key: 'KAZ-1', summary: 'first', description: '' },
-      { jira_key: 'KAZ-2', summary: 'second', description: '' },
+      { jira_key: 'KAZ-1', summary: 'first' },
+      { jira_key: 'KAZ-2', summary: 'second' },
     ]
     const result = await pick(db, fakeTaskProvider(backlog), BITBUCKET, fakeBitbucketFetch({}))
     expect(result?.jira_key).toBe('KAZ-1')
@@ -88,15 +88,15 @@ describe('pick', () => {
 
   it('skips a given-up task and returns the next eligible one', async () => {
     const backlog = [
-      { jira_key: 'KAZ-1', summary: 'given up', description: '' },
-      { jira_key: 'KAZ-2', summary: 'eligible', description: '' },
+      { jira_key: 'KAZ-1', summary: 'given up' },
+      { jira_key: 'KAZ-2', summary: 'eligible' },
     ]
     const result = await pick(db, fakeTaskProvider(backlog), BITBUCKET, fakeBitbucketFetch({ 'KAZ-1': 3 }))
     expect(result?.jira_key).toBe('KAZ-2')
   })
 
   it('returns null when every task is given up', async () => {
-    const backlog = [{ jira_key: 'KAZ-1', summary: 'given up', description: '' }]
+    const backlog = [{ jira_key: 'KAZ-1', summary: 'given up' }]
     const result = await pick(db, fakeTaskProvider(backlog), BITBUCKET, fakeBitbucketFetch({ 'KAZ-1': 3 }))
     expect(result).toBeNull()
   })
@@ -108,8 +108,8 @@ describe('pick', () => {
 
   it('skips a task with an open PR (ADR-007) and returns the next eligible one', async () => {
     const backlog = [
-      { jira_key: 'KAZ-1', summary: 'already has an open PR', description: '' },
-      { jira_key: 'KAZ-2', summary: 'eligible', description: '' },
+      { jira_key: 'KAZ-1', summary: 'already has an open PR' },
+      { jira_key: 'KAZ-2', summary: 'eligible' },
     ]
     const result = await pick(db, fakeTaskProvider(backlog), BITBUCKET, fakeBitbucketFetch({}, { 'KAZ-1': 1 }))
     expect(result?.jira_key).toBe('KAZ-2')

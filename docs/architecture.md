@@ -27,7 +27,7 @@ flowchart TD
     Pick <--> DB
     Human -- "stop / start / queue[ticket] / budget" --> API
     API --> Pick
-    Pick -- "task_id, jira_key, description, attempt #, prior context" --> Minion
+    Pick -- "task_id, jira_key, attempt #" --> Minion
     Minion -- "checkout, implement, verify gate, commit, PR" --> Target
     Minion -- "single result at exit: status + PR url" --> Pick
     Human -- "priority, cancel ticket" --> Jira
@@ -51,7 +51,11 @@ Foreman sees the effect on the next query without any reconciliation step.
 
 ### Task Provider (module inside Foreman, not a container)
 
-Adapts one or more sources into a common backlog-item shape. One adapter exists today
+Adapts one or more sources into a common backlog-item shape — a key and a title, which
+is all Foreman needs to queue a task and show it. The ticket's body and attachments are
+not carried here: Minion reads those from Jira itself when an attempt starts
+([ADR-012](adr/012-minion-reads-its-own-ticket.md)), so there is one reader of what a
+task actually says, and it reads live. One adapter exists today
 (Jira); the interface is source-agnostic so a second source (a different tracker,
 `docs/todo/`-style local entries) can be added later as a new adapter without changing
 Foreman's loop. It isn't split into its own container: there is no isolation,
@@ -146,6 +150,12 @@ Where that note goes is configurable, unlike `verify` — there's a safe default
 target project can redirect it (e.g. `instrumenta/review/`) via a small config value in
 its own repository, which Minion reads at checkout alongside looking for `verify`. See
 [ADR-002](adr/002-foreman-minion-execution-boundary.md).
+
+Minion is handed only the identity of the attempt — `task_id`, `jira_key`,
+`attempt_number` — and reads the ticket itself: summary, description, and attachments,
+downloaded beside the work tree so the agent can open the screenshot that is, for a UI
+bug, usually the entire bug report. That means Minion holds Jira credentials; ADR-012
+covers what that costs and what is done about it.
 
 Minion has no API of its own. Foreman starts the container and waits synchronously for
 it to exit, then reads one structured result (status + PR url, if any) from its stdout —

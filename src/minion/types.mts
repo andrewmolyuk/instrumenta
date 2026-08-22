@@ -5,7 +5,6 @@ import type { MinionProgress } from './progress.mts'
 export interface MinionInput {
   task_id: string
   jira_key: string
-  description: string
   attempt_number: number
 }
 

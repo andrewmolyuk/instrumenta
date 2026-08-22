@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { MinionInput } from '../src/minion/types.mts'
 import { blockedNoVerifyFilename, blockedNoVerifyNote, givenUpFilename, givenUpNote } from '../minion/notes.mts'
 
-const INPUT: MinionInput = { task_id: 't1', jira_key: 'KAZ-42', description: 'do it', attempt_number: 3 }
+const INPUT: MinionInput = { task_id: 't1', jira_key: 'KAZ-42', attempt_number: 3 }
 
 describe('note filenames', () => {
   it('lowercases the jira_key', () => {

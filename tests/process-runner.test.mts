@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { ProcessMinionRunner } from '../src/minion/process-runner.mts'
 import { encodeProgress, type MinionProgress } from '../src/minion/progress.mts'
 
-const INPUT = { task_id: 't1', jira_key: 'KAZ-1', description: 'do the thing', attempt_number: 1 }
+const INPUT = { task_id: 't1', jira_key: 'KAZ-1', summary: 'Fix the thing', description: 'do the thing', attempt_number: 1 }
 
 describe('ProcessMinionRunner', () => {
   it('parses the JSON result the process prints on stdout', async () => {

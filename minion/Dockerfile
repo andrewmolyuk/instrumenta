@@ -37,6 +37,7 @@ RUN bun install --frozen-lockfile --production
 COPY minion ./minion
 COPY src/minion/types.mts ./src/minion/types.mts
 COPY src/minion/progress.mts ./src/minion/progress.mts
+COPY src/task-provider/adf.mts ./src/task-provider/adf.mts
 COPY src/db/index.mts ./src/db/index.mts
 COPY src/bitbucket/closed-prs.mts ./src/bitbucket/closed-prs.mts
 

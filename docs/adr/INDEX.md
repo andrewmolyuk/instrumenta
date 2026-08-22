@@ -40,6 +40,11 @@ and dated.
   `--output-format stream-json`; Foreman's control flow still reads nothing but the single
   result at exit (amends architecture.md's "no live-progress callback channel")
 
+- [ADR-012](012-minion-reads-its-own-ticket.md) — Minion reads its own ticket from Jira,
+  attachments included, and holds Jira credentials to do it; `MinionInput` is reduced to
+  the identity of the attempt and `BacklogItem` to key + title (amends ADR-002's
+  credential boundary and architecture.md's Minion contract)
+
 ## Superseded
 
 None yet.

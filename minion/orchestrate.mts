@@ -1,6 +1,7 @@
 import type { MinionInput, MinionResult } from '../src/minion/types.mts'
 import { MAX_ATTEMPTS } from './constants.mts'
-import type { ImplementResult } from './implement-task.mts'
+import { extractReport, type ImplementResult } from './implement-task.mts'
+import type { JiraTicket } from './jira.mts'
 import { buildSessionRecord } from './session.mts'
 import { blockedNoVerifyFilename, blockedNoVerifyNote, givenUpFilename, givenUpNote } from './notes.mts'
 import type { PreCommitResult, VerifyResult } from './verify-gate.mts'
@@ -8,13 +9,15 @@ import type { PreCommitResult, VerifyResult } from './verify-gate.mts'
 export interface MinionDeps {
   cloneAndBranch(repoUrl: string, branch: string, workDir: string, reuseExisting: boolean): Promise<void>
   hasOpenPrForBranch(branch: string): Promise<boolean>
-  implementTask(workDir: string, input: MinionInput): Promise<ImplementResult>
+  /** Reads the ticket from Jira, downloading its attachments into `attachmentDir`. */
+  fetchTicket(jiraKey: string, attachmentDir: string): Promise<JiraTicket>
+  implementTask(workDir: string, input: MinionInput, ticket: JiraTicket): Promise<ImplementResult>
   hasVerifyScript(workDir: string): Promise<boolean>
   runVerify(workDir: string): Promise<VerifyResult>
   runPreCommitChecks(workDir: string): Promise<PreCommitResult>
   writeNote(workDir: string, notesPath: string, filename: string, content: string): Promise<void>
   commitAndPush(workDir: string, branch: string, message: string): Promise<void>
-  createPullRequest(branch: string, input: MinionInput): Promise<string>
+  createPullRequest(branch: string, input: MinionInput, ticket: JiraTicket, agentReport: string | null): Promise<string>
 }
 
 /** Joins whichever of these sections are non-empty; null if none are. */
@@ -161,12 +164,22 @@ export async function runMinion(
 ): Promise<MinionResult> {
   const isFinalAttempt = input.attempt_number >= MAX_ATTEMPTS
 
+  // Attachments land beside the work tree, never inside it: commitAndPush runs
+  // `git add -A`, so a screenshot written into the clone would be committed and
+  // shipped in the pull request.
+  const attachmentDir = `${workDir}-attachments`
+
+  // Before the clone, and fatal if it fails: an attempt that cannot read its
+  // own ticket has nothing to work from, and running anyway is precisely what
+  // produced RPG-5427's empty-brief pull request. Better to crash and retry.
+  const ticket = await deps.fetchTicket(input.jira_key, attachmentDir)
+
   const hasOpenPr = await deps.hasOpenPrForBranch(input.jira_key)
   await deps.cloneAndBranch(repoUrl, input.jira_key, workDir, !hasOpenPr)
-  const { output: implementOutput, costUsd, transcript } = await deps.implementTask(workDir, input)
+  const { output: implementOutput, costUsd, transcript } = await deps.implementTask(workDir, input, ticket)
   // Built once, here, so every exit below reports the same record — including
   // the `success` path, which is the one that had no diagnostic at all before.
-  const session = buildSessionRecord({ input, transcript, agentSummary: implementOutput, costUsd })
+  const session = buildSessionRecord({ input, ticket, transcript, agentSummary: implementOutput, costUsd })
 
   if (!(await deps.hasVerifyScript(workDir))) {
     await deps.writeNote(workDir, notesPath, blockedNoVerifyFilename(input.jira_key), blockedNoVerifyNote(input))
@@ -218,7 +231,7 @@ export async function runMinion(
     deps,
     workDir,
     input.jira_key,
-    `fix: ${input.jira_key}: ${commitSubject(input.description)}`,
+    `fix: ${input.jira_key}: ${commitSubject(ticket.summary)}`,
   )
   if (commitError) {
     return {
@@ -230,7 +243,7 @@ export async function runMinion(
     }
   }
   try {
-    const prUrl = await deps.createPullRequest(input.jira_key, input)
+    const prUrl = await deps.createPullRequest(input.jira_key, input, ticket, extractReport(implementOutput))
     return { status: 'success', pr_url: prUrl, output: null, cost_usd: costUsd, session }
   } catch (err) {
     const prError = err instanceof Error ? err.message : String(err)

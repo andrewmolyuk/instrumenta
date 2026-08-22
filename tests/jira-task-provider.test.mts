@@ -65,7 +65,7 @@ describe('JiraTaskProvider', () => {
     expect(JSON.parse(init.body as string).maxResults).toBe(50)
   })
 
-  it('normalizes issues into BacklogItem shape, converting ADF descriptions to text', async () => {
+  it('normalizes issues into BacklogItem shape — key and title only', async () => {
     const fetchImpl = fakeFetch({
       issues: [
         {
@@ -82,7 +82,7 @@ describe('JiraTaskProvider', () => {
     })
     const backlog = await provider(CONFIG, fetchImpl).listBacklog()
 
-    expect(backlog).toEqual([{ jira_key: 'KAZ-42', summary: 'Fix the thing', description: 'Details here.' }])
+    expect(backlog).toEqual([{ jira_key: 'KAZ-42', summary: 'Fix the thing' }])
   })
 
   it('handles a null description', async () => {
@@ -91,7 +91,9 @@ describe('JiraTaskProvider', () => {
     })
     const backlog = await provider(CONFIG, fetchImpl).listBacklog()
 
-    expect(backlog[0]?.description).toBe('')
+    // Foreman carries the key and the title only — Minion reads the ticket
+    // body, and its attachments, from Jira itself (ADR-012).
+    expect(backlog[0]).toEqual({ jira_key: 'KAZ-1', summary: 'No description' })
   })
 
   it('throws on a non-ok response', async () => {

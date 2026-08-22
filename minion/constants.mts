@@ -14,3 +14,6 @@ export const MAX_IMPLEMENT_OUTPUT_CHARS = 16000
  * this crosses a stdout pipe as JSON before it reaches the database.
  */
 export const MAX_SESSION_CHARS = 200_000
+
+/** Bitbucket's cap on a pull request description. */
+export const MAX_PR_DESCRIPTION_CHARS = 32_768

@@ -1,11 +1,14 @@
 import type { MinionInput } from '../src/minion/types.mts'
-import { MAX_SESSION_CHARS } from './constants.mts'
+import type { JiraTicket } from './jira.mts'
+import { MAX_PR_DESCRIPTION_CHARS, MAX_SESSION_CHARS } from './constants.mts'
 import { claudeEffort, claudeModel } from './implement-task.mts'
 import { redactCredentials } from './redact.mts'
 
 /** Everything known about what the agent did, once implementTask returns. */
 export interface SessionReport {
   input: MinionInput
+  /** The ticket as Minion read it from Jira at the start of the attempt. */
+  ticket: JiraTicket
   /** The agent's own trail of steps, in order (ImplementResult.transcript). */
   transcript: string[]
   /** Claude Code's final `result` text — the agent's account of what it did. */
@@ -30,17 +33,21 @@ function tail(text: string, max: number): string {
  * recorded anywhere said so — the attempt was stored as a plain `success`. Now
  * the record says it in the first section, where a reviewer sees it first.
  */
-function problemStatement(input: MinionInput): string {
-  if (input.description.trim().length === 0) {
+function problemStatement(ticket: JiraTicket): string {
+  const stated = [ticket.summary, ticket.description].map((part) => part.trim()).filter(Boolean)
+  if (stated.length === 0) {
     return [
       '> **⚠ The agent was given no problem statement.**',
-      '> This ticket\'s description produced no text — it is empty, or holds only',
-      '> images or attachments, which are not passed to the agent. Whatever this',
-      '> attempt changed was not derived from a stated problem. Review it on that',
-      '> basis.',
+      '> This ticket had neither a summary nor a description that produced any',
+      '> text. Whatever this attempt changed was not derived from a stated',
+      '> problem. Review it on that basis.',
     ].join('\n')
   }
-  return ['```text', input.description, '```'].join('\n')
+  const warning =
+    ticket.description.trim().length === 0
+      ? ['', '> **⚠ Title only** — this ticket has no text description.', '']
+      : []
+  return ['```text', ...stated, '```', ...warning].join('\n')
 }
 
 /**
@@ -48,17 +55,18 @@ function problemStatement(input: MinionInput): string {
  * apart from MAX_SESSION_CHARS, which keeps the tail.
  */
 export function buildSessionRecord(report: SessionReport): string {
-  const { input, transcript, agentSummary, costUsd } = report
+  const { input, ticket, transcript, agentSummary, costUsd } = report
   const sections = [
     '## Minion session',
     '',
     `- **Ticket:** ${input.jira_key} (attempt ${input.attempt_number})`,
     `- **Model:** ${claudeModel()} (effort ${claudeEffort()})`,
     `- **Cost:** ${costUsd === null ? 'unknown' : `$${costUsd.toFixed(2)}`}`,
+    `- **Attachments read:** ${ticket.attachments.length === 0 ? 'none' : ticket.attachments.map((a) => a.filename).join(', ')}`,
     '',
     '### Problem statement given to the agent',
     '',
-    problemStatement(input),
+    problemStatement(ticket),
     '',
     `### What the agent did (${transcript.length} step${transcript.length === 1 ? '' : 's'})`,
     '',
@@ -71,4 +79,29 @@ export function buildSessionRecord(report: SessionReport): string {
     agentSummary.trim().length > 0 ? agentSummary : '(the agent produced no summary)',
   ]
   return tail(redactCredentials(sections.join('\n')), MAX_SESSION_CHARS)
+}
+
+/**
+ * The pull request body: the agent's own closing report — what it changed and
+ * why, what it would have asked a human, and what it decided without one.
+ *
+ * The agent writes this, not this function, because only the agent knows which
+ * of its choices were judgement calls. That is the half a reviewer most needs
+ * and the half no transcript makes obvious: a list of steps shows what happened,
+ * not which of it was a guess. The full session goes to `tasks.session`; this is
+ * the part worth putting in front of a human.
+ *
+ * Falls back to the ticket description when the agent produced no report in the
+ * requested form — an empty pull request body is what RPG-5427 shipped, and it
+ * is worse than a stale one.
+ */
+export function buildPrDescription(ticket: JiraTicket, agentReport: string | null): string {
+  const body =
+    agentReport ??
+    [
+      '_The agent did not produce a report for this attempt._',
+      '',
+      ticket.description || '_This ticket has no text description._',
+    ].join('\n')
+  return tail(redactCredentials(body), MAX_PR_DESCRIPTION_CHARS)
 }

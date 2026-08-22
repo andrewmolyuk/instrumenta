@@ -28,8 +28,8 @@ function fakeTaskProvider(items: BacklogItem[]): TaskProvider {
 }
 
 const BACKLOG: BacklogItem[] = [
-  { jira_key: 'KAZ-1', summary: 'first in priority order', description: '' },
-  { jira_key: 'KAZ-2', summary: 'requested out of order', description: '' },
+  { jira_key: 'KAZ-1', summary: 'first in priority order' },
+  { jira_key: 'KAZ-2', summary: 'requested out of order' },
 ]
 
 describe('pickSpecific', () => {

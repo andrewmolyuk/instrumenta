@@ -12,7 +12,7 @@ beforeEach(() => {
   db = openDb(':memory:')
 })
 
-const TASK: BacklogItem = { jira_key: 'KAZ-1', summary: 'Fix it', description: 'Details.' }
+const TASK: BacklogItem = { jira_key: 'KAZ-1', summary: 'Fix it' }
 
 function fakeRunner(result: MinionResult, capture?: (input: MinionInput, timeoutMs: number) => void): MinionRunner {
   return {
@@ -65,7 +65,7 @@ describe('dispatch', () => {
     expect(row.attempt_number).toBe(2)
   })
 
-  it('passes task_id, jira_key, description, and attempt_number to the runner', async () => {
+  it('passes task_id, jira_key and attempt_number to the runner', async () => {
     let captured: MinionInput | undefined
     await dispatch(
       db,
@@ -73,7 +73,7 @@ describe('dispatch', () => {
       TASK,
       60_000,
     )
-    expect(captured).toMatchObject({ jira_key: 'KAZ-1', description: 'Details.', attempt_number: 1 })
+    expect(captured).toMatchObject({ jira_key: 'KAZ-1', attempt_number: 1 })
     expect(captured?.task_id).toBeTruthy()
   })
 

@@ -1,5 +1,4 @@
 import { Buffer } from 'node:buffer'
-import { adfToPlainText, type AdfNode } from './adf.mts'
 import type { BacklogItem, TaskProvider } from './types.mts'
 
 export interface JiraConfig {
@@ -20,7 +19,6 @@ interface JiraSearchResponse {
     key: string
     fields: {
       summary: string
-      description: AdfNode | null
     }
   }>
 }
@@ -46,7 +44,7 @@ export class JiraTaskProvider implements TaskProvider {
       },
       body: JSON.stringify({
         jql: this.config.jql,
-        fields: ['summary', 'description'],
+        fields: ['summary'],
         maxResults: this.config.maxResults ?? 50,
       }),
     })
@@ -56,10 +54,6 @@ export class JiraTaskProvider implements TaskProvider {
     }
 
     const data = (await res.json()) as JiraSearchResponse
-    return data.issues.map((issue) => ({
-      jira_key: issue.key,
-      summary: issue.fields.summary,
-      description: adfToPlainText(issue.fields.description),
-    }))
+    return data.issues.map((issue) => ({ jira_key: issue.key, summary: issue.fields.summary }))
   }
 }

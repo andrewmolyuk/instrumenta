@@ -9,6 +9,7 @@ export interface AdfNode {
   type?: string
   text?: string
   content?: AdfNode[]
+  attrs?: { alt?: string; id?: string }
 }
 
 const BLOCK_TYPES = new Set(['paragraph', 'heading', 'listItem', 'codeBlock', 'blockquote'])
@@ -23,6 +24,12 @@ export function adfToPlainText(node: AdfNode | null | undefined): string {
 function walk(node: AdfNode): string {
   if (node.type === 'text') return node.text ?? ''
   if (node.type === 'hardBreak') return '\n'
+  // Media nodes hold their payload in `attrs`, not in text or children, so the
+  // plain recursion below renders them as nothing at all — a description that
+  // is only a screenshot came out as an empty string (RPG-5427). Naming the
+  // file keeps the description readable and matches it up with the attachment
+  // Minion downloads alongside it.
+  if (node.type === 'media') return `[image: ${node.attrs?.alt ?? node.attrs?.id ?? 'attachment'}]`
 
   const children = (node.content ?? []).map(walk).join('')
   if (node.type && BLOCK_TYPES.has(node.type)) return `${children}\n`
