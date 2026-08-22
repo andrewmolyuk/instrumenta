@@ -34,7 +34,7 @@ function fakeFetch(totalCount = 0): typeof fetch {
 }
 
 function fakeRunner(status: TaskRow['status'] = 'success'): MinionRunner {
-  return { run: async () => ({ status, pr_url: null, output: null, cost_usd: null }) }
+  return { run: async () => ({ status, pr_url: null, output: null, cost_usd: null, session: null }) }
 }
 
 const noSleep = async () => {}
@@ -265,7 +265,7 @@ describe('runLoop', () => {
         dispatches += 1
         if (dispatches === 1) setBudget(db, null)
         if (dispatches >= 4) setStopped(db, true)
-        return { status: 'success', pr_url: null, output: null, cost_usd: null }
+        return { status: 'success', pr_url: null, output: null, cost_usd: null, session: null }
       },
     }
 
@@ -295,7 +295,7 @@ describe('runLoop', () => {
       run: async () => {
         dispatches += 1
         if (dispatches === 1) setBudget(db, 3)
-        return { status: 'success', pr_url: null, output: null, cost_usd: null }
+        return { status: 'success', pr_url: null, output: null, cost_usd: null, session: null }
       },
     }
 
@@ -377,7 +377,7 @@ describe('runLoop', () => {
     const runner: MinionRunner = {
       run: async () => {
         sawWhileDispatching = getCurrentTask(db)
-        return { status: 'success', pr_url: null, output: null, cost_usd: null }
+        return { status: 'success', pr_url: null, output: null, cost_usd: null, session: null }
       },
     }
 
@@ -403,7 +403,7 @@ describe('runLoop', () => {
       run: async () => {
         setStopped(db, true)
         sawWhileDispatching = getCurrentTask(db)
-        return { status: 'success', pr_url: null, output: null, cost_usd: null }
+        return { status: 'success', pr_url: null, output: null, cost_usd: null, session: null }
       },
     }
 
@@ -432,7 +432,7 @@ describe('runLoop', () => {
         onProgress?.({ line: 'Read: src/foo.ts', cost_usd: 0.5 })
         onProgress?.({ line: 'Bash: npm run lint', cost_usd: 1.83 })
         sawWhileDispatching = getCurrentTask(db)
-        return { status: 'success', pr_url: null, output: null, cost_usd: 1.83 }
+        return { status: 'success', pr_url: null, output: null, cost_usd: 1.83, session: null }
       },
     }
 
@@ -461,7 +461,7 @@ describe('runLoop', () => {
         calls += 1
         if (calls === 1) throw new Error('minion runner exploded')
         setStopped(db, true)
-        return { status: 'success', pr_url: null, output: null, cost_usd: null }
+        return { status: 'success', pr_url: null, output: null, cost_usd: null, session: null }
       },
     }
 

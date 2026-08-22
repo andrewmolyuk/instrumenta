@@ -24,6 +24,14 @@ CREATE TABLE IF NOT EXISTS tasks (
   -- carried through MinionResult regardless of outcome — null when Claude Code
   -- never produced a parseable result (crash, timeout, missing binary).
   cost_usd REAL,
+  -- The full record of what the agent did this attempt (minion/session.mts):
+  -- the problem statement it was given, every step it took, and its own closing
+  -- summary. Unlike `output`, written for every status including `success` --
+  -- `output` is null there by design ("nothing to explain"), which left a
+  -- successful attempt with no trace at all. Found live on RPG-5427: a pull
+  -- request existed and nothing in this database could say what had produced
+  -- it, or that the agent had been handed an empty problem statement.
+  session TEXT,
   dispatched_at TEXT NOT NULL,
   finished_at TEXT
 );

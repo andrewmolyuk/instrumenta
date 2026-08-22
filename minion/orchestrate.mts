@@ -1,6 +1,7 @@
 import type { MinionInput, MinionResult } from '../src/minion/types.mts'
 import { MAX_ATTEMPTS } from './constants.mts'
 import type { ImplementResult } from './implement-task.mts'
+import { buildSessionRecord } from './session.mts'
 import { blockedNoVerifyFilename, blockedNoVerifyNote, givenUpFilename, givenUpNote } from './notes.mts'
 import type { PreCommitResult, VerifyResult } from './verify-gate.mts'
 
@@ -132,11 +133,11 @@ async function reportFailedGate(
   input: MinionInput,
   workDir: string,
   notesPath: string,
-  attempt: { isFinalAttempt: boolean; costUsd: number | null; output: string | null },
+  attempt: { isFinalAttempt: boolean; costUsd: number | null; output: string | null; session: string },
 ): Promise<MinionResult> {
-  const { isFinalAttempt, costUsd, output } = attempt
+  const { isFinalAttempt, costUsd, output, session } = attempt
   if (!isFinalAttempt) {
-    return { status: 'failed_verify', pr_url: null, output, cost_usd: costUsd }
+    return { status: 'failed_verify', pr_url: null, output, cost_usd: costUsd, session }
   }
   await deps.writeNote(workDir, notesPath, givenUpFilename(input.jira_key), givenUpNote(input))
   const commitError = await tryCommitAndPush(
@@ -146,9 +147,9 @@ async function reportFailedGate(
     `chore: ${input.jira_key}: giving up after ${MAX_ATTEMPTS} attempts`,
   )
   if (commitError) {
-    return { status: 'crashed', pr_url: null, output: combineOutputs(output, commitError), cost_usd: costUsd }
+    return { status: 'crashed', pr_url: null, output: combineOutputs(output, commitError), cost_usd: costUsd, session }
   }
-  return { status: 'given_up', pr_url: null, output, cost_usd: costUsd }
+  return { status: 'given_up', pr_url: null, output, cost_usd: costUsd, session }
 }
 
 export async function runMinion(
@@ -162,7 +163,10 @@ export async function runMinion(
 
   const hasOpenPr = await deps.hasOpenPrForBranch(input.jira_key)
   await deps.cloneAndBranch(repoUrl, input.jira_key, workDir, !hasOpenPr)
-  const { output: implementOutput, costUsd } = await deps.implementTask(workDir, input)
+  const { output: implementOutput, costUsd, transcript } = await deps.implementTask(workDir, input)
+  // Built once, here, so every exit below reports the same record — including
+  // the `success` path, which is the one that had no diagnostic at all before.
+  const session = buildSessionRecord({ input, transcript, agentSummary: implementOutput, costUsd })
 
   if (!(await deps.hasVerifyScript(workDir))) {
     await deps.writeNote(workDir, notesPath, blockedNoVerifyFilename(input.jira_key), blockedNoVerifyNote(input))
@@ -173,13 +177,20 @@ export async function runMinion(
       `chore: ${input.jira_key}: no verify gate found`,
     )
     if (commitError) {
-      return { status: 'crashed', pr_url: null, output: combineOutputs(implementOutput, commitError), cost_usd: costUsd }
+      return {
+        status: 'crashed',
+        pr_url: null,
+        output: combineOutputs(implementOutput, commitError),
+        cost_usd: costUsd,
+        session,
+      }
     }
     return {
       status: isFinalAttempt ? 'given_up' : 'blocked_no_verify',
       pr_url: null,
       output: combineOutputs(implementOutput),
       cost_usd: costUsd,
+      session,
     }
   }
 
@@ -188,6 +199,7 @@ export async function runMinion(
     return await reportFailedGate(deps, input, workDir, notesPath, {
       isFinalAttempt,
       costUsd,
+      session,
       output: combineOutputs(implementOutput, verify.output),
     })
   }
@@ -197,6 +209,7 @@ export async function runMinion(
     return await reportFailedGate(deps, input, workDir, notesPath, {
       isFinalAttempt,
       costUsd,
+      session,
       output: combineOutputs(implementOutput, preCommit.output),
     })
   }
@@ -208,13 +221,25 @@ export async function runMinion(
     `fix: ${input.jira_key}: ${commitSubject(input.description)}`,
   )
   if (commitError) {
-    return { status: 'crashed', pr_url: null, output: combineOutputs(implementOutput, commitError), cost_usd: costUsd }
+    return {
+      status: 'crashed',
+      pr_url: null,
+      output: combineOutputs(implementOutput, commitError),
+      cost_usd: costUsd,
+      session,
+    }
   }
   try {
     const prUrl = await deps.createPullRequest(input.jira_key, input)
-    return { status: 'success', pr_url: prUrl, output: null, cost_usd: costUsd }
+    return { status: 'success', pr_url: prUrl, output: null, cost_usd: costUsd, session }
   } catch (err) {
     const prError = err instanceof Error ? err.message : String(err)
-    return { status: 'crashed', pr_url: null, output: combineOutputs(implementOutput, prError), cost_usd: costUsd }
+    return {
+      status: 'crashed',
+      pr_url: null,
+      output: combineOutputs(implementOutput, prError),
+      cost_usd: costUsd,
+      session,
+    }
   }
 }

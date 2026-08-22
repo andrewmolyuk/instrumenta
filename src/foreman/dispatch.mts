@@ -36,6 +36,7 @@ export async function dispatch(
     pr_url: result.pr_url,
     output: result.output,
     cost_usd: result.cost_usd,
+    session: result.session,
     dispatched_at,
     finished_at: new Date().toISOString(),
   }

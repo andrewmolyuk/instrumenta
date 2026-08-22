@@ -77,7 +77,7 @@ describe('GET /api/status', () => {
       status: 'success',
       pr_url: 'https://x/pr/1',
       output: null,
-      cost_usd: null,
+      cost_usd: null, session: null,
       dispatched_at: '2026-08-13T00:00:00Z',
       finished_at: '2026-08-13T00:05:00Z',
     })
@@ -276,7 +276,7 @@ describe('POST /api/delete-attempts', () => {
       status: 'crashed',
       pr_url: null,
       output: null,
-      cost_usd: null,
+      cost_usd: null, session: null,
       dispatched_at: '2026-08-13T00:00:00Z',
       finished_at: '2026-08-13T00:01:00Z',
     })
@@ -287,7 +287,7 @@ describe('POST /api/delete-attempts', () => {
       status: 'crashed',
       pr_url: null,
       output: null,
-      cost_usd: null,
+      cost_usd: null, session: null,
       dispatched_at: '2026-08-13T00:02:00Z',
       finished_at: '2026-08-13T00:03:00Z',
     })
@@ -334,7 +334,7 @@ describe('GET /api/attempts', () => {
         status: 'success',
         pr_url: null,
         output: null,
-        cost_usd: 1,
+        cost_usd: 1, session: null,
         dispatched_at: '2026-08-' + String((i % 28) + 1).padStart(2, '0') + 'T00:00:00Z',
         finished_at: null,
       })
@@ -360,11 +360,11 @@ describe('GET /api/attempts', () => {
   it('orders most recent first, like the history it replaces', async () => {
     recordAttempt(db, {
       task_id: 'old', jira_key: 'KAZ-1', attempt_number: 1, status: 'success', pr_url: null,
-      output: null, cost_usd: null, dispatched_at: '2026-08-01T00:00:00Z', finished_at: null,
+      output: null, cost_usd: null, session: null, dispatched_at: '2026-08-01T00:00:00Z', finished_at: null,
     })
     recordAttempt(db, {
       task_id: 'new', jira_key: 'KAZ-2', attempt_number: 1, status: 'success', pr_url: null,
-      output: null, cost_usd: null, dispatched_at: '2026-08-20T00:00:00Z', finished_at: null,
+      output: null, cost_usd: null, session: null, dispatched_at: '2026-08-20T00:00:00Z', finished_at: null,
     })
 
     const body = (await (await handler(new Request('http://x/api/attempts'))).json()) as {

@@ -6,3 +6,11 @@ export const MAX_VERIFY_OUTPUT_CHARS = 16000
 
 /** Cap on captured Claude Code output from implementTask — keeps the tail, same reasoning as verify. */
 export const MAX_IMPLEMENT_OUTPUT_CHARS = 16000
+
+/**
+ * Cap on the session transcript stored per attempt (`tasks.session`). Generous
+ * — the whole point is to be able to reconstruct what an agent actually did —
+ * but bounded, since an agent that loops can generate steps indefinitely, and
+ * this crosses a stdout pipe as JSON before it reaches the database.
+ */
+export const MAX_SESSION_CHARS = 200_000

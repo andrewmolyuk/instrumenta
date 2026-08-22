@@ -27,6 +27,16 @@ export interface MinionResult {
   output: string | null
   /** Claude Code's own total_cost_usd for this attempt; null when implementTask never got a parseable result (crash, timeout before Claude ran, missing binary). */
   cost_usd: number | null
+  /**
+   * The full record of what the agent did this attempt (minion/session.mts) —
+   * its problem statement, every step it took, and its own closing summary.
+   * Reported for every status, including `success`: `output` is deliberately
+   * null there ("nothing to explain"), which left successful attempts with no
+   * trace at all — found live on RPG-5427, where a PR existed and nothing in
+   * the system could say what had produced it. Null only when Minion never got
+   * far enough to run the agent.
+   */
+  session: string | null
 }
 
 export interface MinionRunner {

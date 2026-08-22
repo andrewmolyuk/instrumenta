@@ -321,13 +321,13 @@
         <tr>
           <th style="width:120px">Jira key</th><th style="width:80px">Attempt</th><th style="width:170px">Status</th>
           <th style="width:70px">PR</th><th style="width:90px">Cost</th><th style="width:170px">Dispatched</th>
-          <th style="width:110px">Duration</th><th>Output</th>
+          <th style="width:110px">Duration</th><th>Output</th><th>Session</th>
         </tr>
       </thead>
       <tbody id="attempts-body"></tbody>
     </table>
   </div>
-  <div class="note" style="max-width:70ch">Output is captured diagnostic text: Claude Code&rsquo;s stdout and stderr combined with the verify gate&rsquo;s on failed_verify, or Minion&rsquo;s own process output on crashed and timeout. It is null on a passing verify &mdash; nothing to explain there.</div>
+  <div class="note" style="max-width:70ch">Output is captured diagnostic text: Claude Code&rsquo;s stdout and stderr combined with the verify gate&rsquo;s on failed_verify, or Minion&rsquo;s own process output on crashed and timeout. It is null on a passing verify &mdash; nothing to explain there. Session is the full record of what the agent did &mdash; the problem statement it was given, every step it took, and its own closing summary &mdash; recorded for <em>every</em> status, including success.</div>
 </section>
 
 <!-- ─────────────── SETTINGS ─────────────── -->
@@ -483,6 +483,19 @@
       a.href = prUrl
       a.textContent = 'PR'
       cell.append(a)
+    }
+    return cell
+  }
+
+  /* Long captured text in a table cell: scrollable in place rather than
+     expanding the row, same treatment for `output` and `session`. */
+  function preCell(text) {
+    const cell = document.createElement('td')
+    if (text) {
+      const pre = document.createElement('pre')
+      pre.className = 'output-pre'
+      pre.textContent = text
+      cell.append(pre)
     }
     return cell
   }
@@ -659,14 +672,9 @@
       const durationTd = td(durationLabel(row.dispatched_at, row.finished_at))
       durationTd.classList.add('tabular')
       durationTd.style.color = 'var(--color-neutral-700)'
-      const outputTd = document.createElement('td')
-      if (row.output) {
-        const pre = document.createElement('pre')
-        pre.className = 'output-pre'
-        pre.textContent = row.output
-        outputTd.append(pre)
-      }
-      tr.append(td(row.jira_key), attemptTd, tagCell(row.status), prCell(row.pr_url), costTd, dispatchedTd, durationTd, outputTd)
+      const outputTd = preCell(row.output)
+      const sessionTd = preCell(row.session)
+      tr.append(td(row.jira_key), attemptTd, tagCell(row.status), prCell(row.pr_url), costTd, dispatchedTd, durationTd, outputTd, sessionTd)
       tbody.append(tr)
     }
   }

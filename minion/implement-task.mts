@@ -2,6 +2,15 @@ import { encodeProgress, type MinionProgress } from '../src/minion/progress.mts'
 import type { MinionInput } from '../src/minion/types.mts'
 import { MAX_IMPLEMENT_OUTPUT_CHARS } from './constants.mts'
 
+/** The model and effort an attempt runs under — resolved once, so the argv and the session report can't disagree. */
+export function claudeModel(): string {
+  return process.env.MINION_CLAUDE_MODEL ?? 'claude-opus-5[1m]'
+}
+
+export function claudeEffort(): string {
+  return process.env.MINION_CLAUDE_EFFORT ?? 'high'
+}
+
 /**
  * The default argv, split out so it's assertable without actually spawning `claude`.
  * The explicit "implement it, don't just propose it" instruction exists because,
@@ -60,9 +69,9 @@ passing only if you actually ran it and saw it pass.`
     'claude',
     '--dangerously-skip-permissions',
     '--model',
-    process.env.MINION_CLAUDE_MODEL ?? 'claude-opus-5[1m]',
+    claudeModel(),
     '--effort',
-    process.env.MINION_CLAUDE_EFFORT ?? 'high',
+    claudeEffort(),
     '-p',
     prompt,
     // `stream-json` rather than `json` so the run reports as it goes instead of
@@ -90,6 +99,14 @@ passing only if you actually ran it and saw it pass.`
 export interface ImplementResult {
   output: string
   costUsd: number | null
+  /**
+   * One line per stream event — the agent's own trail of tool calls and
+   * reasoning, in order. The same lines reported live as progress, kept here
+   * so they survive the run: they are what makes an attempt reviewable after
+   * the fact, and Claude Code's final `result` text alone is the agent's
+   * account of its work rather than a record of it.
+   */
+  transcript: string[]
 }
 
 /**
@@ -223,6 +240,7 @@ async function captureImplementOutput(workDir: string, command: string[]): Promi
 
     let resultText: string | null = null
     let costUsd: number | null = null
+    const transcript: string[] = []
 
     const [rawStdout, rawStderr] = await Promise.all([
       readLines(proc.stdout, (line) => {
@@ -241,7 +259,10 @@ async function captureImplementOutput(workDir: string, command: string[]): Promi
         }
         if (typeof event.result === 'string') resultText = event.result
         const summary = summarizeEvent(event)
-        if (summary) progress.line = summary
+        if (summary) {
+          progress.line = summary
+          transcript.push(summary)
+        }
         if (progress.line !== undefined || progress.cost_usd !== undefined) console.error(encodeProgress(progress))
       }),
       new Response(proc.stderr).text(),
@@ -252,10 +273,14 @@ async function captureImplementOutput(workDir: string, command: string[]): Promi
     const stderr = rawStderr.trim()
     const output = resultText !== null ? [resultText, stderr].filter(Boolean).join('\n') : [stdout, stderr].filter(Boolean).join('\n')
 
-    return { output: tail(output, MAX_IMPLEMENT_OUTPUT_CHARS), costUsd }
+    return { output: tail(output, MAX_IMPLEMENT_OUTPUT_CHARS), costUsd, transcript }
   } catch (err) {
     // Command not available — caller doesn't treat this as fatal (see above).
-    return { output: `(claude command failed to start: ${err instanceof Error ? err.message : String(err)})`, costUsd: null }
+    return {
+      output: `(claude command failed to start: ${err instanceof Error ? err.message : String(err)})`,
+      costUsd: null,
+      transcript: [],
+    }
   }
 }
 

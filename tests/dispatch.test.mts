@@ -27,7 +27,7 @@ describe('dispatch', () => {
   it('returns a row with a fresh task_id and attempt_number 1 for a new jira_key', async () => {
     const row = await dispatch(
       db,
-      fakeRunner({ status: 'success', pr_url: 'https://x/pr/1', output: null, cost_usd: 0.5 }),
+      fakeRunner({ status: 'success', pr_url: 'https://x/pr/1', output: null, cost_usd: 0.5, session: null }),
       TASK,
       60_000,
     )
@@ -42,7 +42,7 @@ describe('dispatch', () => {
   it('carries the runner-reported output through to the returned row', async () => {
     const row = await dispatch(
       db,
-      fakeRunner({ status: 'failed_verify', pr_url: null, output: 'test 1 failed', cost_usd: null }),
+      fakeRunner({ status: 'failed_verify', pr_url: null, output: 'test 1 failed', cost_usd: null, session: null }),
       TASK,
       60_000,
     )
@@ -57,11 +57,11 @@ describe('dispatch', () => {
       status: 'crashed',
       pr_url: null,
       output: null,
-      cost_usd: null,
+      cost_usd: null, session: null,
       dispatched_at: '2026-08-13T00:00:00Z',
       finished_at: '2026-08-13T00:01:00Z',
     })
-    const row = await dispatch(db, fakeRunner({ status: 'success', pr_url: null, output: null, cost_usd: null }), TASK, 60_000)
+    const row = await dispatch(db, fakeRunner({ status: 'success', pr_url: null, output: null, cost_usd: null, session: null }), TASK, 60_000)
     expect(row.attempt_number).toBe(2)
   })
 
@@ -69,7 +69,7 @@ describe('dispatch', () => {
     let captured: MinionInput | undefined
     await dispatch(
       db,
-      fakeRunner({ status: 'success', pr_url: null, output: null, cost_usd: null }, (input) => (captured = input)),
+      fakeRunner({ status: 'success', pr_url: null, output: null, cost_usd: null, session: null }, (input) => (captured = input)),
       TASK,
       60_000,
     )
@@ -82,7 +82,7 @@ describe('dispatch', () => {
     await dispatch(
       db,
       fakeRunner(
-        { status: 'success', pr_url: null, output: null, cost_usd: null },
+        { status: 'success', pr_url: null, output: null, cost_usd: null, session: null },
         (_input, timeoutMs) => (capturedTimeout = timeoutMs),
       ),
       TASK,
@@ -92,12 +92,12 @@ describe('dispatch', () => {
   })
 
   it('sets dispatched_at and finished_at as ISO timestamps with finished_at not before dispatched_at', async () => {
-    const row = await dispatch(db, fakeRunner({ status: 'success', pr_url: null, output: null, cost_usd: null }), TASK, 60_000)
+    const row = await dispatch(db, fakeRunner({ status: 'success', pr_url: null, output: null, cost_usd: null, session: null }), TASK, 60_000)
     expect(new Date(row.finished_at as string).getTime()).toBeGreaterThanOrEqual(new Date(row.dispatched_at).getTime())
   })
 
   it('does not write to the database itself — the caller records the returned row', async () => {
-    await dispatch(db, fakeRunner({ status: 'success', pr_url: null, output: null, cost_usd: null }), TASK, 60_000)
+    await dispatch(db, fakeRunner({ status: 'success', pr_url: null, output: null, cost_usd: null, session: null }), TASK, 60_000)
     const rows = db.query('SELECT * FROM tasks').all()
     expect(rows).toEqual([])
   })

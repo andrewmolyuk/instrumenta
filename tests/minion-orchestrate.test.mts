@@ -17,7 +17,7 @@ function fakeDeps(overrides: Partial<MinionDeps> = {}): MinionDeps {
   return {
     cloneAndBranch: vi.fn(async () => {}),
     hasOpenPrForBranch: vi.fn(async () => false),
-    implementTask: vi.fn(async () => ({ output: '', costUsd: null })),
+    implementTask: vi.fn(async () => ({ output: '', costUsd: null, transcript: [] })),
     hasVerifyScript: vi.fn(async () => true),
     runVerify: vi.fn(async () => ({ passed: true, output: '' })),
     runPreCommitChecks: vi.fn(async () => ({ ran: true, passed: true, output: '' })),
@@ -59,14 +59,17 @@ describe('runMinion', () => {
       status: 'success',
       pr_url: 'https://bitbucket.org/o/r/pull-requests/1',
       output: null,
+      // Reported even here, where `output` is deliberately null: a successful
+      // attempt used to leave no record of what the agent actually did.
       cost_usd: null,
+      session: expect.any(String),
     })
     expect(deps.commitAndPush).toHaveBeenCalledWith('/tmp/wd', 'KAZ-1', expect.stringMatching(/^fix: KAZ-1:/))
     expect(deps.createPullRequest).toHaveBeenCalledWith('KAZ-1', expect.objectContaining({ jira_key: 'KAZ-1' }))
   })
 
   it('carries implementTask\'s reported cost through to a successful result', async () => {
-    const deps = fakeDeps({ implementTask: vi.fn(async () => ({ output: '', costUsd: 0.42 })) })
+    const deps = fakeDeps({ implementTask: vi.fn(async () => ({ output: '', costUsd: 0.42, transcript: [] })) })
     const result = await runMinion(input(), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
 
     expect(result.cost_usd).toBe(0.42)
@@ -133,7 +136,13 @@ describe('runMinion', () => {
     const deps = fakeDeps({ hasVerifyScript: vi.fn(async () => false) })
     const result = await runMinion(input({ attempt_number: 1 }), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
 
-    expect(result).toEqual({ status: 'blocked_no_verify', pr_url: null, output: null, cost_usd: null })
+    expect(result).toEqual({
+      status: 'blocked_no_verify',
+      pr_url: null,
+      output: null,
+      cost_usd: null,
+      session: expect.any(String),
+    })
     expect(deps.writeNote).toHaveBeenCalledWith('/tmp/wd', 'docs/todo/', 'kaz-1-blocked-no-verify.md', expect.any(String))
     expect(deps.commitAndPush).toHaveBeenCalledWith('/tmp/wd', 'KAZ-1', expect.stringMatching(/^chore: KAZ-1:/))
     expect(deps.createPullRequest).not.toHaveBeenCalled()
@@ -142,7 +151,7 @@ describe('runMinion', () => {
   it('includes implementTask output on blocked_no_verify when there was some', async () => {
     const deps = fakeDeps({
       hasVerifyScript: vi.fn(async () => false),
-      implementTask: vi.fn(async () => ({ output: 'claude: nothing to change here', costUsd: null })),
+      implementTask: vi.fn(async () => ({ output: 'claude: nothing to change here', costUsd: null, transcript: [] })),
     })
     const result = await runMinion(input({ attempt_number: 1 }), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
 
@@ -153,14 +162,20 @@ describe('runMinion', () => {
     const deps = fakeDeps({ runVerify: vi.fn(async () => ({ passed: false, output: 'test 1 failed' })) })
     const result = await runMinion(input({ attempt_number: 1 }), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
 
-    expect(result).toEqual({ status: 'failed_verify', pr_url: null, output: 'test 1 failed', cost_usd: null })
+    expect(result).toEqual({
+      status: 'failed_verify',
+      pr_url: null,
+      output: 'test 1 failed',
+      cost_usd: null,
+      session: expect.any(String),
+    })
     expect(deps.commitAndPush).not.toHaveBeenCalled()
     expect(deps.writeNote).not.toHaveBeenCalled()
   })
 
   it('combines implementTask output with verify output on failed_verify when there was both', async () => {
     const deps = fakeDeps({
-      implementTask: vi.fn(async () => ({ output: 'claude did something', costUsd: null })),
+      implementTask: vi.fn(async () => ({ output: 'claude did something', costUsd: null, transcript: [] })),
       runVerify: vi.fn(async () => ({ passed: false, output: 'test 1 failed' })),
     })
     const result = await runMinion(input({ attempt_number: 1 }), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
@@ -191,7 +206,7 @@ describe('runMinion', () => {
 
   it('reports failed_verify and commits nothing when the pre-commit checks fail on a non-final attempt', async () => {
     const deps = fakeDeps({
-      implementTask: vi.fn(async () => ({ output: 'claude did something', costUsd: 1.5 })),
+      implementTask: vi.fn(async () => ({ output: 'claude did something', costUsd: 1.5, transcript: [] })),
       runPreCommitChecks: vi.fn(async () => ({ ran: true, passed: false, output: 'eslint: 2 problems' })),
     })
     const result = await runMinion(input({ attempt_number: 1 }), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
@@ -215,6 +230,7 @@ describe('runMinion', () => {
       pr_url: null,
       output: 'eslint: 2 problems',
       cost_usd: null,
+      session: expect.any(String),
     })
     expect(deps.writeNote).toHaveBeenCalledWith('/tmp/wd', 'docs/todo/', 'kaz-1-given-up.md', expect.any(String))
     expect(deps.createPullRequest).not.toHaveBeenCalled()
@@ -246,7 +262,13 @@ describe('runMinion', () => {
     const deps = fakeDeps({ runVerify: vi.fn(async () => ({ passed: false, output: 'test 1 failed' })) })
     const result = await runMinion(input({ attempt_number: 3 }), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
 
-    expect(result).toEqual({ status: 'given_up', pr_url: null, output: 'test 1 failed', cost_usd: null })
+    expect(result).toEqual({
+      status: 'given_up',
+      pr_url: null,
+      output: 'test 1 failed',
+      cost_usd: null,
+      session: expect.any(String),
+    })
     expect(deps.writeNote).toHaveBeenCalledWith('/tmp/wd', 'docs/todo/', 'kaz-1-given-up.md', expect.any(String))
     expect(deps.commitAndPush).toHaveBeenCalledWith('/tmp/wd', 'KAZ-1', expect.stringMatching(/^chore: KAZ-1:/))
     expect(deps.createPullRequest).not.toHaveBeenCalled()

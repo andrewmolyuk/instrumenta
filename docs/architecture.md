@@ -80,13 +80,17 @@ Foreman owns two things directly:
 
 - **SQLite on a persistent Docker volume** — the only state instrumenta keeps for
   itself. Schema: `task_id (uuid, pk) | jira_key | attempt_number | status | pr_url |
-  output | dispatched_at | finished_at`, plus a `stopped` flag. `output` is captured
-  diagnostic text — Claude Code's own stdout+stderr, combined with the verify gate's
-  on `failed_verify`, or Minion's own process stdout+stderr (which includes Claude
-  Code's, echoed to stderr for exactly this case) on `crashed` or `timeout` — null for
-  every other status, including a passing verify. A human's only way to see why an
-  attempt failed, since Minion's own container (run with `--rm`) is already gone by
-  the time this is read. Only Foreman reads or writes it. Why this exists and what
+  output | cost_usd | session | dispatched_at | finished_at`, plus a `stopped` flag.
+  `output` is captured diagnostic text — Claude Code's own stdout+stderr, combined
+  with the verify gate's on `failed_verify`, or Minion's own process stdout+stderr
+  (which includes Claude Code's, echoed to stderr for exactly this case) on `crashed`
+  or `timeout` — null for every other status, including a passing verify. `session`
+  is the full record of what the agent did that attempt (minion/session.mts): the
+  problem statement it was given, every step it took, and its own closing summary.
+  Unlike `output` it is written for *every* status — a `success` used to record
+  nothing at all, which meant the one outcome that produces a pull request was also
+  the one nobody could audit. Both exist because Minion's own container (run with
+  `--rm`) is already gone by the time anyone reads this. Only Foreman reads or writes it. Why this exists and what
   it's authoritative for
   (and what it isn't) is
   [ADR-001](adr/001-task-state-three-sources.md).

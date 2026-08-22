@@ -4,10 +4,10 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { openDb } from '../src/db/index.mts'
-import { appendCurrentProgress, getCurrentTask, setCurrentTask } from '../src/db/queries.mts'
+import { appendCurrentProgress, getCurrentTask, listAttempts, recordAttempt, setCurrentTask } from '../src/db/queries.mts'
 
 describe('openDb', () => {
-  it('creates the tasks table with ADR-001\'s columns, plus ADR-008\'s cost_usd', () => {
+  it('creates the tasks table with ADR-001\'s columns, plus ADR-008\'s cost_usd and the session record', () => {
     const db = openDb(':memory:')
     const columns = db
       .query('PRAGMA table_info(tasks)')
@@ -22,6 +22,7 @@ describe('openDb', () => {
       'pr_url',
       'output',
       'cost_usd',
+      'session',
       'dispatched_at',
       'finished_at',
     ])
@@ -99,6 +100,35 @@ describe('openDb migrations', () => {
       output: 'Read: src/foo.ts',
       cost_usd: 1.83,
     })
+  })
+
+  it('adds the session column to a tasks table that predates it', () => {
+    dir = mkdtempSync(join(tmpdir(), 'instrumenta-db-'))
+    const path = join(dir, 'foreman.db')
+    const old = new Database(path, { create: true })
+    old.run(`CREATE TABLE tasks (
+      task_id TEXT PRIMARY KEY,
+      jira_key TEXT NOT NULL,
+      attempt_number INTEGER NOT NULL,
+      status TEXT NOT NULL,
+      pr_url TEXT,
+      output TEXT,
+      cost_usd REAL,
+      dispatched_at TEXT NOT NULL,
+      finished_at TEXT
+    )`)
+    old.run("INSERT INTO tasks (task_id, jira_key, attempt_number, status, dispatched_at) VALUES ('t0','KAZ-1',1,'success','2026-08-01T00:00:00Z')")
+    old.close()
+
+    const db = openDb(path)
+
+    // The pre-existing row survives, reporting null for the new column.
+    expect(listAttempts(db, 10)[0]).toMatchObject({ task_id: 't0', session: null })
+    recordAttempt(db, {
+      task_id: 't1', jira_key: 'KAZ-2', attempt_number: 1, status: 'success', pr_url: null,
+      output: null, cost_usd: null, session: '## Minion session', dispatched_at: '2026-08-02T00:00:00Z', finished_at: null,
+    })
+    expect(listAttempts(db, 10).find((r) => r.task_id === 't1')?.session).toBe('## Minion session')
   })
 
   it('leaves an already-migrated database alone when reopened', () => {

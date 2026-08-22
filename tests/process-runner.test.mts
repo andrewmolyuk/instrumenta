@@ -12,14 +12,14 @@ describe('ProcessMinionRunner', () => {
       "const input = JSON.parse(await Bun.stdin.text()); console.log(JSON.stringify({ status: 'success', pr_url: `https://example.com/pr/${input.attempt_number}` }))",
     ])
     const result = await runner.run(INPUT, 5000)
-    expect(result).toEqual({ status: 'success', pr_url: 'https://example.com/pr/1', output: null, cost_usd: null })
+    expect(result).toEqual({ status: 'success', pr_url: 'https://example.com/pr/1', output: null, cost_usd: null, session: null })
   })
 
   it('parses cost_usd through when the process reports one', async () => {
     const runner = new ProcessMinionRunner([
       'bun',
       '-e',
-      "console.log(JSON.stringify({ status: 'success', pr_url: null, cost_usd: 0.42 }))",
+      "console.log(JSON.stringify({ status: 'success', pr_url: null, cost_usd: 0.42, session: null }))",
     ])
     const result = await runner.run(INPUT, 5000)
     expect(result.cost_usd).toBe(0.42)
@@ -32,7 +32,7 @@ describe('ProcessMinionRunner', () => {
       "console.log(JSON.stringify({ status: 'failed_verify', pr_url: null, output: 'test 1 failed' }))",
     ])
     const result = await runner.run(INPUT, 5000)
-    expect(result).toEqual({ status: 'failed_verify', pr_url: null, output: 'test 1 failed', cost_usd: null })
+    expect(result).toEqual({ status: 'failed_verify', pr_url: null, output: 'test 1 failed', cost_usd: null, session: null })
   })
 
   it('passes input to the process over stdin as JSON', async () => {
@@ -48,13 +48,13 @@ describe('ProcessMinionRunner', () => {
   it('reports crashed with the raw stdout as output when it is not a valid result', async () => {
     const runner = new ProcessMinionRunner(['bun', '-e', "console.log('not json')"])
     const result = await runner.run(INPUT, 5000)
-    expect(result).toEqual({ status: 'crashed', pr_url: null, output: 'not json', cost_usd: null })
+    expect(result).toEqual({ status: 'crashed', pr_url: null, output: 'not json', cost_usd: null, session: null })
   })
 
   it('reports crashed with null output on empty stdout and stderr', async () => {
     const runner = new ProcessMinionRunner(['bun', '-e', 'await Bun.stdin.text()'])
     const result = await runner.run(INPUT, 5000)
-    expect(result).toEqual({ status: 'crashed', pr_url: null, output: null, cost_usd: null })
+    expect(result).toEqual({ status: 'crashed', pr_url: null, output: null, cost_usd: null, session: null })
   })
 
   it('captures stderr (e.g. an uncaught exception) as crash output', async () => {
@@ -68,7 +68,7 @@ describe('ProcessMinionRunner', () => {
     const runner = new ProcessMinionRunner(['bun', '-e', 'await Bun.sleep(5000)'])
     const start = Date.now()
     const result = await runner.run(INPUT, 100)
-    expect(result).toEqual({ status: 'timeout', pr_url: null, output: null, cost_usd: null })
+    expect(result).toEqual({ status: 'timeout', pr_url: null, output: null, cost_usd: null, session: null })
     expect(Date.now() - start).toBeLessThan(4000)
   })
 
@@ -78,7 +78,7 @@ describe('ProcessMinionRunner', () => {
     const runner = new ProcessMinionRunner([
       'bun',
       '-e',
-      "console.log(JSON.stringify({ status: 'crashed', pr_url: null, output: 'pre-commit hook failed', cost_usd: 9.72 })); await Bun.sleep(10000)",
+      "console.log(JSON.stringify({ status: 'crashed', pr_url: null, output: 'pre-commit hook failed', cost_usd: 9.72, session: null })); await Bun.sleep(10000)",
     ])
     const result = await runner.run(INPUT, 500)
 
@@ -86,7 +86,7 @@ describe('ProcessMinionRunner', () => {
       status: 'crashed',
       pr_url: null,
       output: 'pre-commit hook failed',
-      cost_usd: 9.72,
+      cost_usd: 9.72, session: null,
     })
   })
 

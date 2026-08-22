@@ -17,7 +17,7 @@ function flagValue(command: string[], flag: string): string | undefined {
 
 describe('implementTask', () => {
   it('runs the given command and returns empty output when it prints nothing', async () => {
-    await expect(implementTask('/tmp', INPUT, ['true'])).resolves.toEqual({ output: '', costUsd: null })
+    await expect(implementTask('/tmp', INPUT, ['true'])).resolves.toEqual({ output: '', costUsd: null, transcript: [] })
   })
 
   it('does not throw when the command does not exist, and says so in its output', async () => {

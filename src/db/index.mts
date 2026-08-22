@@ -22,23 +22,25 @@ export interface TaskRow {
   pr_url: string | null
   output: string | null
   cost_usd: number | null
+  /** The full agent session for this attempt (minion/session.mts) — see schema.sql. */
+  session: string | null
   dispatched_at: string
   finished_at: string | null
 }
 
 /**
- * Columns added to `foreman_state` after the first release, with the SQLite
- * type to add them as. schema.sql alone can't introduce these: its statements
+ * Columns added after the first release, as [table, column, type]. schema.sql alone can't introduce these: its statements
  * are all `CREATE TABLE IF NOT EXISTS`, which is a no-op against the table an
  * existing database already has — and Foreman's database is deliberately on a
  * persistent volume, so "existing" is the normal case, not the exception.
- * Additive and nullable only: every one of these is display-only state that a
- * database predating it simply reports as null.
+ * Additive and nullable only: a database predating any of these simply reports
+ * it as null.
  */
-const ADDED_COLUMNS: Array<[column: string, type: string]> = [
-  ['current_summary', 'TEXT'],
-  ['current_output', 'TEXT'],
-  ['current_cost_usd', 'REAL'],
+const ADDED_COLUMNS: Array<[table: string, column: string, type: string]> = [
+  ['foreman_state', 'current_summary', 'TEXT'],
+  ['foreman_state', 'current_output', 'TEXT'],
+  ['foreman_state', 'current_cost_usd', 'REAL'],
+  ['tasks', 'session', 'TEXT'],
 ]
 
 /** Opens (creating if needed) the SQLite file at `path` and applies the schema. */
@@ -49,11 +51,11 @@ export function openDb(path: string): Database {
   // SQLite has no `ADD COLUMN IF NOT EXISTS`, so the existing columns are read
   // back and the missing ones added — rather than adding blind and swallowing
   // the error, which would also swallow a genuinely broken schema.
-  const existing = new Set(
-    db.query<{ name: string }, []>('PRAGMA table_info(foreman_state)').all().map((row) => row.name),
-  )
-  for (const [column, type] of ADDED_COLUMNS) {
-    if (!existing.has(column)) db.run(`ALTER TABLE foreman_state ADD COLUMN ${column} ${type}`)
+  const columnsOf = (table: string): Set<string> =>
+    new Set(db.query<{ name: string }, []>(`PRAGMA table_info(${table})`).all().map((row) => row.name))
+  const existing = new Map([...new Set(ADDED_COLUMNS.map(([t]) => t))].map((t) => [t, columnsOf(t)]))
+  for (const [table, column, type] of ADDED_COLUMNS) {
+    if (!existing.get(table)?.has(column)) db.run(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`)
   }
 
   return db

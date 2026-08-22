@@ -72,7 +72,7 @@ export class ProcessMinionRunner implements MinionRunner {
       const reported = parseResult(stdout)
       if (reported) return reported
 
-      return { status: 'timeout', pr_url: null, output: combineOutput(stdout, stderr), cost_usd: null }
+      return { status: 'timeout', pr_url: null, output: combineOutput(stdout, stderr), cost_usd: null, session: null }
     }
 
     const stdout = (await stdoutPromise).trim()
@@ -85,7 +85,7 @@ export class ProcessMinionRunner implements MinionRunner {
     // Node/Bun uncaught exception's stack trace lands — since the container
     // itself (run with `--rm`) is already gone by the time anyone looks.
     const stderr = (await stderrPromise).trim()
-    return { status: 'crashed', pr_url: null, output: combineOutput(stdout, stderr), cost_usd: null }
+    return { status: 'crashed', pr_url: null, output: combineOutput(stdout, stderr), cost_usd: null, session: null }
   }
 }
 
@@ -131,6 +131,7 @@ function parseResult(stdout: string): MinionResult | null {
       pr_url: parsed.pr_url ?? null,
       output: parsed.output ?? null,
       cost_usd: typeof parsed.cost_usd === 'number' ? parsed.cost_usd : null,
+      session: typeof parsed.session === 'string' ? parsed.session : null,
     }
   } catch {
     return null

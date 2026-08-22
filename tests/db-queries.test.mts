@@ -37,6 +37,7 @@ function attempt(overrides: Partial<TaskRow> = {}): TaskRow {
     pr_url: null,
     output: null,
     cost_usd: null,
+  session: null,
     dispatched_at: '2026-08-13T00:00:00Z',
     finished_at: '2026-08-13T00:05:00Z',
     ...overrides,
@@ -218,6 +219,18 @@ describe('listAttempts', () => {
 
   it('returns an empty list when there are no attempts', () => {
     expect(listAttempts(db, 10)).toEqual([])
+  })
+
+  it("round-trips an attempt's session record, for a success as well as a failure", () => {
+    // The RPG-5427 gap: `output` is null on success by design, so a successful
+    // attempt left no record of what the agent had done. `session` is written
+    // for every status precisely so that is no longer true.
+    recordAttempt(db, attempt({ task_id: 't1', status: 'success', output: null, session: '## Minion session\nRead: src/foo.ts' }))
+    recordAttempt(db, attempt({ task_id: 't2', status: 'crashed', session: null }))
+
+    const rows = listAttempts(db, 10)
+    expect(rows.find((r) => r.task_id === 't1')?.session).toContain('Read: src/foo.ts')
+    expect(rows.find((r) => r.task_id === 't2')?.session).toBeNull()
   })
 
   it('returns every attempt when the limit is null', () => {
