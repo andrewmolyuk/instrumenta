@@ -1,6 +1,6 @@
 import { Buffer } from 'node:buffer'
 import { mkdir } from 'node:fs/promises'
-import { basename, join } from 'node:path'
+import { join } from 'node:path'
 import { adfToPlainText, type AdfNode } from '../src/task-provider/adf.mts'
 
 /**
@@ -138,51 +138,6 @@ export async function commentOnTicket(
     return res.ok
   } catch (err) {
     console.error(`Jira comment on ${jiraKey} failed: ${err instanceof Error ? err.message : String(err)}`)
-    return false
-  }
-}
-
-/**
- * Attaches a file to the ticket. Returns false if it could not be uploaded.
- *
- * Used for the before/after screenshots of a visual fix (ADR-016): they belong
- * on the ticket rather than in the pull request because Bitbucket will not
- * render an inline image, and because the ticket is where the person who
- * reported the bug with a screenshot is looking.
- *
- * `X-Atlassian-Token: no-check` is required by Jira for this endpoint and the
- * upload is rejected without it. Content-Type is deliberately not set — fetch
- * generates the multipart boundary, and overriding it corrupts the body.
- *
- * Best-effort, like commentOnTicket: a failed upload must not turn a finished
- * attempt into a failed one.
- */
-export async function attachToTicket(
-  config: MinionJiraConfig,
-  jiraKey: string,
-  filePath: string,
-  fetchImpl: typeof fetch = fetch,
-): Promise<boolean> {
-  try {
-    const file = Bun.file(filePath)
-    if (!(await file.exists())) return false
-    // Read into a File rather than appending the BunFile with a filename
-    // argument: Bun ignores that argument and sends the whole temp path as the
-    // name, so the ticket would show an attachment called
-    // `/tmp/minion-<uuid>-shots/before.png`. Screenshots are small enough that
-    // holding one in memory costs nothing.
-    const form = new FormData()
-    form.append('file', new File([await file.arrayBuffer()], basename(filePath), { type: file.type }))
-
-    const res = await fetchImpl(`${config.baseUrl}/rest/api/3/issue/${jiraKey}/attachments`, {
-      method: 'POST',
-      headers: { Authorization: authHeader(config), 'X-Atlassian-Token': 'no-check' },
-      body: form,
-    })
-    if (!res.ok) console.error(`Jira attachment on ${jiraKey} failed: ${res.status} ${res.statusText}`)
-    return res.ok
-  } catch (err) {
-    console.error(`Jira attachment on ${jiraKey} failed: ${err instanceof Error ? err.message : String(err)}`)
     return false
   }
 }

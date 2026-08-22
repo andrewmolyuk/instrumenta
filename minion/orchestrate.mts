@@ -1,5 +1,5 @@
 import type { MinionInput, MinionResult } from '../src/minion/types.mts'
-import { MAX_ATTEMPTS, SHOT_NAMES } from './constants.mts'
+import { MAX_ATTEMPTS } from './constants.mts'
 import { extractReport, type ImplementResult } from './implement-task.mts'
 import type { JiraTicket } from './jira.mts'
 import { buildSessionRecord } from './session.mts'
@@ -11,9 +11,7 @@ export interface MinionDeps {
   hasOpenPrForBranch(branch: string): Promise<boolean>
   /** Reads the ticket from Jira, downloading its attachments into `attachmentDir`. */
   fetchTicket(jiraKey: string, attachmentDir: string): Promise<JiraTicket>
-  implementTask(workDir: string, input: MinionInput, ticket: JiraTicket, shotDir: string): Promise<ImplementResult>
-  /** Attaches a file to the ticket; false if it could not be uploaded (ADR-016). */
-  attachToTicket(jiraKey: string, filePath: string): Promise<boolean>
+  implementTask(workDir: string, input: MinionInput, ticket: JiraTicket): Promise<ImplementResult>
   hasVerifyScript(workDir: string): Promise<boolean>
   runVerify(workDir: string): Promise<VerifyResult>
   runPreCommitChecks(workDir: string): Promise<PreCommitResult>
@@ -180,19 +178,6 @@ function noChangeComment(input: MinionInput, agentAccount: string): string {
   ].join('\n')
 }
 
-/**
- * Uploads whatever screenshots the agent left, in order, ignoring any it didn't.
- *
- * Sequential rather than parallel so `before` is attached before `after` and the
- * ticket lists them the right way round; two small uploads do not need the
- * concurrency. Every failure is already swallowed by attachToTicket.
- */
-async function attachScreenshots(deps: MinionDeps, jiraKey: string, shotDir: string): Promise<void> {
-  for (const name of SHOT_NAMES) {
-    await deps.attachToTicket(jiraKey, `${shotDir}/${name}`)
-  }
-}
-
 export async function runMinion(
   input: MinionInput,
   repoUrl: string,
@@ -206,8 +191,6 @@ export async function runMinion(
   // `git add -A`, so a screenshot written into the clone would be committed and
   // shipped in the pull request.
   const attachmentDir = `${workDir}-attachments`
-  // Beside the work tree, never inside it: `git add -A` would commit these.
-  const shotDir = `${workDir}-shots`
 
   // Before the clone, and fatal if it fails: an attempt that cannot read its
   // own ticket has nothing to work from, and running anyway is precisely what
@@ -216,11 +199,7 @@ export async function runMinion(
 
   const hasOpenPr = await deps.hasOpenPrForBranch(input.jira_key)
   await deps.cloneAndBranch(repoUrl, input.jira_key, workDir, !hasOpenPr)
-  const { output: implementOutput, costUsd, transcript } = await deps.implementTask(workDir, input, ticket, shotDir)
-  // Whatever the agent left, before the outcome is decided — a before/after
-  // pair is worth having on the ticket even for an attempt that then fails the
-  // gate, since it shows what the agent was actually looking at.
-  await attachScreenshots(deps, input.jira_key, shotDir)
+  const { output: implementOutput, costUsd, transcript } = await deps.implementTask(workDir, input, ticket)
   // Built once, here, so every exit below reports the same record — including
   // the `success` path, which is the one that had no diagnostic at all before.
   const session = buildSessionRecord({ input, ticket, transcript, agentSummary: implementOutput, costUsd })
