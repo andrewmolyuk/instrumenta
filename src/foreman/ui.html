@@ -81,10 +81,11 @@
 
   .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-8); }
   .stat-card { display: flex; flex-direction: column; gap: var(--space-2); min-height: 104px; position: relative; }
-  .current-metrics { display: flex; gap: var(--space-4); font-size: 14px; color: var(--color-neutral-700); }
-  /* On its own line below the metrics: at 11px against their 14px it could not
-     share a row without the baselines disagreeing. */
-  #stat-current-log { margin-top: var(--space-2); align-self: flex-start; }
+  /* baseline, not the default stretch: the link is 11px against the metrics'
+     14px, and only a shared baseline lines their text up on one row. */
+  .current-metrics { display: flex; align-items: baseline; gap: var(--space-4);
+    font-size: 14px; color: var(--color-neutral-700); }
+  #stat-current-log { margin-left: auto; }
 
   .cockpit-grid { display: grid; grid-template-columns: 360px 1fr; gap: var(--space-8); align-items: start; }
   .col { display: flex; flex-direction: column; gap: 34px; }
@@ -219,10 +220,9 @@
       <div class="note" id="stat-current-summary"></div>
       <div class="current-metrics">
         <span class="tabular" id="stat-current-duration"></span>
-        <span class="tabular" id="stat-current-cost"></span>
+        <a href="#" class="detail-link" id="stat-current-log" hidden>LOG</a>
       </div>
       <div class="note" id="stat-current-note"></div>
-      <a href="#" class="detail-link" id="stat-current-log" hidden>LOG</a>
     </div>
   </div>
 
@@ -452,8 +452,10 @@
   // ADR-002's Minion sandboxing). Every dynamic value below is set via
   // textContent/value, never innerHTML, so nothing here can inject markup.
 
-  const STATUSES = ['all', 'success', 'failed_verify', 'blocked_no_verify', 'crashed', 'timeout', 'given_up']
-  const TAG_CLASS = { success: 'tag-accent', given_up: 'tag-outline' }
+  const STATUSES = ['all', 'success', 'no_change', 'failed_verify', 'blocked_no_verify', 'crashed', 'timeout', 'given_up']
+  // no_change is outlined rather than accented: the attempt finished cleanly,
+  // but it produced no pull request and is waiting on a human to decide.
+  const TAG_CLASS = { success: 'tag-accent', no_change: 'tag-outline', given_up: 'tag-outline' }
   const tagClassFor = (status) => TAG_CLASS[status] ?? 'tag-neutral'
 
   let currentTab = 'cockpit'
@@ -490,6 +492,34 @@
 
   function costLabel(cost) {
     return typeof cost === 'number' ? '$' + cost.toFixed(2) : '—'
+  }
+
+  /* Jira's base URL, from GET /api/config. Null until that lands (and on a
+     Foreman started without config, which 404s the route) — keys then render as
+     plain text rather than as dead links. */
+  let jiraBaseUrl = null
+
+  function keyNode(jiraKey) {
+    if (!jiraBaseUrl) {
+      const span = document.createElement('span')
+      span.textContent = jiraKey
+      return span
+    }
+    const a = document.createElement('a')
+    // The base URL comes from Foreman's own environment; the key comes from
+    // Jira. Encoding the key keeps the href well-formed whatever the project's
+    // key format turns out to be.
+    a.href = jiraBaseUrl.replace(/\/$/, '') + '/browse/' + encodeURIComponent(jiraKey)
+    a.target = '_blank'
+    a.rel = 'noopener noreferrer'
+    a.textContent = jiraKey
+    return a
+  }
+
+  function keyCell(jiraKey) {
+    const cell = document.createElement('td')
+    cell.append(keyNode(jiraKey))
+    return cell
   }
 
   function prCell(prUrl) {
@@ -585,16 +615,19 @@
 
   function renderCurrent(current) {
     const summaryEl = document.getElementById('stat-current-summary')
-    const costEl = document.getElementById('stat-current-cost')
     const noteEl = document.getElementById('stat-current-note')
     const logEl = document.getElementById('stat-current-log')
 
     currentDispatchedAt = current ? current.dispatched_at : null
-    document.getElementById('stat-current').textContent = current ? current.jira_key : '—'
+    const statEl = document.getElementById('stat-current')
+    statEl.replaceChildren(current ? keyNode(current.jira_key) : document.createTextNode('—'))
     // textContent, not innerHTML: a Jira summary is arbitrary text from a
     // ticket nobody here controls, and it lands in the page verbatim.
     summaryEl.textContent = current ? (current.summary || '') : ''
-    costEl.textContent = current ? (typeof current.cost_usd === 'number' ? costLabel(current.cost_usd) : '$—') : ''
+    // No cost here: Claude Code reports total_cost_usd only on its final event
+    // (verified against a live run), so a live figure would have to be computed
+    // from token usage against a hardcoded price table. The real number appears
+    // in the Attempts row the moment the attempt finishes.
     noteEl.textContent = current ? 'dispatched ' + current.dispatched_at : 'Nothing in flight'
 
     // Shown whenever an attempt is in flight, not only once it has reported a
@@ -676,7 +709,7 @@
     tbody.replaceChildren()
     for (const item of queue) {
       const tr = document.createElement('tr')
-      tr.append(td(item.jira_key), td(item.summary))
+      tr.append(keyCell(item.jira_key), td(item.summary))
       tbody.append(tr)
     }
   }
@@ -696,7 +729,7 @@
       const dispatchedTd = td(row.dispatched_at)
       dispatchedTd.classList.add('tabular')
       dispatchedTd.style.color = 'var(--color-neutral-700)'
-      tr.append(td(row.jira_key), attemptTd, tagCell(row.status), prCell(row.pr_url), costTd, durationTd, dispatchedTd)
+      tr.append(keyCell(row.jira_key), attemptTd, tagCell(row.status), prCell(row.pr_url), costTd, durationTd, dispatchedTd)
       tbody.append(tr)
     }
   }
@@ -752,7 +785,7 @@
       durationTd.classList.add('tabular')
       durationTd.style.color = 'var(--color-neutral-700)'
       const detailTd = detailCell(row)
-      tr.append(td(row.jira_key), attemptTd, tagCell(row.status), prCell(row.pr_url), costTd, dispatchedTd, durationTd, detailTd)
+      tr.append(keyCell(row.jira_key), attemptTd, tagCell(row.status), prCell(row.pr_url), costTd, dispatchedTd, durationTd, detailTd)
       tbody.append(tr)
     }
   }
@@ -793,7 +826,18 @@
   async function loadConfig() {
     const res = await fetch('/api/config')
     if (!res.ok) return
-    renderConfig(await res.json())
+    const config = await res.json()
+    jiraBaseUrl = config.jira?.baseUrl ?? null
+    renderConfig(config)
+    // Config resolves after the first status poll, so anything already drawn
+    // was drawn without a base URL. Redraw it, or the keys stay plain until the
+    // next five-second tick.
+    if (lastStatus) {
+      renderStatCards(lastStatus)
+      renderQueue(lastStatus.queue)
+      renderRecent(lastStatus.history)
+      if (allAttempts) renderAttempts(allAttempts)
+    }
   }
 
   async function toggleRun() {

@@ -51,6 +51,23 @@ export function giveUpAttemptCount(db: Database, jiraKey: string): number {
   return row?.n ?? 0
 }
 
+/**
+ * True if any attempt on this ticket concluded that nothing needed changing
+ * (ADR-014).
+ *
+ * Terminal on its own, unlike the give-up count: re-running an agent on a
+ * ticket it just decided needs no change reaches the same conclusion for
+ * another full attempt's cost. One conclusion, then a human decides — which
+ * also means this must make the ticket ineligible, or Pick would keep
+ * re-selecting a ticket that is still in the backlog and has no PR, forever.
+ */
+export function hasNoChangeAttempt(db: Database, jiraKey: string): boolean {
+  const row = db
+    .query<{ n: number }, [string]>("SELECT COUNT(*) as n FROM tasks WHERE jira_key = ? AND status = 'no_change'")
+    .get(jiraKey)
+  return (row?.n ?? 0) > 0
+}
+
 export function isStopped(db: Database): boolean {
   const row = db.query<{ stopped: number }, []>('SELECT stopped FROM foreman_state WHERE id = 1').get()
   return row?.stopped === 1

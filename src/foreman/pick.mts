@@ -1,6 +1,6 @@
 import type { Database } from 'bun:sqlite'
 import { closedPrCountForBranch, hasOpenPrForBranch, type BitbucketConfig } from '../bitbucket/closed-prs.mts'
-import { giveUpAttemptCount } from '../db/queries.mts'
+import { giveUpAttemptCount, hasNoChangeAttempt } from '../db/queries.mts'
 import type { BacklogItem, TaskProvider } from '../task-provider/types.mts'
 
 /** ADR-001: given up the moment either source crosses this, whichever happens first. */
@@ -34,6 +34,10 @@ async function isEligible(
   fetchImpl?: typeof fetch,
 ): Promise<boolean> {
   if (await isGivenUp(db, bitbucket, jiraKey, fetchImpl)) return false
+  // ADR-014: a `no_change` conclusion is terminal after one attempt, and is not
+  // part of the give-up count — without this the ticket stays in the backlog
+  // with no PR and Pick selects it again on the next iteration, indefinitely.
+  if (hasNoChangeAttempt(db, jiraKey)) return false
   if (await hasOpenPrForBranch(bitbucket, jiraKey, fetchImpl)) return false
   return true
 }

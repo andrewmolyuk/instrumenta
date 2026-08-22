@@ -131,6 +131,53 @@ describe('openDb migrations', () => {
     expect(listAttempts(db, 10).find((r) => r.task_id === 't1')?.session).toBe('## Minion session')
   })
 
+  it('widens the status CHECK constraint on a database that predates no_change', () => {
+    // SQLite cannot ALTER a CHECK constraint, so this one rebuilds the table.
+    // The rows must survive it — there were 114 real attempts in the database
+    // when no_change was added.
+    dir = mkdtempSync(join(tmpdir(), 'instrumenta-db-'))
+    const path = join(dir, 'foreman.db')
+    const old = new Database(path, { create: true })
+    old.run(`CREATE TABLE tasks (
+      task_id TEXT PRIMARY KEY,
+      jira_key TEXT NOT NULL,
+      attempt_number INTEGER NOT NULL,
+      status TEXT NOT NULL CHECK (
+        status IN ('success', 'failed_verify', 'blocked_no_verify', 'crashed', 'timeout', 'given_up')
+      ),
+      pr_url TEXT,
+      output TEXT,
+      cost_usd REAL,
+      dispatched_at TEXT NOT NULL,
+      finished_at TEXT
+    )`)
+    old.run(
+      "INSERT INTO tasks (task_id, jira_key, attempt_number, status, cost_usd, dispatched_at) VALUES ('t0','KAZ-1',1,'success',9.69,'2026-08-01T00:00:00Z')",
+    )
+    old.close()
+
+    const db = openDb(path)
+
+    // The pre-existing row survived the rebuild, values intact.
+    expect(listAttempts(db, 10)[0]).toMatchObject({ task_id: 't0', status: 'success', cost_usd: 9.69 })
+    // And the new status is now accepted.
+    recordAttempt(db, {
+      task_id: 't1', jira_key: 'KAZ-2', attempt_number: 1, status: 'no_change', pr_url: null,
+      output: null, cost_usd: null, session: null, dispatched_at: '2026-08-02T00:00:00Z', finished_at: null,
+    })
+    expect(listAttempts(db, 10).find((r) => r.task_id === 't1')?.status).toBe('no_change')
+  })
+
+  it('still rejects a status outside the widened vocabulary', () => {
+    const db = openDb(':memory:')
+    expect(() =>
+      recordAttempt(db, {
+        task_id: 't1', jira_key: 'KAZ-1', attempt_number: 1, status: 'invented' as never, pr_url: null,
+        output: null, cost_usd: null, session: null, dispatched_at: '2026-08-01T00:00:00Z', finished_at: null,
+      }),
+    ).toThrow()
+  })
+
   it('leaves an already-migrated database alone when reopened', () => {
     dir = mkdtempSync(join(tmpdir(), 'instrumenta-db-'))
     const path = join(dir, 'foreman.db')

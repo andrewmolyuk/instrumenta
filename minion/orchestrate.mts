@@ -15,6 +15,10 @@ export interface MinionDeps {
   hasVerifyScript(workDir: string): Promise<boolean>
   runVerify(workDir: string): Promise<VerifyResult>
   runPreCommitChecks(workDir: string): Promise<PreCommitResult>
+  /** True if the work tree has anything to commit — false means the agent changed nothing (ADR-014). */
+  hasChanges(workDir: string): Promise<boolean>
+  /** Best-effort Jira comment; returns false if it could not be posted. */
+  commentOnTicket(jiraKey: string, text: string): Promise<boolean>
   writeNote(workDir: string, notesPath: string, filename: string, content: string): Promise<void>
   commitAndPush(workDir: string, branch: string, message: string): Promise<void>
   createPullRequest(branch: string, input: MinionInput, ticket: JiraTicket, agentReport: string | null): Promise<string>
@@ -155,6 +159,25 @@ async function reportFailedGate(
   return { status: 'given_up', pr_url: null, output, cost_usd: costUsd, session }
 }
 
+/**
+ * What Minion tells a human on Jira when it changed nothing. Deliberately
+ * states that the checks passed *unmodified* and that this is the agent's
+ * conclusion, not a verified fact — a reader deciding whether to close the
+ * ticket needs to know which of those they are being handed.
+ */
+function noChangeComment(input: MinionInput, agentAccount: string): string {
+  const report = extractReport(agentAccount) ?? agentAccount
+  return [
+    `instrumenta made no change for ${input.jira_key} (attempt ${input.attempt_number}).`,
+    "The project's own checks pass against an unmodified working tree, and the agent",
+    'produced no edits. Its account of why follows — this is the agent\'s conclusion, not',
+    'a verified one. No pull request was opened, and this ticket will not be attempted',
+    'again automatically.',
+    '',
+    report.trim().length > 0 ? report : '(the agent gave no account)',
+  ].join('\n')
+}
+
 export async function runMinion(
   input: MinionInput,
   repoUrl: string,
@@ -225,6 +248,21 @@ export async function runMinion(
       session,
       output: combineOutputs(implementOutput, preCommit.output),
     })
+  }
+
+  // The gate passed and there is nothing to commit: the agent concluded the
+  // ticket needs no change (ADR-014). Before this, `git commit` failed with
+  // "nothing to commit" and the attempt was recorded as `crashed` — the best
+  // possible outcome reported as the worst, then retried twice more at full
+  // cost to reach the same conclusion, and finally `given_up`.
+  //
+  // What is *observed* here is narrow: the checks pass and the diff is empty.
+  // Whether that means "already fixed" or "the agent achieved nothing" is the
+  // agent's account, not something this can verify — so the account goes to
+  // Jira for a human, and the status says only what was seen.
+  if (!(await deps.hasChanges(workDir))) {
+    await deps.commentOnTicket(input.jira_key, noChangeComment(input, implementOutput))
+    return { status: 'no_change', pr_url: null, output: implementOutput, cost_usd: costUsd, session }
   }
 
   const commitError = await tryCommitAndPush(

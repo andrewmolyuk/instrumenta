@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
+import { blocks } from '../.claude/hooks/block-api-key-auth.mts'
 import { isGhPrMerge, isGitCommit, isGitMerge, segments, stripQuotes } from '../.claude/hooks/utils/shell.mts'
 
 const HOOKS = join(import.meta.dirname, '..', '.claude', 'hooks')
@@ -189,4 +190,37 @@ describe('all hooks tolerate malformed input', () => {
       expect(res.status).toBe(0)
     },
   )
+})
+
+describe('block-api-key-auth hook', () => {
+  // Assembled rather than written literally, so this file does not itself read
+  // as an attempt to wire the variable up.
+  const KEY = ['ANTHROPIC', 'API', 'KEY'].join('_')
+
+  it('blocks the ways an API key actually gets wired up', () => {
+    expect(blocks({ command: `export ${KEY}=sk-ant-x` })).toBe(true)
+    expect(blocks({ command: `docker run -e ${KEY} minion:latest` })).toBe(true)
+    expect(blocks({ content: `${KEY}=sk-ant-x` })).toBe(true)
+    expect(blocks({ content: `ENV ${KEY}=sk-ant-x` })).toBe(true)
+    expect(blocks({ new_string: `const key = process.env.${KEY}` })).toBe(true)
+    expect(blocks({ new_string: `const key = env['${KEY}']` })).toBe(true)
+  })
+
+  it('allows naming it in prose — a rule has to be writable down', () => {
+    // The first version of this hook blocked the very commit that added it.
+    expect(blocks({ command: `git commit -m "never use ${KEY}, see ADR-006"` })).toBe(false)
+    expect(blocks({ content: `Never introduce ${KEY}; ADR-006 chose subscription auth.` })).toBe(false)
+  })
+
+  it('exempts tests and hooks, where the patterns are the subject matter', () => {
+    expect(blocks({ file_path: 'tests/hooks.test.mts', content: `export ${KEY}=sk-x` })).toBe(false)
+    expect(blocks({ file_path: '/repo/.claude/hooks/block-api-key-auth.mts', content: `${KEY}=sk-x` })).toBe(false)
+    // ...but not ordinary source or config.
+    expect(blocks({ file_path: '.env', content: `${KEY}=sk-x` })).toBe(true)
+    expect(blocks({ file_path: 'minion/main.mts', content: `process.env.${KEY}` })).toBe(true)
+  })
+
+  it('leaves the subscription variable alone', () => {
+    expect(blocks({ command: 'docker run -e CLAUDE_CODE_OAUTH_TOKEN minion:latest' })).toBe(false)
+  })
 })

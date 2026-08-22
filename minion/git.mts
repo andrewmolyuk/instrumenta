@@ -189,6 +189,25 @@ export async function writeNote(workDir: string, notesPath: string, filename: st
   await Bun.write(join(dir, filename), content)
 }
 
+/**
+ * True if the work tree has anything to commit.
+ *
+ * Asked directly rather than inferred from `git commit` failing with "nothing
+ * to commit": that failure is how an already-fixed ticket used to be recorded
+ * as `crashed` (ADR-014), and matching on git's wording to tell a real outcome
+ * from a real error is exactly the kind of thing that breaks on a git upgrade
+ * or a non-English locale.
+ *
+ * `--porcelain` is the stable machine-readable form, and covers staged,
+ * unstaged and untracked alike — so this is correct whether or not stageAll has
+ * run yet.
+ */
+export async function hasChanges(workDir: string): Promise<boolean> {
+  const proc = Bun.spawn(['git', 'status', '--porcelain'], { cwd: workDir, stdout: 'pipe', stderr: 'ignore' })
+  await proc.exited
+  return (await new Response(proc.stdout).text()).trim().length > 0
+}
+
 /** Stages everything currently in the working tree, without committing. */
 export async function stageAll(workDir: string): Promise<void> {
   await run(['git', 'add', '-A'], workDir)

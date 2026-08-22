@@ -88,13 +88,15 @@ missing convention here isn't a hard stop.
 _Decided in_: [ADR-002](docs/adr/002-foreman-minion-execution-boundary.md).
 
 **Status**:
-The outcome Minion reports at exit, one of: `success` (PR opened), `failed_verify` (gate ran
+The outcome Minion reports at exit, one of: `success` (PR opened), `no_change` (the gate
+passed against an unmodified tree — the agent concluded the ticket needs no change; no PR,
+and the ticket is not attempted again), `failed_verify` (gate ran
 and failed), `blocked_no_verify` (no gate found), `crashed` (exited without a structured
 result), `timeout` (Foreman killed it after its time budget with nothing reported — a
 kill that lands on a Minion which *had* already reported is recorded under the status it
 reported, not as a timeout), `given_up` (final allowed attempt still didn't succeed).
 _Decided in_: [architecture.md](docs/architecture.md#minion-container-ephemeral-one-per-dispatched-task),
-[ADR-001](docs/adr/001-task-state-three-sources.md).
+[ADR-001](docs/adr/001-task-state-three-sources.md), [ADR-014](docs/adr/014-no-change-is-an-outcome.md).
 
 ## Human control surface
 

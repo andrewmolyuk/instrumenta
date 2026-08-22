@@ -26,6 +26,8 @@ function fakeDeps(overrides: Partial<MinionDeps> = {}): MinionDeps {
     hasVerifyScript: vi.fn(async () => true),
     runVerify: vi.fn(async () => ({ passed: true, output: '' })),
     runPreCommitChecks: vi.fn(async () => ({ ran: true, passed: true, output: '' })),
+    hasChanges: vi.fn(async () => true),
+    commentOnTicket: vi.fn(async () => true),
     writeNote: vi.fn(async () => {}),
     commitAndPush: vi.fn(async () => {}),
     createPullRequest: vi.fn(async () => 'https://bitbucket.org/o/r/pull-requests/1'),
@@ -338,5 +340,66 @@ describe('runMinion', () => {
     expect(result.status).toBe('crashed')
     expect(result.output).toContain('test 1 failed')
     expect(result.output).toContain('commit-msg hook rejected')
+  })
+})
+
+describe('runMinion when the agent changed nothing', () => {
+  function noChangeDeps(overrides: Partial<MinionDeps> = {}): MinionDeps {
+    return fakeDeps({ hasChanges: vi.fn(async () => false), ...overrides })
+  }
+
+  it('reports no_change instead of crashing on "nothing to commit"', async () => {
+    // ADR-014: the gate passed against an unmodified tree. Before this,
+    // `git commit` failed, the attempt was recorded as `crashed`, and the
+    // ticket was retried twice more at full cost to reach the same conclusion.
+    const deps = noChangeDeps()
+    const result = await runMinion(input(), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
+
+    expect(result.status).toBe('no_change')
+    expect(result.pr_url).toBeNull()
+    expect(deps.commitAndPush).not.toHaveBeenCalled()
+    expect(deps.createPullRequest).not.toHaveBeenCalled()
+  })
+
+  it('tells Jira why, since the pipeline cannot verify the claim itself', async () => {
+    const deps = noChangeDeps({
+      implementTask: vi.fn(async () => ({
+        output: 'narration\n<!-- minion-report -->\n## What changed\n\nAlready fixed in ab12cd.',
+        costUsd: 1.5,
+        transcript: [],
+      })),
+    })
+
+    await runMinion(input(), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
+
+    expect(deps.commentOnTicket).toHaveBeenCalledWith('KAZ-1', expect.stringContaining('made no change'))
+    const [, text] = (deps.commentOnTicket as ReturnType<typeof vi.fn>).mock.calls[0]!
+    expect(text).toContain('Already fixed in ab12cd.')
+    // A reader deciding whether to close the ticket must know this is a claim.
+    expect(text).toContain("agent's conclusion, not")
+    expect(text).not.toContain('narration')
+  })
+
+  it('still reports no_change when the Jira comment cannot be posted', async () => {
+    const deps = noChangeDeps({ commentOnTicket: vi.fn(async () => false) })
+    const result = await runMinion(input(), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
+
+    expect(result.status).toBe('no_change')
+  })
+
+  it('records the session, so the conclusion is auditable afterwards', async () => {
+    const deps = noChangeDeps()
+    const result = await runMinion(input(), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
+
+    expect(result.session).toContain('Minion session')
+  })
+
+  it('does not reach the no-change path when the gate failed', async () => {
+    // An empty tree after a failing gate is a failure, not a conclusion.
+    const deps = noChangeDeps({ runVerify: vi.fn(async () => ({ passed: false, output: 'test 1 failed' })) })
+    const result = await runMinion(input(), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
+
+    expect(result.status).toBe('failed_verify')
+    expect(deps.commentOnTicket).not.toHaveBeenCalled()
   })
 })

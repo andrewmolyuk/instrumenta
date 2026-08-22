@@ -50,6 +50,11 @@ and dated.
   measured 5–7 minute clone into seconds; falls back to a direct clone on any cache
   failure (qualifies ADR-002's "ephemeral, sandboxed" Minion)
 
+- [ADR-014](014-no-change-is-an-outcome.md) — an attempt whose gate passes against an
+  unmodified tree reports `no_change`, not `crashed`; terminal after one attempt (so Pick
+  skips the ticket) and explained to a human in a Jira comment, since the pipeline cannot
+  verify the agent's claim itself (amends ADR-001's status vocabulary)
+
 ## Superseded
 
 None yet.

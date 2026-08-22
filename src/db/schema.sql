@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS tasks (
   jira_key TEXT NOT NULL,
   attempt_number INTEGER NOT NULL,
   status TEXT NOT NULL CHECK (
-    status IN ('success', 'failed_verify', 'blocked_no_verify', 'crashed', 'timeout', 'given_up')
+    status IN ('success', 'no_change', 'failed_verify', 'blocked_no_verify', 'crashed', 'timeout', 'given_up')
   ),
   pr_url TEXT,
   -- Captured diagnostic text, tail-truncated: Claude Code's own stdout+stderr

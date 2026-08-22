@@ -101,3 +101,43 @@ export async function fetchTicket(
     attachments,
   }
 }
+
+/**
+ * Posts a comment on the ticket.
+ *
+ * Used to say why an attempt concluded that nothing needed changing (ADR-014):
+ * the pipeline cannot verify that claim, so it goes to the humans who can,
+ * where they already work, rather than only into a database they would have to
+ * think to check. Jira's comment body is ADF, so the text is wrapped in the
+ * minimal document that renders as paragraphs.
+ *
+ * Best-effort: a comment that fails to post must not turn a finished attempt
+ * into a failed one. The caller gets `false` and carries on.
+ */
+export async function commentOnTicket(
+  config: MinionJiraConfig,
+  jiraKey: string,
+  text: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<boolean> {
+  const body = {
+    type: 'doc',
+    version: 1,
+    content: text
+      .split('\n')
+      .filter((line) => line.trim().length > 0)
+      .map((line) => ({ type: 'paragraph', content: [{ type: 'text', text: line }] })),
+  }
+  try {
+    const res = await fetchImpl(`${config.baseUrl}/rest/api/3/issue/${jiraKey}/comment`, {
+      method: 'POST',
+      headers: { Authorization: authHeader(config), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ body }),
+    })
+    if (!res.ok) console.error(`Jira comment on ${jiraKey} failed: ${res.status} ${res.statusText}`)
+    return res.ok
+  } catch (err) {
+    console.error(`Jira comment on ${jiraKey} failed: ${err instanceof Error ? err.message : String(err)}`)
+    return false
+  }
+}

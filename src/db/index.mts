@@ -5,9 +5,25 @@ import { fileURLToPath } from 'node:url'
 
 const SCHEMA_PATH = join(dirname(fileURLToPath(import.meta.url)), 'schema.sql')
 
+/**
+ * CONTEXT.md's Status glossary, and the schema's CHECK constraint. Listed as a
+ * value as well as a type because openDb compares it against the constraint an
+ * existing database was built with — see widenTaskStatusCheck.
+ */
+export const TASK_STATUSES = [
+  'success',
+  'no_change',
+  'failed_verify',
+  'blocked_no_verify',
+  'crashed',
+  'timeout',
+  'given_up',
+] as const
+
 /** Matches CONTEXT.md's Status glossary entry and the schema's CHECK constraint. */
 export type TaskStatus =
   | 'success'
+  | 'no_change'
   | 'failed_verify'
   | 'blocked_no_verify'
   | 'crashed'
@@ -58,5 +74,37 @@ export function openDb(path: string): Database {
     if (!existing.get(table)?.has(column)) db.run(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`)
   }
 
+  widenTaskStatusCheck(db)
   return db
+}
+
+/**
+ * Rebuilds `tasks` when its CHECK constraint predates a status in the current
+ * vocabulary.
+ *
+ * SQLite cannot alter a CHECK constraint — the only way to change one is to
+ * build a new table, copy the rows across, and swap the names. Unlike the
+ * additive column migration above, this rewrites every row, so it runs only
+ * when the constraint is actually out of date: the stored DDL is compared
+ * against the vocabulary, and an already-current database is left untouched.
+ *
+ * The copy names its columns explicitly rather than `SELECT *`, so it stays
+ * correct if a future column is added between the two definitions.
+ */
+function widenTaskStatusCheck(db: Database): void {
+  const ddl = db.query<{ sql: string }, []>("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'tasks'").get()
+  if (!ddl) return
+  const missing = TASK_STATUSES.filter((status) => !ddl.sql.includes(`'${status}'`))
+  if (missing.length === 0) return
+
+  const columns =
+    'task_id, jira_key, attempt_number, status, pr_url, output, cost_usd, session, dispatched_at, finished_at'
+  db.run('PRAGMA foreign_keys = OFF')
+  db.transaction(() => {
+    db.run(`ALTER TABLE tasks RENAME TO tasks_old`)
+    db.run(readFileSync(SCHEMA_PATH, 'utf-8'))
+    db.run(`INSERT INTO tasks (${columns}) SELECT ${columns} FROM tasks_old`)
+    db.run('DROP TABLE tasks_old')
+  })()
+  db.run('PRAGMA foreign_keys = ON')
 }

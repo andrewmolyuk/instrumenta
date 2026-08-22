@@ -30,6 +30,11 @@ check it before introducing new terminology.
 - **Keep history linear.** No merge commits, on any branch: `git merge` requires
   `--ff-only`. Anything that can leave a merge commit is blocked by
   `.claude/hooks/block-merge-commit.mts`.
+- **Subscription auth only — never a metered API key.** Minion authenticates Claude Code
+  with `CLAUDE_CODE_OAUTH_TOKEN` ([ADR-006](docs/adr/006-minion-auth-is-subscription-not-api-key.md)).
+  Never introduce `ANTHROPIC_API_KEY`, never suggest it as a fallback, and never add a
+  code path that would use per-token API billing — not for a fix, not for a test, not
+  temporarily. Blocked by `.claude/hooks/block-api-key-auth.mts`.
 - **Local git only — never `gh`.** Don't push, open, review, or merge pull requests, and
   don't call the GitHub API. Work on a local branch and stop there; a human takes it from
   the branch. This overrides the default guidance to reach for the `gh` CLI. (The merge

@@ -1,9 +1,9 @@
 import { hasOpenPrForBranch } from '../src/bitbucket/closed-prs.mts'
 import type { MinionInput } from '../src/minion/types.mts'
 import { buildCloneUrl, createPullRequest, type BitbucketPrConfig } from './bitbucket-pr.mts'
-import { cloneAndBranch, commitAndPush, stageAll, writeNote } from './git.mts'
+import { cloneAndBranch, commitAndPush, hasChanges, stageAll, writeNote } from './git.mts'
 import { implementTask } from './implement-task.mts'
-import { fetchTicket, type MinionJiraConfig } from './jira.mts'
+import { commentOnTicket, fetchTicket, type MinionJiraConfig } from './jira.mts'
 import type { MinionDeps } from './orchestrate.mts'
 import { runMinion } from './orchestrate.mts'
 import { hasVerifyScript, runPreCommitHook, runVerify } from './verify-gate.mts'
@@ -63,6 +63,8 @@ async function main(): Promise<void> {
       await stageAll(workDir)
       return await runPreCommitHook(workDir)
     },
+    hasChanges,
+    commentOnTicket: (jiraKey, text) => commentOnTicket(jira, jiraKey, text),
     writeNote,
     commitAndPush,
     createPullRequest: (branch, taskInput, ticket, agentReport) =>

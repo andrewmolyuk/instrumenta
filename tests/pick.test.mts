@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Database } from 'bun:sqlite'
 import { openDb, type TaskRow } from '../src/db/index.mts'
-import { recordAttempt } from '../src/db/queries.mts'
+import { giveUpAttemptCount, recordAttempt } from '../src/db/queries.mts'
 import { isGivenUp, pick } from '../src/foreman/pick.mts'
 import type { BitbucketConfig } from '../src/bitbucket/closed-prs.mts'
 import type { BacklogItem, TaskProvider } from '../src/task-provider/types.mts'
@@ -113,5 +113,35 @@ describe('pick', () => {
     ]
     const result = await pick(db, fakeTaskProvider(backlog), BITBUCKET, fakeBitbucketFetch({}, { 'KAZ-1': 1 }))
     expect(result?.jira_key).toBe('KAZ-2')
+  })
+})
+
+describe('pick and a no_change conclusion', () => {
+  it('skips a ticket an earlier attempt concluded needs no change', async () => {
+    // ADR-014: terminal after one attempt. Not part of the give-up count, so
+    // without this the ticket stays in the backlog with no PR and Pick keeps
+    // selecting it — a full-cost attempt every iteration, forever.
+    recordAttempt(db, attempt({ task_id: 't1', jira_key: 'KAZ-1', status: 'no_change' }))
+
+    const picked = await pick(
+      db,
+      fakeTaskProvider([
+        { jira_key: 'KAZ-1', summary: 'a' },
+        { jira_key: 'KAZ-2', summary: 'b' },
+      ]),
+      BITBUCKET,
+      fakeBitbucketFetch({}),
+    )
+
+    expect(picked?.jira_key).toBe('KAZ-2')
+  })
+
+  it('does not count no_change toward the give-up threshold', async () => {
+    // Terminal in its own right — it must not also make two ordinary failures
+    // look like three and change what `given_up` means.
+    for (let i = 0; i < 3; i++) {
+      recordAttempt(db, attempt({ task_id: 'n' + i, jira_key: 'KAZ-9', status: 'no_change' }))
+    }
+    expect(giveUpAttemptCount(db, 'KAZ-9')).toBe(0)
   })
 })
