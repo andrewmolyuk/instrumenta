@@ -17,3 +17,14 @@ export const MAX_SESSION_CHARS = 200_000
 
 /** Bitbucket's cap on a pull request description. */
 export const MAX_PR_DESCRIPTION_CHARS = 32_768
+
+/**
+ * Cap on one step in the session transcript.
+ *
+ * Was effectively 100 characters, sized for a ten-line hover tooltip that no
+ * longer exists — it cut every `Bash:` line mid-command, which is exactly the
+ * part you read the log for. The transcript now opens in a near-fullscreen
+ * modal, so this only needs to stop a single step from swallowing the whole
+ * record; MAX_SESSION_CHARS bounds the total either way.
+ */
+export const MAX_STEP_CHARS = 600

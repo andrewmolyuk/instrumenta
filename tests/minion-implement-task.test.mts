@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { MAX_STEP_CHARS } from '../minion/constants.mts'
 import { decodeProgress, type MinionProgress } from '../src/minion/progress.mts'
 import type { MinionInput } from '../src/minion/types.mts'
 import type { JiraTicket } from '../minion/jira.mts'
@@ -105,6 +106,22 @@ describe('defaultImplementCommand', () => {
   })
 })
 
+/** Runs implementTask over a canned stream-json transcript, collecting what it reported. */
+async function runOverEvents(events: unknown[]): Promise<{ result: Awaited<ReturnType<typeof implementTask>>; progress: MinionProgress[] }> {
+  const progress: MinionProgress[] = []
+  const spy = vi.spyOn(console, 'error').mockImplementation((...args: unknown[]) => {
+    const decoded = decodeProgress(String(args[0]))
+    if (decoded) progress.push(decoded)
+  })
+  try {
+    const script = events.map((e) => `console.log(${JSON.stringify(JSON.stringify(e))})`).join('; ')
+    const result = await implementTask('/tmp', INPUT, TICKET, ['bun', '-e', script])
+    return { result, progress }
+  } finally {
+    spy.mockRestore()
+  }
+}
+
 describe('implementTask stream-json progress', () => {
   const EVENTS = [
     { type: 'system', subtype: 'init', model: 'claude-opus-5[1m]' },
@@ -113,22 +130,6 @@ describe('implementTask stream-json progress', () => {
     { type: 'user', message: { content: [{ type: 'tool_result', content: 'a very long file dump' }] } },
     { type: 'result', subtype: 'success', result: 'fixed the thing', total_cost_usd: 1.83 },
   ]
-
-  /** Runs implementTask over a canned stream-json transcript, collecting what it reported. */
-  async function runOverEvents(events: unknown[]): Promise<{ result: Awaited<ReturnType<typeof implementTask>>; progress: MinionProgress[] }> {
-    const progress: MinionProgress[] = []
-    const spy = vi.spyOn(console, 'error').mockImplementation((...args: unknown[]) => {
-      const decoded = decodeProgress(String(args[0]))
-      if (decoded) progress.push(decoded)
-    })
-    try {
-      const script = events.map((e) => `console.log(${JSON.stringify(JSON.stringify(e))})`).join('; ')
-      const result = await implementTask('/tmp', INPUT, TICKET, ['bun', '-e', script])
-      return { result, progress }
-    } finally {
-      spy.mockRestore()
-    }
-  }
 
   it("takes the output text and cost from the stream's final result event", async () => {
     const { result } = await runOverEvents(EVENTS)
@@ -218,5 +219,53 @@ describe('extractReport', () => {
     const output = [REPORT_MARKER, 'the template', REPORT_MARKER, '## What changed', '', 'The real one.'].join('\n')
     expect(extractReport(output)).toContain('The real one.')
     expect(extractReport(output)).not.toContain('the template')
+  })
+})
+
+describe('a step in the transcript', () => {
+  it('keeps a long shell command readable instead of cutting it at 100 characters', async () => {
+    // Reported live: every `Bash:` line in the log popup ended in an ellipsis
+    // mid-command, which is the part you open the log to read.
+    const command =
+      'grep -n "float\\|display" src/components/modal/modal-styles.scss | head -40; echo "=== total lines"; wc -l src/components/modal/modal-styles.scss'
+    const { progress } = await runOverEvents([
+      { type: 'assistant', message: { content: [{ type: 'tool_use', name: 'Bash', input: { command } }] } },
+    ])
+
+    expect(progress[0]?.line).toBe('Bash: ' + command)
+    expect(progress[0]?.line).not.toContain('…')
+  })
+
+  it('collapses a heredoc onto one line, since a step is one line', async () => {
+    // appendCurrentProgress splits on newlines to keep its tail — a real line
+    // break inside a step silently costs a step.
+    const { progress } = await runOverEvents([
+      {
+        type: 'assistant',
+        message: {
+          content: [{ type: 'tool_use', name: 'Bash', input: { command: "cat > f.scss <<'EOF'\n.a { b: c; }\nEOF" } }],
+        },
+      },
+    ])
+
+    expect(progress[0]?.line).not.toContain('\n')
+    expect(progress[0]?.line).toBe("Bash: cat > f.scss <<'EOF' .a { b: c; } EOF")
+  })
+
+  it('still caps a single runaway step so it cannot swallow the record', async () => {
+    const { progress } = await runOverEvents([
+      { type: 'assistant', message: { content: [{ type: 'text', text: 'x'.repeat(5_000) }] } },
+    ])
+
+    expect(progress[0]?.line?.length).toBeLessThanOrEqual(MAX_STEP_CHARS)
+    expect(progress[0]?.line).toContain('…')
+  })
+
+  it('reports what the agent said, not just its first line', async () => {
+    const { progress } = await runOverEvents([
+      { type: 'assistant', message: { content: [{ type: 'text', text: 'I traced the bug.\nThe hr is 2px.' }] } },
+    ])
+
+    expect(progress[0]?.line).toBe('I traced the bug. The hr is 2px.')
   })
 })

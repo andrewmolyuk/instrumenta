@@ -16,7 +16,7 @@ export function extractReport(output: string): string | null {
   const report = output.slice(at + REPORT_MARKER.length).trim()
   return report.length > 0 ? report : null
 }
-import { MAX_IMPLEMENT_OUTPUT_CHARS } from './constants.mts'
+import { MAX_IMPLEMENT_OUTPUT_CHARS, MAX_STEP_CHARS } from './constants.mts'
 
 /** The model and effort an attempt runs under — resolved once, so the argv and the session report can't disagree. */
 export function claudeModel(): string {
@@ -284,18 +284,30 @@ function summarizeEvent(event: ClaudeEvent): string | null {
   const parts: string[] = []
   for (const block of content) {
     if (block?.type === 'text' && typeof block.text === 'string') {
-      const firstLine = block.text.trim().split('\n')[0]
-      if (firstLine) parts.push(truncate(firstLine, 120))
+      const said = step(block.text)
+      if (said) parts.push(said)
     }
     if (block?.type === 'tool_use' && typeof block.name === 'string') {
       const input = block.input ?? {}
       const detail = [input.file_path, input.command, input.pattern, input.description].find(
         (v: unknown) => typeof v === 'string' && v.length > 0,
       )
-      parts.push(detail ? `${block.name}: ${truncate(String(detail), 100)}` : block.name)
+      parts.push(detail ? `${block.name}: ${step(String(detail))}` : block.name)
     }
   }
   return parts.length > 0 ? parts.join(' · ') : null
+}
+
+/**
+ * One step, on one line.
+ *
+ * Newlines are collapsed rather than kept: a heredoc in a `Bash` command, or a
+ * multi-paragraph reply, would otherwise put real line breaks inside what the
+ * rest of the system treats as a single step — and appendCurrentProgress counts
+ * lines to keep its tail, so an embedded newline silently costs a step.
+ */
+function step(text: string): string {
+  return truncate(text.replace(/\s+/g, ' ').trim(), MAX_STEP_CHARS)
 }
 
 function truncate(text: string, max: number): string {
