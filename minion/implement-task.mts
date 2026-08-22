@@ -1,6 +1,7 @@
 import { encodeProgress, type MinionProgress } from '../src/minion/progress.mts'
 import type { MinionInput } from '../src/minion/types.mts'
 import type { JiraTicket } from './jira.mts'
+import { verifyCommand } from './verify-gate.mts'
 
 /**
  * Delimits the agent's closing report inside its final message. Extracted
@@ -147,12 +148,18 @@ your report. It is not part of this ticket, and a human will decide whether it
 is worth its own one. A diff a reviewer can read in a minute is worth more here
 than a thorough one they will not read at all.
 
-Before you finish, run this project's own checks over your changes — its
-\`verify\`/lint/test/type-check scripts, and whatever its pre-commit hook runs —
-and fix everything they report, including problems in files you added. Every one
-of those checks is run again before your work is committed, and any failure means
-no commit and no pull request, so the whole attempt is wasted. Report a check as
-passing only if you actually ran it and saw it pass.
+Before you finish, run this project's own checks over your changes and fix
+everything they report, including problems in files you added.
+
+The gate that decides whether your work is committed runs exactly this, from the
+repository root:
+
+    ${verifyCommand()}
+
+plus whatever the project's pre-commit hook runs. Run that same command yourself
+and see it pass. Any failure there means no commit and no pull request, so the
+whole attempt is wasted. Report a check as passing only if you actually ran it
+and watched it pass — not because it ought to.
 
 End your reply with a report in exactly this form, and write nothing after it.
 It becomes the description of the pull request a human reviews, so write it for

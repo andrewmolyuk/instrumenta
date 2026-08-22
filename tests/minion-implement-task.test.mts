@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { MAX_STEP_CHARS } from '../minion/constants.mts'
+import { verifyCommand } from '../minion/verify-gate.mts'
 import { decodeProgress, type MinionProgress } from '../src/minion/progress.mts'
 import type { MinionInput } from '../src/minion/types.mts'
 import type { JiraTicket } from '../minion/jira.mts'
@@ -100,8 +101,20 @@ describe('defaultImplementCommand', () => {
   it('tells Claude Code to run the project\'s own checks and fix what they report', () => {
     const prompt = promptOf(defaultImplementCommand(INPUT, TICKET, SHOTS))
     expect(prompt).toMatch(/pre-commit hook/i)
-    expect(prompt).toMatch(/fix everything they report/i)
-    expect(prompt).toMatch(/run again before your work is committed/i)
+    expect(prompt).toMatch(/fix\s+everything they report/i)
+    // The exact gate command, so the agent runs what the gate will run rather
+    // than guessing at "the project's checks" (ADR-009's whole point).
+    expect(prompt).toContain(verifyCommand())
+    expect(prompt).toMatch(/no commit and no pull request/i)
+  })
+
+  it("names the deployment's overridden gate command, when there is one", () => {
+    process.env.MINION_VERIFY_COMMAND = 'npm run lint && npm run test'
+    try {
+      expect(promptOf(defaultImplementCommand(INPUT, TICKET, SHOTS))).toContain('npm run lint && npm run test')
+    } finally {
+      delete process.env.MINION_VERIFY_COMMAND
+    }
   })
 
   it('tells Claude Code to leave the changes uncommitted', () => {

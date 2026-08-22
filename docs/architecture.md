@@ -145,6 +145,14 @@ Inside:
    writes a give-up note at that same path before reporting `given_up` — the same
    PR-review path a human contributor's work would go through.
 
+`verify` is what the target project offers as its gate, but a project may not
+have one that works: CGS/webui's `verify` script is the literal string `true`,
+so the gate passed unconditionally, and its real checks are behind `make`
+targets that need `sudo` and a container. `MINION_VERIFY_COMMAND` lets a
+deployment name the command instead — run through `sh -c`, so several checks can
+be chained. The same command is quoted into the agent's prompt, so what it runs
+and what the gate runs cannot drift apart (ADR-009).
+
 Where that note goes is configurable, unlike `verify` — there's a safe default
 (`docs/todo/`), so a missing convention isn't a hard stop the way a missing gate is. A
 target project can redirect it (e.g. `instrumenta/review/`) via a small config value in

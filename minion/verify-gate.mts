@@ -2,8 +2,34 @@ import { access, constants } from 'node:fs/promises'
 import { isAbsolute, join } from 'node:path'
 import { MAX_VERIFY_OUTPUT_CHARS } from './constants.mts'
 
-/** The verify-gate convention: a `"verify"` script in package.json's `scripts`. */
+/**
+ * What the gate runs, as a shell command.
+ *
+ * `npm run verify` by default — the convention architecture.md gives the target
+ * project. `MINION_VERIFY_COMMAND` overrides it per deployment, in the same
+ * spirit as `NOTES_PATH`, because the convention assumes the target *can* offer
+ * a working `verify`, and a target may not.
+ *
+ * Found live on CGS/webui, whose `verify` script is the literal string `true`.
+ * hasVerifyScript saw a script and runVerify ran it, so the gate passed
+ * unconditionally on every attempt — ADR-009's protection against committing
+ * work that does not build, doing nothing at all. Its real checks are
+ * `npm run lint` and `npm run test`; its canonical entry points, `make lint` and
+ * `make test`, wrap those in `sudo webuic/webuic.sh`, needing a container and
+ * root that a Minion has neither of. The commands underneath are reachable, so
+ * a deployment can name them.
+ *
+ * Run through `sh -c`, so an override can be several checks: `npm run lint &&
+ * npm run test`.
+ */
+export function verifyCommand(): string {
+  return process.env.MINION_VERIFY_COMMAND?.trim() || 'npm run verify'
+}
+
+/** True if this attempt has a gate to run at all: an override, or the `"verify"` script convention. */
 export async function hasVerifyScript(workDir: string): Promise<boolean> {
+  if (process.env.MINION_VERIFY_COMMAND?.trim()) return true
+
   const file = Bun.file(join(workDir, 'package.json'))
   if (!(await file.exists())) return false
 
@@ -31,9 +57,9 @@ async function capture(command: string[], workDir: string): Promise<VerifyResult
   return { passed, output: truncateTail(`${stdout}${stderr}`.trim()) }
 }
 
-/** Runs `npm run verify` in `workDir`, capturing its output for a human (or a retry) to see why it failed. */
+/** Runs the gate in `workDir`, capturing its output for a human to see why it failed. */
 export async function runVerify(workDir: string): Promise<VerifyResult> {
-  return await capture(['npm', 'run', 'verify'], workDir)
+  return await capture(['sh', '-c', verifyCommand()], workDir)
 }
 
 export interface PreCommitResult extends VerifyResult {

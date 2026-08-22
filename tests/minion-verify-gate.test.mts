@@ -3,7 +3,7 @@ import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:f
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { hasVerifyScript, runPreCommitHook, runVerify } from '../minion/verify-gate.mts'
+import { hasVerifyScript, runPreCommitHook, runVerify, verifyCommand } from '../minion/verify-gate.mts'
 
 let dir: string
 
@@ -131,5 +131,51 @@ describe('runPreCommitHook', () => {
     expect(result.passed).toBe(false)
     expect(result.output.length).toBeLessThan(20000)
     expect(result.output).toContain('truncated')
+  })
+})
+
+describe('MINION_VERIFY_COMMAND', () => {
+  afterEach(() => {
+    delete process.env.MINION_VERIFY_COMMAND
+  })
+
+  it('defaults to the npm run verify convention', () => {
+    expect(verifyCommand()).toBe('npm run verify')
+  })
+
+  it('runs the override instead, through a shell so several checks can be chained', async () => {
+    // CGS/webui's `verify` script is the literal string `true`, so the gate
+    // passed unconditionally. Its real checks are reachable, just not via
+    // `verify` or via `make` (which needs sudo and a container).
+    const tmp = mkdtempSync(join(tmpdir(), 'verify-override-'))
+    process.env.MINION_VERIFY_COMMAND = 'echo first && echo second'
+
+    const result = await runVerify(tmp)
+
+    expect(result.passed).toBe(true)
+    expect(result.output).toContain('first')
+    expect(result.output).toContain('second')
+    rmSync(tmp, { recursive: true, force: true })
+  })
+
+  it('fails the gate when any chained check fails', async () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'verify-override-'))
+    process.env.MINION_VERIFY_COMMAND = 'echo ran && exit 3'
+
+    const result = await runVerify(tmp)
+
+    expect(result.passed).toBe(false)
+    expect(result.output).toContain('ran')
+    rmSync(tmp, { recursive: true, force: true })
+  })
+
+  it('counts as having a gate even where the project defines no verify script', async () => {
+    // Without this the override would be set and then skipped as "no gate".
+    const tmp = mkdtempSync(join(tmpdir(), 'verify-override-'))
+    expect(await hasVerifyScript(tmp)).toBe(false)
+
+    process.env.MINION_VERIFY_COMMAND = 'npm run lint'
+    expect(await hasVerifyScript(tmp)).toBe(true)
+    rmSync(tmp, { recursive: true, force: true })
   })
 })
