@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
-import { closedPrCountForBranch, hasOpenPrForBranch } from '../src/bitbucket/closed-prs.mts'
+import {
+  branchesWithBlockingPr,
+  closedPrCountForBranch,
+  hasBlockingPrForBranch,
+  hasOpenPrForBranch,
+} from '../src/bitbucket/closed-prs.mts'
 
 const CONFIG = { workspace: 'andrewmolyuk', repoSlug: 'target-project', token: 'bb-token' }
 
@@ -78,5 +83,58 @@ describe('hasOpenPrForBranch', () => {
     await expect(
       hasOpenPrForBranch(CONFIG, 'KAZ-1', fetchImpl as unknown as typeof fetch),
     ).rejects.toThrow('Bitbucket search failed: 403')
+  })
+})
+
+describe('request shape Bitbucket actually accepts', () => {
+  /** Captures the URL each helper requests, so the query can be asserted. */
+  function capturing() {
+    const urls: string[] = []
+    const fetchImpl = (async (url: string) => {
+      urls.push(String(url))
+      return { ok: true, status: 200, statusText: 'OK', json: async () => ({ size: 0, values: [] }) }
+    }) as unknown as typeof fetch
+    return { urls, fetchImpl }
+  }
+
+  it('never asks for more than 50 per page', async () => {
+    // Bitbucket does not clamp an oversized pagelen, it answers
+    // `400 Invalid pagelen` — which took /api/queue-ticket down live.
+    const { urls, fetchImpl } = capturing()
+    await hasBlockingPrForBranch(CONFIG, 'KAZ-1', fetchImpl)
+    await branchesWithBlockingPr(CONFIG, fetchImpl)
+
+    expect(urls).toHaveLength(2)
+    for (const url of urls) {
+      expect(Number(new URL(url).searchParams.get('pagelen'))).toBeLessThanOrEqual(50)
+    }
+  })
+
+  it('asks for open and merged, and never for declined', async () => {
+    // Declined is the give-up signal, not a reason to refuse a run.
+    const { urls, fetchImpl } = capturing()
+    await hasBlockingPrForBranch(CONFIG, 'KAZ-1', fetchImpl)
+
+    const q = new URL(urls[0]!).searchParams.get('q') ?? ''
+    expect(q).toContain('state="OPEN"')
+    expect(q).toContain('state="MERGED"')
+    expect(q).not.toContain('DECLINED')
+    expect(q).toContain('source.branch.name="KAZ-1"')
+  })
+
+  it('follows the next cursor when the sweep is paginated', async () => {
+    const pages = [
+      { values: [{ source: { branch: { name: 'KAZ-1' } } }], next: 'https://api.bitbucket.org/next-page' },
+      { values: [{ source: { branch: { name: 'KAZ-2' } } }] },
+    ]
+    let i = 0
+    const fetchImpl = (async () => ({
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      json: async () => pages[i++],
+    })) as unknown as typeof fetch
+
+    expect(await branchesWithBlockingPr(CONFIG, fetchImpl)).toEqual(new Set(['KAZ-1', 'KAZ-2']))
   })
 })

@@ -20,8 +20,15 @@ interface SearchPullRequestsResponse {
  */
 const BLOCKING_STATES = 'state="OPEN" OR state="MERGED"'
 
+/**
+ * Bitbucket's maximum for this endpoint. Asking for 100 is not clamped — it is
+ * rejected outright with `400 Invalid pagelen`, which took down /api/queue-ticket
+ * live.
+ */
+const MAX_PAGELEN = '50'
+
 async function search(config: BitbucketConfig, query: string, fetchImpl: typeof fetch, fields?: string): Promise<unknown> {
-  const params = new URLSearchParams({ q: query, pagelen: '100' })
+  const params = new URLSearchParams({ q: query, pagelen: MAX_PAGELEN })
   if (fields) params.set('fields', fields)
   const url = `https://api.bitbucket.org/2.0/repositories/${config.workspace}/${config.repoSlug}/pullrequests?${params}`
   const res = await fetchImpl(url, { headers: { Authorization: `Bearer ${config.token}` } })
@@ -59,14 +66,14 @@ export async function branchesWithBlockingPr(
 ): Promise<Set<string>> {
   const params = new URLSearchParams({
     q: `(${BLOCKING_STATES})`,
-    pagelen: '100',
+    pagelen: MAX_PAGELEN,
     fields: 'values.source.branch.name,next',
   })
   let url: string | undefined = `https://api.bitbucket.org/2.0/repositories/${config.workspace}/${config.repoSlug}/pullrequests?${params}`
 
   const branches = new Set<string>()
-  // Bounded so a pathological repo cannot spin here; 50 pages of 100 is 5000
-  // PRs, far past anything this is aimed at.
+  // Bounded so a pathological repo cannot spin here; 50 pages of 50 is 2500
+  // PRs, comfortably past the few hundred this is aimed at.
   for (let page = 0; url && page < 50; page++) {
     const res = await fetchImpl(url, { headers: { Authorization: `Bearer ${config.token}` } })
     if (!res.ok) throw new Error(`Bitbucket search failed: ${res.status} ${res.statusText}`)
