@@ -56,6 +56,12 @@ COPY src/bitbucket/closed-prs.mts ./src/bitbucket/closed-prs.mts
 RUN useradd --create-home --shell /bin/bash minion \
   && mkdir -p /cache \
   && chown -R minion:minion /app /usr/local/lib/node_modules /usr/local/bin /cache
+# Loaded by Claude Code as user-level memory on every run, merged with whatever
+# CLAUDE.md the target repository has (the target's is more specific and wins).
+# Carried in the image rather than mounted: it is versioned with the prompt it
+# complements, so the two cannot drift apart across a deployment.
+COPY --chown=minion:minion minion/agent-home/CLAUDE.md /home/minion/.claude/CLAUDE.md
+
 USER minion
 ENV HOME=/home/minion
 
