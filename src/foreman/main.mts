@@ -1,11 +1,39 @@
+import type { Database } from 'bun:sqlite'
 import { openDb } from '../db/index.mts'
-import { isStopped, setBudget, setBudgetTotal, setQueueTicket, setStopped } from '../db/queries.mts'
+import { isStopped, setBudget, setBudgetTotal, setCurrentTask, setQueueTicket, setStopped } from '../db/queries.mts'
 import { ProcessMinionRunner } from '../minion/process-runner.mts'
 import { JiraTaskProvider } from '../task-provider/jira.mts'
 import { startApiServer } from './api.mts'
 import { parseConfig } from './config.mts'
 import { JiraStatusMirror } from './jira-status-mirror.mts'
 import { type LoopDeps, runLoop } from './loop.mts'
+
+/**
+ * Clears the state that describes a *running* Foreman, which a freshly started
+ * one has no claim to.
+ *
+ * `stopped` is forced on regardless of what the database already held:
+ * dispatching against the real Jira/Bitbucket backlog the moment the container
+ * comes up, with no chance to look at the queue first, is exactly the failure
+ * mode hit while testing this locally.
+ *
+ * The current task is cleared for a related but distinct reason. The loop clears
+ * it in a `finally`, which does not run when the process is killed mid-dispatch
+ * — and the database is on a persistent volume, so the row outlives the process
+ * that wrote it. Found live: after a restart the Cockpit showed a Minion still
+ * working on RPG-4972, its duration ticking upward, half an hour after the
+ * container that was running it had gone.
+ *
+ * Note what this does *not* do: a Minion container started by the previous
+ * Foreman may genuinely still be running, and it will finish, push, and open a
+ * PR that nothing records. That attempt is lost from SQLite, but not from the
+ * world — the open PR makes the ticket ineligible at the next Pick, which is
+ * exactly the case ADR-001 keeps a second source for.
+ */
+export function resetTransientState(db: Database): void {
+  setStopped(db, true)
+  setCurrentTask(db, null)
+}
 
 /**
  * Foreman's composition root — wires the pieces built so far into a
@@ -20,17 +48,15 @@ import { type LoopDeps, runLoop } from './loop.mts'
  * recheck while stopped, forever. A human clearing `stopped` via the API
  * (`/api/start`) is what makes this loop call runLoop() again.
  *
- * Every boot forces `stopped = true` before anything else runs, regardless
- * of whatever the (currently ephemeral, per-container) DB already had —
- * dispatching against the real Jira/Bitbucket backlog the moment the
- * container comes up, with no chance to look at the queue first, is exactly
- * the failure mode hit testing this locally. A human has to hit `/api/start`
- * (or the UI's Start button) to actually start it.
+ * Every boot clears the state that describes a *running* Foreman — see
+ * resetTransientState below. A human has to hit `/api/start` (or the UI's Start
+ * button) to actually start it.
  */
+
 export async function main(env: NodeJS.ProcessEnv = process.env): Promise<void> {
   const config = parseConfig(env)
   const db = openDb(config.dbPath)
-  setStopped(db, true)
+  resetTransientState(db)
   if (config.budget !== undefined) {
     setBudget(db, config.budget)
     setBudgetTotal(db, config.budget)
