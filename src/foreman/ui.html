@@ -587,25 +587,30 @@
     // textContent, not innerHTML: a Jira summary is arbitrary text from a
     // ticket nobody here controls, and it lands in the page verbatim.
     summaryEl.textContent = current ? (current.summary || '') : ''
-    costEl.textContent = current && typeof current.cost_usd === 'number' ? costLabel(current.cost_usd) : ''
+    costEl.textContent = current ? (typeof current.cost_usd === 'number' ? costLabel(current.cost_usd) : '$—') : ''
     noteEl.textContent = current ? 'dispatched ' + current.dispatched_at : 'Nothing in flight'
 
-    // No link at all until the Minion has reported something, rather than one
-    // that opens an empty box.
+    // Shown whenever an attempt is in flight, not only once it has reported a
+    // line. There is a real gap at the start of every attempt — clone, ticket
+    // read, agent startup — before the first progress arrives, and a link that
+    // appears partway through reads as a broken card rather than a quiet one.
     const log = current && current.output ? current.output : ''
-    logEl.hidden = log.length === 0
+    logEl.hidden = !current
 
     // The live half of the modal: a snapshot of a finished attempt never
     // changes, but this one is being written to while it is open, so every
     // poll pushes the new tail in. Without this the modal would freeze at
     // whatever the agent had done at the moment it was opened.
     if (liveDetail) {
-      if (log.length === 0 && !current) closeDetail()
-      else updateDetailBody(log, liveTitle(current))
+      if (!current) closeDetail()
+      else updateDetailBody(log || WAITING_FOR_PROGRESS, liveTitle(current))
     }
 
     tickCurrentDuration()
   }
+
+  const WAITING_FOR_PROGRESS =
+    'Nothing reported yet.\n\nThe attempt is under way — cloning the target repo, reading the ticket,\nstarting the agent. Steps appear here as the agent takes them.'
 
   function liveTitle(current) {
     return current ? 'Live — ' + current.jira_key + (current.summary ? ' · ' + current.summary : '') : 'Live'
@@ -614,7 +619,7 @@
   document.getElementById('stat-current-log').addEventListener('click', (e) => {
     e.preventDefault()
     const current = lastStatus?.current
-    openDetail(liveTitle(current), current?.output ?? '', true)
+    openDetail(liveTitle(current), current?.output || WAITING_FOR_PROGRESS, true)
   })
 
   function tickCurrentDuration() {
