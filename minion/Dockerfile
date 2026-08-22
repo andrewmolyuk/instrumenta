@@ -38,6 +38,19 @@ COPY --from=bun /usr/local/bin/bun /usr/local/bin/bun
 # in one command. `python3` is the third tool that attempt reached for and did
 # not find; it is thirteen packages and the agent keeps expecting it.
 #
+# `python3-pil` and `file` come from the same evidence. Two attempts opened with
+# `from PIL import Image` to read pixels out of a screenshot, fell over, and one
+# then tried `pip install pillow` — there is no pip either. It got there in the
+# end via `ffmpeg -f rawvideo -pix_fmt rgb24` and hand-indexed bytes, which
+# works and reads like it. Six packages for the library beats shipping pip and
+# inviting minutes of installing at runtime. `file` is three packages and was
+# reached for once.
+#
+# Note what needs nothing: a `file://` page cannot read its own stylesheet rules
+# (SecurityError on cssRules), and the way out is a local HTTP server —
+# `python3 -m http.server` is already in the standard library, and an attempt
+# used it successfully once python3 was there.
+#
 # `chromium` (with fonts) is here because most of this pipeline's tickets are UI
 # bugs reported as a screenshot, and without a browser the agent cannot see what
 # it is fixing. Found live on RPG-5427: it tried PIL, ImageMagick, ffmpeg, sharp
@@ -47,7 +60,7 @@ COPY --from=bun /usr/local/bin/bun /usr/local/bin/bun
 # fix. `fonts-liberation` is not optional either: headless Chromium with no
 # fonts renders text as empty boxes, which is worthless for a text-alignment bug.
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends ca-certificates chromium ffmpeg fonts-liberation git python3 \
+  && apt-get install -y --no-install-recommends ca-certificates chromium ffmpeg file fonts-liberation git python3 python3-pil \
   && rm -rf /var/lib/apt/lists/* \
   && npm install -g @anthropic-ai/claude-code sass clean-css stylelint stylelint-config-standard-scss
 
@@ -86,13 +99,20 @@ COPY src/bitbucket/closed-prs.mts ./src/bitbucket/closed-prs.mts
 # project installs its own, use those — and what actually gates a commit is
 # MINION_VERIFY_COMMAND plus the pre-commit hook, nothing found lying around.
 #
+# /npm-cache is npm's own cache, on a volume shared by every Minion for the same
+# reason the git mirror is (ADR-013): a fresh clone has no node_modules, so a
+# target project's `npm install` is run from scratch on every attempt. Measured
+# on a live attempt: still running after three minutes, inside a run that only
+# lasts twenty. npm's cache is content-addressed, so a warm one turns most of
+# that back into local extraction instead of a download.
+#
 # /cache is where the git mirror volume mounts (ADR-013). Created here, owned by
 # minion, because Docker copies an image directory's ownership onto a fresh named
 # volume mounted over it — without this the volume arrives root-owned and the
 # non-root user below cannot write the mirror.
 RUN useradd --create-home --shell /bin/bash minion \
-  && mkdir -p /cache \
-  && chown -R minion:minion /app /usr/local/lib/node_modules /usr/local/bin /cache
+  && mkdir -p /cache /npm-cache \
+  && chown -R minion:minion /app /usr/local/lib/node_modules /usr/local/bin /cache /npm-cache
 # Loaded by Claude Code as user-level memory on every run, merged with whatever
 # CLAUDE.md the target repository has (the target's is more specific and wins).
 # Carried in the image rather than mounted: it is versioned with the prompt it
@@ -106,6 +126,7 @@ ENV HOME=/home/minion
 ENV CHROME_BIN=/usr/bin/chromium \
     PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium \
     PUPPETEER_SKIP_DOWNLOAD=1 \
-    NODE_PATH=/usr/local/lib/node_modules
+    NODE_PATH=/usr/local/lib/node_modules \
+    npm_config_cache=/npm-cache
 
 ENTRYPOINT ["bun", "minion/main.mts"]

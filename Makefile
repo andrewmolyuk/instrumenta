@@ -3,6 +3,7 @@ FOREMAN_IMAGE := foreman:latest
 ENV_FILE := .env
 DB_VOLUME := instrumenta-foreman-db
 CACHE_VOLUME := instrumenta-minion-git-cache
+NPM_CACHE_VOLUME := instrumenta-minion-npm-cache
 
 .PHONY: build build-minion build-foreman dev check clean clean-db
 
@@ -29,6 +30,7 @@ dev: build
 	}
 	docker volume create $(DB_VOLUME) >/dev/null
 	docker volume create $(CACHE_VOLUME) >/dev/null
+	docker volume create $(NPM_CACHE_VOLUME) >/dev/null
 	docker run --rm -i \
 		-p 3000:3000 \
 		-v /var/run/docker.sock:/var/run/docker.sock \
@@ -53,4 +55,4 @@ clean-db:
 # re-clones it — but the first attempt after this pays the full clone again.
 .PHONY: clean-cache
 clean-cache:
-	docker volume rm -f $(CACHE_VOLUME) 2>/dev/null || true
+	docker volume rm -f $(CACHE_VOLUME) $(NPM_CACHE_VOLUME) 2>/dev/null || true
