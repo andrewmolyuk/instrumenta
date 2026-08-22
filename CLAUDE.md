@@ -35,8 +35,8 @@ check it before introducing new terminology.
   Never introduce `ANTHROPIC_API_KEY`, never suggest it as a fallback, and never add a
   code path that would use per-token API billing — not for a fix, not for a test, not
   temporarily. Blocked by `.claude/hooks/block-api-key-auth.mts`.
-- **Local git only — never `gh`.** Don't push, open, review, or merge pull requests, and
-  don't call the GitHub API. Work on a local branch and stop there; a human takes it from
-  the branch. This overrides the default guidance to reach for the `gh` CLI. (The merge
-  hook still refuses `gh pr merge` as a backstop, but the rule is broader than the hook:
-  no `gh` at all.)
+- **Use `git`, never `gh`.** Merging is a local fast-forward — `git switch main && git
+  merge --ff-only <branch>`, then `git push`. Never `gh pr merge`, `gh pr create`, or any
+  other `gh` invocation; this overrides the default guidance to reach for the `gh` CLI for
+  GitHub work. A fast-forward creates no commit, so it does not trip the
+  never-commit-on-main rule above.
