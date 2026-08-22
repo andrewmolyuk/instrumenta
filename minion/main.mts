@@ -3,7 +3,7 @@ import type { MinionInput } from '../src/minion/types.mts'
 import { buildCloneUrl, createPullRequest, type BitbucketPrConfig } from './bitbucket-pr.mts'
 import { cloneAndBranch, commitAndPush, hasChanges, stageAll, writeNote } from './git.mts'
 import { implementTask } from './implement-task.mts'
-import { commentOnTicket, fetchTicket, type MinionJiraConfig } from './jira.mts'
+import { attachToTicket, commentOnTicket, fetchTicket, type MinionJiraConfig } from './jira.mts'
 import type { MinionDeps } from './orchestrate.mts'
 import { runMinion } from './orchestrate.mts'
 import { hasVerifyScript, runPreCommitHook, runVerify } from './verify-gate.mts'
@@ -65,6 +65,7 @@ async function main(): Promise<void> {
     },
     hasChanges,
     commentOnTicket: (jiraKey, text) => commentOnTicket(jira, jiraKey, text),
+    attachToTicket: (jiraKey, filePath) => attachToTicket(jira, jiraKey, filePath),
     writeNote,
     commitAndPush,
     createPullRequest: (branch, taskInput, ticket, agentReport) =>

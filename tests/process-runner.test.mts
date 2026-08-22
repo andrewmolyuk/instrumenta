@@ -103,10 +103,11 @@ describe('ProcessMinionRunner', () => {
       '-e',
       "console.log('cloned repo'); console.error('still implementing...'); await Bun.sleep(10000)",
     ])
-    // A longer budget than the other timeout test — this one needs the child
-    // process to actually boot and print before it's killed, which a very
-    // tight budget can miss under load (flaky, not wrong).
-    const result = await runner.run(INPUT, 500)
+    // Generous on purpose: this one needs the child to boot Bun and flush two
+    // writes before the kill lands. At 500ms it passed alone and failed under
+    // full-suite load, which tested the machine rather than the runner. The
+    // child sleeps 10s, so the timeout still fires well before it exits.
+    const result = await runner.run(INPUT, 2500)
     expect(result.status).toBe('timeout')
     expect(result.output).toContain('cloned repo')
     expect(result.output).toContain('still implementing...')
