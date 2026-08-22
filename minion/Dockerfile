@@ -27,6 +27,17 @@ COPY --from=bun /usr/local/bin/bun /usr/local/bin/bun
 # start. Found live on RPG-6017/6029/6036/6040/6043/6044 — eight attempts
 # crashed within a second of dispatch, each one a wasted retry.
 #
+# `ffmpeg` is here because tickets arrive as screen recordings, not only
+# screenshots, and Claude Code can read an image but not an `.mp4`. Found live
+# on a topology-diagram ticket whose only attachment was a 3.4MB video: the
+# agent probed eight tools (all absent), rendered the video in Chromium, then
+# wrote a Chrome DevTools Protocol client in Node to pull frames out — and was
+# stopped by `SecurityError: Tainted canvases may not be exported`, because a
+# file:// video taints the canvas it is drawn into. Chromium decodes the video
+# fine; it cannot export a frame. `ffmpeg -i v.mp4 -vf fps=1 f_%03d.png` does it
+# in one command. `python3` is the third tool that attempt reached for and did
+# not find; it is thirteen packages and the agent keeps expecting it.
+#
 # `chromium` (with fonts) is here because most of this pipeline's tickets are UI
 # bugs reported as a screenshot, and without a browser the agent cannot see what
 # it is fixing. Found live on RPG-5427: it tried PIL, ImageMagick, ffmpeg, sharp
@@ -36,7 +47,7 @@ COPY --from=bun /usr/local/bin/bun /usr/local/bin/bun
 # fix. `fonts-liberation` is not optional either: headless Chromium with no
 # fonts renders text as empty boxes, which is worthless for a text-alignment bug.
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends ca-certificates chromium fonts-liberation git \
+  && apt-get install -y --no-install-recommends ca-certificates chromium ffmpeg fonts-liberation git python3 \
   && rm -rf /var/lib/apt/lists/* \
   && npm install -g @anthropic-ai/claude-code sass clean-css
 

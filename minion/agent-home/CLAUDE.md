@@ -66,6 +66,21 @@ rendered is a guess.
 Puppeteer, if the target project has it, will find this browser through
 `PUPPETEER_EXECUTABLE_PATH` — do not let it download another.
 
+## Video attachments
+
+A ticket may attach a screen recording rather than a screenshot, and you cannot
+read an `.mp4` directly. Pull frames out first and read those:
+
+```
+ffprobe -v error -show_entries format=duration -of csv=p=0 v.mp4   # how long
+ffmpeg -i v.mp4 -vf fps=1 /tmp/frames/f_%03d.png                   # one per second
+```
+
+Do not try to do this through Chromium. It decodes the video quite happily, but
+drawing a `file://` video into a canvas taints it, and exporting the frame then
+fails with a SecurityError — a dead end that has already cost one attempt several
+minutes.
+
 `sass` and `clean-css` are installed globally, so you can compile stylesheets
 without installing anything: `sass --no-source-map --load-path=<src> file.scss`,
 and `require('clean-css')` resolves from any directory.
