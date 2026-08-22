@@ -78,6 +78,16 @@ ${list}
  * choices, not properties of Minion's contract. `--effort` needs a recent Claude
  * Code CLI (the image installs the current one on every build).
  *
+ * The "smallest change" instruction is the counterweight to "implement it, don't
+ * just propose it" above. Told to act unattended with full tool access and no
+ * reviewer to push back, an agent given a narrow bug will reach for the
+ * thorough fix: restructuring the module it landed in, normalising the
+ * surrounding style, adding the abstraction the duplication suggests. All of it
+ * plausible in isolation, all of it unreviewable in aggregate — and every line
+ * of it is a line a human has to read and take responsibility for on a ticket
+ * that asked for something small. Noticed-but-unrelated problems are routed to
+ * the report instead, where they cost a sentence rather than a diff.
+ *
  * The explicit "leave the commit to Minion" instruction exists because, also found
  * live: with full tool access, Claude Code sometimes committed its own changes
  * before returning. `orchestrate.mts` always runs its own `commitAndPush` afterward
@@ -98,6 +108,19 @@ directly in the codebase yourself. Do not stop to describe or propose a fix
 and ask for confirmation; make the actual code changes. Leave the changes
 uncommitted — do not run \`git commit\` yourself; committing is handled
 separately after you finish.
+
+Make the smallest change that fixes the stated problem, and stop there. Match
+how the surrounding code already does things rather than introducing a pattern
+of your own. Do not refactor code that is not broken, do not add an abstraction
+for a single use, do not add a dependency, a config option or a new file unless
+the fix genuinely cannot be made without it, and do not tidy formatting,
+comments or naming you happen to pass. If a one-line change is enough, the
+answer is that one line.
+
+If you notice something else wrong along the way, leave it alone and say so in
+your report. It is not part of this ticket, and a human will decide whether it
+is worth its own one. A diff a reviewer can read in a minute is worth more here
+than a thorough one they will not read at all.
 
 Before you finish, run this project's own checks over your changes — its
 \`verify\`/lint/test/type-check scripts, and whatever its pre-commit hook runs —
@@ -121,7 +144,9 @@ describing something else you did.
 
 Anything you would have asked had someone been available — an ambiguity in the
 ticket, a missing reproduction step, a design choice that was not yours to make.
-One bullet each. Write "None." only if there were genuinely none.
+Also anything you noticed was wrong but deliberately left alone as out of scope,
+so someone can judge whether it deserves its own ticket. One bullet each. Write
+"None." only if there were genuinely none.
 
 ## Decisions taken without review
 

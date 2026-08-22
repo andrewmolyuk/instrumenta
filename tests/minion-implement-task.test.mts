@@ -192,6 +192,17 @@ describe('the ticket in the prompt', () => {
     expect(promptOf(defaultImplementCommand(INPUT, TICKET))).not.toContain('This ticket has attachments')
   })
 
+  it('asks for the smallest change, not the thorough one', () => {
+    // The counterweight to "implement it, don't just propose it": an unattended
+    // agent with full tool access will otherwise return a refactor for a
+    // one-line bug, and every line of it needs a human to take responsibility.
+    const prompt = promptOf(defaultImplementCommand(INPUT, TICKET))
+
+    expect(prompt).toContain('smallest change')
+    expect(prompt).toContain('Do not refactor code that is not broken')
+    expect(prompt).toContain('leave it alone and say so in')
+  })
+
   it('asks for a closing report covering questions and unreviewed decisions', () => {
     const prompt = promptOf(defaultImplementCommand(INPUT, TICKET))
     expect(prompt).toContain(REPORT_MARKER)
