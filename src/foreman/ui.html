@@ -82,6 +82,9 @@
   .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-8); }
   .stat-card { display: flex; flex-direction: column; gap: var(--space-2); min-height: 104px; position: relative; }
   .current-metrics { display: flex; gap: var(--space-4); font-size: 14px; color: var(--color-neutral-700); }
+  /* On its own line below the metrics: at 11px against their 14px it could not
+     share a row without the baselines disagreeing. */
+  #stat-current-log { margin-top: var(--space-2); align-self: flex-start; }
 
   .cockpit-grid { display: grid; grid-template-columns: 360px 1fr; gap: var(--space-8); align-items: start; }
   .col { display: flex; flex-direction: column; gap: 34px; }
@@ -217,9 +220,9 @@
       <div class="current-metrics">
         <span class="tabular" id="stat-current-duration"></span>
         <span class="tabular" id="stat-current-cost"></span>
-        <a href="#" class="detail-link" id="stat-current-log" hidden>LOG</a>
       </div>
       <div class="note" id="stat-current-note"></div>
+      <a href="#" class="detail-link" id="stat-current-log" hidden>LOG</a>
     </div>
   </div>
 
@@ -325,17 +328,6 @@
       <tbody id="attempts-body"></tbody>
     </table>
   </div>
-  <div id="detail-modal" class="modal-backdrop" hidden>
-    <div class="modal blueprint" role="dialog" aria-modal="true" aria-labelledby="detail-title">
-      <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
-      <div class="modal-head">
-        <div class="kicker" id="detail-title"></div>
-        <button type="button" id="detail-close" class="btn btn-secondary" style="padding-inline:var(--space-4)">Close</button>
-      </div>
-      <pre id="detail-body" class="modal-body"></pre>
-    </div>
-  </div>
-
   <div class="note" style="max-width:70ch">Output is captured diagnostic text: Claude Code&rsquo;s stdout and stderr combined with the verify gate&rsquo;s on failed_verify, or Minion&rsquo;s own process output on crashed and timeout. It is null on a passing verify &mdash; nothing to explain there. Session is the full record of what the agent did &mdash; the problem statement it was given, every step it took, and its own closing summary &mdash; recorded for <em>every</em> status, including success.</div>
 </section>
 
@@ -424,6 +416,21 @@
     </div>
   </div>
 </section>
+
+<!-- Outside every panel on purpose: the panels are shown and hidden with the
+     `hidden` attribute, and a modal nested inside a hidden section stays
+     invisible however its own `hidden` is set — which is what made the
+     Cockpit's live LOG link look dead while the Attempts one worked. -->
+<div id="detail-modal" class="modal-backdrop" hidden>
+  <div class="modal blueprint" role="dialog" aria-modal="true" aria-labelledby="detail-title">
+    <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+    <div class="modal-head">
+      <div class="kicker" id="detail-title"></div>
+      <button type="button" id="detail-close" class="btn btn-secondary" style="padding-inline:var(--space-4)">Close</button>
+    </div>
+    <pre id="detail-body" class="modal-body"></pre>
+  </div>
+</div>
 
 <div id="dialog-backdrop" class="dialog-backdrop" hidden>
   <div class="dialog blueprint">
