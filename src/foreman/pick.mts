@@ -1,32 +1,26 @@
 import type { Database } from 'bun:sqlite'
-import { closedPrCountForBranch, hasBlockingPrForBranch, type BitbucketConfig } from '../bitbucket/closed-prs.mts'
+import { hasBlockingPrForBranch, type BitbucketConfig } from '../bitbucket/closed-prs.mts'
 import { giveUpAttemptCount, hasNoChangeAttempt } from '../db/queries.mts'
 import type { BacklogItem, TaskProvider } from '../task-provider/types.mts'
 
 /**
- * Given up the moment either source reaches this, whichever happens first
- * (ADR-001, lowered from 3 to 1 by ADR-015).
- *
- * At 1 this also means a single closed PR retires the ticket: a human who
- * declined the agent's work should not have it redone unasked.
+ * Given up the moment Foreman's own recorded attempts reach this (ADR-001,
+ * lowered from 3 to 1 by ADR-015).
  *
  * Must stay equal to MAX_ATTEMPTS in minion/constants.mts; a test asserts it.
  */
 export const GIVE_UP_THRESHOLD = 1
 
 /**
- * Both sources are checked on every call — Bitbucket isn't a fallback used
- * only when SQLite is empty, it can independently trigger give-up (ADR-001).
+ * ADR-016: Foreman's own SQLite is the only give-up source. A declined PR used
+ * to count too (ADR-001's third source, at ADR-015's threshold of 1), which
+ * retired the ticket for good on a single human decline — with 245 tickets in
+ * the live backlog and a declined PR on every one of the 50 Pick can see, that
+ * left the loop polling an empty-looking queue forever. A decline is a verdict
+ * on one attempt's diff, not on the ticket.
  */
-export async function isGivenUp(
-  db: Database,
-  bitbucket: BitbucketConfig,
-  jiraKey: string,
-  fetchImpl?: typeof fetch,
-): Promise<boolean> {
-  const sqliteCount = giveUpAttemptCount(db, jiraKey)
-  const closedPrCount = await closedPrCountForBranch(bitbucket, jiraKey, fetchImpl)
-  return sqliteCount >= GIVE_UP_THRESHOLD || closedPrCount >= GIVE_UP_THRESHOLD
+export function isGivenUp(db: Database, jiraKey: string): boolean {
+  return giveUpAttemptCount(db, jiraKey) >= GIVE_UP_THRESHOLD
 }
 
 /**
@@ -41,7 +35,7 @@ async function isEligible(
   jiraKey: string,
   fetchImpl?: typeof fetch,
 ): Promise<boolean> {
-  if (await isGivenUp(db, bitbucket, jiraKey, fetchImpl)) return false
+  if (isGivenUp(db, jiraKey)) return false
   // ADR-014: a `no_change` conclusion is terminal after one attempt, and is not
   // part of the give-up count — without this the ticket stays in the backlog
   // with no PR and Pick selects it again on the next iteration, indefinitely.
@@ -90,11 +84,11 @@ export async function pickSpecific(
   const item = backlog.find((candidate) => candidate.jira_key === jiraKey)
   if (!item) return null
   // Deliberately not the give-up check: naming a ticket by hand *is* the
-  // override. Without this the ticket is unreachable — deleteAttempts clears
-  // SQLite but cannot clear the Bitbucket half, so one declined PR retires a
-  // ticket for good (ADR-015 put the threshold at 1), with no way back.
+  // override, for a ticket whose recorded attempt already failed once
+  // (ADR-015 put the threshold at 1). deleteAttempts is the other way back,
+  // and since ADR-016 it clears the whole of give-up rather than half of it.
   //
-  // The open-or-merged guard stays. Neither is a judgement about the work's
+  // The open-or-merged guard stays. It isn't a judgement about the work's
   // quality: an open PR is unreviewed commits on the branch that a redispatch
   // would push over, and a merged one is work already delivered.
   if (await hasBlockingPrForBranch(bitbucket, item.jira_key, fetchImpl)) return null

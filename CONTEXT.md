@@ -62,15 +62,16 @@ or being Given Up.
 _Decided in_: [ADR-001](docs/adr/001-task-state-three-sources.md).
 
 **Given Up**:
-True the moment either of two independent counts reaches 1 for a `jira_key` (ADR-015
-lowered this from ADR-001's 3), whichever
-happens first: SQLite attempts with `status` in (`failed_verify`, `crashed`, `timeout`), or
-closed (non-merged) PRs on the target repo whose branch name matches the `jira_key`. Both are
-checked on every Pick — the Bitbucket count isn't a fallback used only when SQLite is
-unavailable, it can independently trigger give-up. At 1 there are no retries: one failed
-attempt retires the ticket, and so does one PR a human closed.
+True the moment Foreman's own SQLite holds one attempt for a `jira_key` with `status` in
+(`failed_verify`, `crashed`, `timeout`, `given_up`) — ADR-015 lowered the threshold from
+ADR-001's 3, so there are no retries: one failed attempt retires the ticket. ADR-016
+removed the second count ADR-001 gave this term, declined PRs on the target repo: a
+human declining the agent's work is a verdict on that diff, not on the ticket, and the
+ticket goes back into the backlog. Open and merged PRs still keep a ticket out of Pick,
+but as a separate check, not as give-up.
 _Decided in_: [ADR-001](docs/adr/001-task-state-three-sources.md),
-[ADR-015](docs/adr/015-one-attempt-per-ticket.md).
+[ADR-015](docs/adr/015-one-attempt-per-ticket.md),
+[ADR-016](docs/adr/016-a-declined-pr-does-not-retire-a-ticket.md).
 
 **Verify gate**:
 The `verify` mechanism a target project defines for itself and that Minion looks for before

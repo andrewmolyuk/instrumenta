@@ -37,9 +37,9 @@ export function recordAttempt(db: Database, row: TaskRow): void {
  * ended without a PR (failed_verify, crashed, timeout), plus given_up itself —
  * Minion can self-report given_up on its final allowed attempt
  * (architecture.md's Minion section), and that has to count too, or a task it
- * already gave up on would look eligible again next Pick. The Bitbucket half
- * (closed PRs matching jira_key) lives outside this database — see
- * architecture.md's "Where task/claim state actually lives".
+ * already gave up on would look eligible again next Pick. Since ADR-016 this is
+ * the whole of give-up: declined PRs on the target repo used to count too, and
+ * no longer do — see architecture.md's "Where task/claim state actually lives".
  */
 export function giveUpAttemptCount(db: Database, jiraKey: string): number {
   const row = db
@@ -210,11 +210,11 @@ export function listAttempts(db: Database, limit: number | null): TaskRow[] {
 
 /**
  * Clears a jira_key's recorded attempts, resetting giveUpAttemptCount back to
- * 0 — the only way to force a given-up ticket eligible again, since
- * pickSpecific deliberately doesn't bypass the give-up check itself (see its
- * doc comment). Only the SQLite half: a closed-PR count on Bitbucket that
- * alone crosses GIVE_UP_THRESHOLD still leaves the ticket given-up after
- * this. Returns the number of rows removed.
+ * 0 — the way to force a given-up ticket eligible again, since pickSpecific
+ * deliberately doesn't bypass the give-up check itself (see its doc comment).
+ * A complete undo since ADR-016 dropped the Bitbucket half of give-up: there
+ * is no longer a declined-PR count outside this database to survive it.
+ * Returns the number of rows removed.
  */
 export function deleteAttempts(db: Database, jiraKey: string): number {
   return db.run('DELETE FROM tasks WHERE jira_key = ?', [jiraKey]).changes

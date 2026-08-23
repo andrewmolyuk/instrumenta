@@ -11,9 +11,9 @@ interface SearchPullRequestsResponse {
 /**
  * A PR in either of these states means the ticket should not be run again:
  * OPEN is work a human still has to review, MERGED is work already delivered.
- * DECLINED is deliberately absent — that is the give-up signal
- * (closedPrCountForBranch), and a human queueing the ticket by name is
- * overruling it.
+ * DECLINED is deliberately absent, and since ADR-016 it means nothing at all
+ * here: a declined PR neither blocks a ticket nor retires it, so the ticket
+ * goes back into the backlog like any other.
  *
  * Approval is not a state in Bitbucket, it is a flag on a participant, so an
  * approved-but-unmerged PR is still OPEN and is covered here.
@@ -85,32 +85,6 @@ export async function branchesWithBlockingPr(
     url = data.next
   }
   return branches
-}
-
-/**
- * The Bitbucket half of ADR-001's give-up check: declined (closed, non-merged)
- * PRs whose source branch matches `jiraKey`. Bitbucket's PR states are OPEN,
- * MERGED, DECLINED, SUPERSEDED — DECLINED is the direct analog of GitHub's
- * "closed and not merged"; SUPERSEDED (replaced by a newer PR) isn't counted,
- * since that's a different situation than the attempt actually failing.
- */
-export async function closedPrCountForBranch(
-  config: BitbucketConfig,
-  branchName: string,
-  fetchImpl: typeof fetch = fetch,
-): Promise<number> {
-  const q = `source.branch.name="${branchName}" AND state="DECLINED"`
-  const url = `https://api.bitbucket.org/2.0/repositories/${config.workspace}/${config.repoSlug}/pullrequests?q=${encodeURIComponent(q)}`
-  const res = await fetchImpl(url, {
-    headers: { Authorization: `Bearer ${config.token}` },
-  })
-
-  if (!res.ok) {
-    throw new Error(`Bitbucket search failed: ${res.status} ${res.statusText}`)
-  }
-
-  const data = (await res.json()) as SearchPullRequestsResponse
-  return data.size
 }
 
 /**

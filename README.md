@@ -28,7 +28,7 @@ All of these are required unless marked optional — see
 |---|---|
 | `JIRA_BASE_URL`, `JIRA_EMAIL`, `JIRA_API_TOKEN` | Jira auth, shared by the Task Provider and status mirror |
 | `JIRA_JQL` | The live backlog query — ordering and "open" are this query's job, not Foreman's (architecture.md) |
-| `BITBUCKET_WORKSPACE`, `BITBUCKET_REPO_SLUG`, `BITBUCKET_TOKEN` | Target repo, for the give-up check's declined-PR count and for Minion (inherited — see below). Minion derives its git clone URL from these three (`buildCloneUrl`) rather than taking one of its own — one source of truth for which repo this is |
+| `BITBUCKET_WORKSPACE`, `BITBUCKET_REPO_SLUG`, `BITBUCKET_TOKEN` | Target repo, for Pick's open-or-merged PR check and for Minion (inherited — see below). Minion derives its git clone URL from these three (`buildCloneUrl`) rather than taking one of its own — one source of truth for which repo this is |
 | `BITBUCKET_BASE_BRANCH` *(optional, default `main`)* | The branch Minion opens PRs against — read directly by Minion (`minion/main.mts`), not via `src/foreman/config.mts`. Must match the target repo's actual default branch (e.g. `master`), or every PR creation fails outright |
 | `BITBUCKET_PR_REVIEWERS` *(optional)* | Comma-separated Bitbucket account UUIDs (not display names or usernames — Bitbucket's PR API only accepts UUIDs) added as reviewers on every PR Minion opens — read directly by Minion (`minion/main.mts`). No reviewers are added if unset |
 | `MINION_GIT_AUTHOR_NAME`, `MINION_GIT_AUTHOR_EMAIL` *(optional, default `instrumenta-minion` / `minion@instrumenta.invalid`)* | Git identity Minion commits as in the target repo — read directly by Minion (`minion/git.mts`), not via `src/foreman/config.mts` |

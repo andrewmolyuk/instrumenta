@@ -32,22 +32,20 @@ function attempt(overrides: Partial<TaskRow> = {}): TaskRow {
 }
 
 /**
- * Reads `source.branch.name="<key>"` and `state="<STATE>"` out of the search
- * query and returns that key+state's configured count — declined and open
- * are separate queries (closedPrCountForBranch vs. hasOpenPrForBranch), so
- * this has to distinguish them rather than keying on branch alone.
+ * Reads `source.branch.name="<key>"` out of the search query and returns that
+ * branch's configured blocking-PR count. Only one query reaches Bitbucket from
+ * Pick now (open-or-merged); ADR-016 removed the declined-PR count entirely,
+ * so a fake that answered it would be answering nobody.
  */
-function fakeBitbucketFetch(declinedCounts: Record<string, number>, openCounts: Record<string, number> = {}) {
+function fakeBitbucketFetch(blockingCounts: Record<string, number> = {}) {
   return vi.fn(async (url: string) => {
     const q = new URL(url).searchParams.get('q') ?? ''
     const key = q.match(/source\.branch\.name="([^"]+)"/)?.[1] ?? ''
-    const state = q.match(/state="([^"]+)"/)?.[1] ?? ''
-    const counts = state === 'OPEN' ? openCounts : declinedCounts
     return {
       ok: true,
       status: 200,
       statusText: 'OK',
-      json: async () => ({ size: counts[key] ?? 0 }),
+      json: async () => ({ size: blockingCounts[key] ?? 0 }),
     }
   }) as unknown as typeof fetch
 }
@@ -57,33 +55,13 @@ function fakeTaskProvider(items: BacklogItem[]): TaskProvider {
 }
 
 describe('isGivenUp', () => {
-  it('is false when both sources are below the threshold', async () => {
-    // ADR-015 put the threshold at 1, so "below" is zero on both sides: no
-    // recorded failure and no closed PR.
-    const result = await isGivenUp(db, BITBUCKET, 'KAZ-1', fakeBitbucketFetch({ 'KAZ-1': 0 }))
-    expect(result).toBe(false)
+  it('is false with no recorded attempt', () => {
+    expect(isGivenUp(db, 'KAZ-1')).toBe(false)
   })
 
-  it('is true from a single failed attempt, with no retry (ADR-015)', async () => {
+  it('is true from a single failed attempt, with no retry (ADR-015)', () => {
     recordAttempt(db, attempt({ status: 'crashed' }))
-    expect(await isGivenUp(db, BITBUCKET, 'KAZ-1', fakeBitbucketFetch({ 'KAZ-1': 0 }))).toBe(true)
-  })
-
-  it('is true from a single closed PR — a human declined this work once', async () => {
-    expect(await isGivenUp(db, BITBUCKET, 'KAZ-1', fakeBitbucketFetch({ 'KAZ-1': 1 }))).toBe(true)
-  })
-
-  it('is true from SQLite alone, even with zero closed PRs', async () => {
-    recordAttempt(db, attempt({ attempt_number: 1, status: 'crashed' }))
-    recordAttempt(db, attempt({ attempt_number: 2, status: 'crashed' }))
-    recordAttempt(db, attempt({ attempt_number: 3, status: 'crashed' }))
-    const result = await isGivenUp(db, BITBUCKET, 'KAZ-1', fakeBitbucketFetch({ 'KAZ-1': 0 }))
-    expect(result).toBe(true)
-  })
-
-  it('is true from Bitbucket alone, even with zero SQLite attempts', async () => {
-    const result = await isGivenUp(db, BITBUCKET, 'KAZ-1', fakeBitbucketFetch({ 'KAZ-1': 3 }))
-    expect(result).toBe(true)
+    expect(isGivenUp(db, 'KAZ-1')).toBe(true)
   })
 })
 
@@ -93,27 +71,39 @@ describe('pick', () => {
       { jira_key: 'KAZ-1', summary: 'first' },
       { jira_key: 'KAZ-2', summary: 'second' },
     ]
-    const result = await pick(db, fakeTaskProvider(backlog), BITBUCKET, fakeBitbucketFetch({}))
+    const result = await pick(db, fakeTaskProvider(backlog), BITBUCKET, fakeBitbucketFetch())
     expect(result?.jira_key).toBe('KAZ-1')
   })
 
   it('skips a given-up task and returns the next eligible one', async () => {
+    recordAttempt(db, attempt({ jira_key: 'KAZ-1', status: 'crashed' }))
     const backlog = [
       { jira_key: 'KAZ-1', summary: 'given up' },
       { jira_key: 'KAZ-2', summary: 'eligible' },
     ]
-    const result = await pick(db, fakeTaskProvider(backlog), BITBUCKET, fakeBitbucketFetch({ 'KAZ-1': 3 }))
+    const result = await pick(db, fakeTaskProvider(backlog), BITBUCKET, fakeBitbucketFetch())
     expect(result?.jira_key).toBe('KAZ-2')
   })
 
   it('returns null when every task is given up', async () => {
+    recordAttempt(db, attempt({ jira_key: 'KAZ-1', status: 'crashed' }))
     const backlog = [{ jira_key: 'KAZ-1', summary: 'given up' }]
-    const result = await pick(db, fakeTaskProvider(backlog), BITBUCKET, fakeBitbucketFetch({ 'KAZ-1': 3 }))
+    const result = await pick(db, fakeTaskProvider(backlog), BITBUCKET, fakeBitbucketFetch())
     expect(result).toBeNull()
   })
 
+  it('picks a ticket whose only PR was declined (ADR-016)', async () => {
+    // The live case this came from: every ticket Pick could see had a declined
+    // PR and no recorded attempt, so the loop polled an empty-looking queue
+    // forever on an unlimited budget. A declined PR is not blocking, so the
+    // fake reports no blocking PR for it — and nothing else may stop it.
+    const backlog = [{ jira_key: 'KAZ-1', summary: 'a human declined the last PR' }]
+    const result = await pick(db, fakeTaskProvider(backlog), BITBUCKET, fakeBitbucketFetch())
+    expect(result?.jira_key).toBe('KAZ-1')
+  })
+
   it('returns null for an empty backlog', async () => {
-    const result = await pick(db, fakeTaskProvider([]), BITBUCKET, fakeBitbucketFetch({}))
+    const result = await pick(db, fakeTaskProvider([]), BITBUCKET, fakeBitbucketFetch())
     expect(result).toBeNull()
   })
 
@@ -122,7 +112,7 @@ describe('pick', () => {
       { jira_key: 'KAZ-1', summary: 'already has an open PR' },
       { jira_key: 'KAZ-2', summary: 'eligible' },
     ]
-    const result = await pick(db, fakeTaskProvider(backlog), BITBUCKET, fakeBitbucketFetch({}, { 'KAZ-1': 1 }))
+    const result = await pick(db, fakeTaskProvider(backlog), BITBUCKET, fakeBitbucketFetch({ 'KAZ-1': 1 }))
     expect(result?.jira_key).toBe('KAZ-2')
   })
 })
@@ -141,7 +131,7 @@ describe('pick and a no_change conclusion', () => {
         { jira_key: 'KAZ-2', summary: 'b' },
       ]),
       BITBUCKET,
-      fakeBitbucketFetch({}),
+      fakeBitbucketFetch(),
     )
 
     expect(picked?.jira_key).toBe('KAZ-2')

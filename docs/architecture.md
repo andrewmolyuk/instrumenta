@@ -194,8 +194,8 @@ Carries everything about the target project that isn't Foreman's own operational
 bookkeeping: the code, the accumulated knowledge (ADRs, glossary, and the notes Minion
 writes at the project's configured notes path — `docs/todo/` by default, arriving as
 ordinary PRs, reviewed like any other change), the gate the project defines for itself
-(the `verify` mechanism), and the git/Bitbucket state (branches, PRs) that backstops
-give-up detection. Nothing here is instrumenta-specific infrastructure;
+(the `verify` mechanism), and the git/Bitbucket state (branches, PRs) that tells Pick
+which tickets already have work awaiting review or delivered. Nothing here is instrumenta-specific infrastructure;
 a human could delete every trace of instrumenta having worked here and the project
 would still make complete sense on its own.
 
@@ -212,14 +212,15 @@ Two distinct relationships, not one generic "human in the loop":
 ## Where task/claim state actually lives
 
 Three sources, each authoritative for a different question — not three copies voting
-on the same fact. Full reasoning and the exact combination rule for give-up is
-[ADR-001](adr/001-task-state-three-sources.md):
+on the same fact. Full reasoning is [ADR-001](adr/001-task-state-three-sources.md);
+give-up itself is now SQLite's alone, per
+[ADR-016](adr/016-a-declined-pr-does-not-retire-a-ticket.md):
 
 | Source | Answers |
 |---|---|
 | Jira (live query) | Is this task still wanted at all? |
 | SQLite (Foreman's own) | What has Foreman itself observed about its attempts — including a crash or timeout with no PR to show for it? |
-| Bitbucket (target repo PR history) | Checked alongside SQLite on every Pick; give-up triggers the moment either source crosses the attempt threshold first, so it also catches give-up if SQLite is ever lost or diverges from reality. |
+| Bitbucket (target repo PR history) | Does this ticket's branch already have an open or merged PR — work awaiting a human's review, or work already delivered? Checked on every Pick. It no longer feeds give-up: a declined PR is not a verdict on the ticket (ADR-016), which also means SQLite alone carries give-up if that volume is ever lost. |
 
 ## Known, accepted gaps
 

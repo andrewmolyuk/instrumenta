@@ -189,9 +189,9 @@ export function createApiHandler(deps: ApiDeps): (req: Request) => Promise<Respo
         return json({ error: `${jiraKey} is not in the live backlog (doesn't match the configured JQL)` }, 404)
       }
       // Given-up is deliberately *not* checked here: queueing a ticket by name
-      // is the human overriding that verdict, and it is the only way back for a
-      // ticket retired by a closed PR — delete-attempts clears SQLite but has
-      // no reach into Bitbucket.
+      // is the human overriding that verdict for a ticket whose one recorded
+      // attempt failed. Since ADR-016 that verdict comes from SQLite alone, so
+      // delete-attempts is the other, bulk way back.
       if (await hasBlockingPrForBranch(deps.bitbucket, jiraKey, deps.fetchImpl)) {
         return json(
           {

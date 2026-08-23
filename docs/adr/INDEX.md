@@ -59,6 +59,11 @@ and dated.
   drops from 3 to 1 (amends ADR-001), which also makes `failed_verify` and
   `blocked_no_verify` unreachable and retires a ticket on a single closed PR
 
+- [ADR-016](016-a-declined-pr-does-not-retire-a-ticket.md) — a declined PR is not a
+  give-up signal: Foreman's SQLite is the only give-up source, and open or merged PRs
+  still block a dispatch (amends ADR-001's third source and ADR-015's closed-PR
+  consequence)
+
 
 ## Superseded
 
