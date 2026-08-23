@@ -52,7 +52,7 @@ export async function createPullRequest(
         title: `${branch}: ${ticket.summary}`.slice(0, 255),
         source: { branch: { name: branch } },
         destination: { branch: { name: config.base ?? 'main' } },
-        description: buildPrDescription(ticket, agentReport),
+        description: buildPrDescription(input, ticket, agentReport),
         ...(config.reviewers?.length ? { reviewers: config.reviewers.map((uuid) => ({ uuid })) } : {}),
       }),
     },

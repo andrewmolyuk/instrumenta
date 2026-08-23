@@ -59,10 +59,6 @@ and dated.
   drops from 3 to 1 (amends ADR-001), which also makes `failed_verify` and
   `blocked_no_verify` unreachable and retires a ticket on a single closed PR
 
-- [ADR-016](016-before-after-screenshots-on-the-ticket.md) — before/after screenshots of a
-  visual fix are attached to the Jira ticket, not the pull request: Bitbucket's PR API
-  exposes no attachment endpoint, and committing them would merge binaries into the target
-  repo permanently
 
 ## Superseded
 

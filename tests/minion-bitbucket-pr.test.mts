@@ -41,8 +41,8 @@ describe('createPullRequest', () => {
       title: 'KAZ-1: Fix the thing',
       source: { branch: { name: 'KAZ-1' } },
       destination: { branch: { name: 'main' } },
-      // The agent's own report, not the ticket text — see buildPrDescription.
-      description: REPORT,
+      // The agent's own report plus a link back to the ticket.
+      description: expect.stringContaining(REPORT),
     })
   })
 

@@ -37,14 +37,6 @@ export const MAX_PR_DESCRIPTION_CHARS = 32_768
  */
 export const MAX_STEP_CHARS = 600
 
-/**
- * Screenshots the agent leaves for Minion to attach to the ticket (ADR-016).
- * Fixed names so orchestrate knows what to look for without the agent having to
- * report anything back, and a directory beside the work tree rather than inside
- * it, for the same reason attachments live there: `git add -A` would otherwise
- * commit them into the pull request.
- */
-export const SHOT_NAMES = ['before.png', 'after.png'] as const
 
 /**
  * Cap on one tool *result* in the transcript, split head and tail.

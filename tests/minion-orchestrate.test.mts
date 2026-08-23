@@ -28,7 +28,6 @@ function fakeDeps(overrides: Partial<MinionDeps> = {}): MinionDeps {
     runPreCommitChecks: vi.fn(async () => ({ ran: true, passed: true, output: '' })),
     hasChanges: vi.fn(async () => true),
     commentOnTicket: vi.fn(async () => true),
-    attachToTicket: vi.fn(async () => true),
     writeNote: vi.fn(async () => {}),
     commitAndPush: vi.fn(async () => {}),
     createPullRequest: vi.fn(async () => 'https://bitbucket.org/o/r/pull-requests/1'),
@@ -46,7 +45,6 @@ describe('runMinion', () => {
       '/tmp/wd',
       expect.objectContaining({ jira_key: 'KAZ-1' }),
       expect.objectContaining({ summary: 'Fix the thing' }),
-      '/tmp/wd-shots',
     )
   })
 
@@ -410,35 +408,5 @@ describe('runMinion when the agent changed nothing', () => {
 
     expect(result.status).toBe('given_up')
     expect(deps.commentOnTicket).not.toHaveBeenCalled()
-  })
-})
-
-describe('before/after screenshots', () => {
-  it('offers both to Jira, in order, from beside the work tree', async () => {
-    // Beside, not inside: commitAndPush runs `git add -A`, so screenshots
-    // written into the clone would ship in the pull request.
-    const deps = fakeDeps()
-    await runMinion(input(), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
-
-    expect(deps.attachToTicket).toHaveBeenNthCalledWith(1, 'KAZ-1', '/tmp/wd-shots/before.png')
-    expect(deps.attachToTicket).toHaveBeenNthCalledWith(2, 'KAZ-1', '/tmp/wd-shots/after.png')
-  })
-
-  it('carries on when the agent produced no screenshots', async () => {
-    // The common case — most tickets are not visual. attachToTicket reports
-    // false for a file that does not exist and nothing else changes.
-    const deps = fakeDeps({ attachToTicket: vi.fn(async () => false) })
-    const result = await runMinion(input(), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
-
-    expect(result.status).toBe('success')
-  })
-
-  it('attaches them even when the attempt then fails its gate', async () => {
-    // A before/after pair still shows what the agent was looking at.
-    const deps = fakeDeps({ runVerify: vi.fn(async () => ({ passed: false, output: 'test 1 failed' })) })
-    const result = await runMinion(input(), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
-
-    expect(result.status).toBe('given_up')
-    expect(deps.attachToTicket).toHaveBeenCalledTimes(2)
   })
 })

@@ -8,7 +8,6 @@ import { defaultImplementCommand, extractReport, implementTask, REPORT_MARKER } 
 
 const INPUT: MinionInput = { task_id: 't1', jira_key: 'KAZ-1', attempt_number: 1 }
 const TICKET: JiraTicket = { summary: 'Fix the thing', description: 'Fix the thing', attachments: [] }
-const SHOTS = '/tmp/minion-t1-shots'
 
 /** Strips the `[mm:ss] ` elapsed prefix every step carries. */
 const unstamped = (line?: string) => (line ?? '').replace(/^\[\d+:?\d*:?\d*\]\s/, '')
@@ -34,17 +33,17 @@ function flagValue(command: string[], flag: string): string | undefined {
 
 describe('implementTask', () => {
   it('runs the given command and returns empty output when it prints nothing', async () => {
-    await expect(implementTask('/tmp', INPUT, TICKET, SHOTS, ['true'])).resolves.toEqual({ output: '', costUsd: null, transcript: [] })
+    await expect(implementTask('/tmp', INPUT, TICKET, ['true'])).resolves.toEqual({ output: '', costUsd: null, transcript: [] })
   })
 
   it('does not throw when the command does not exist, and says so in its output', async () => {
-    const result = await implementTask('/tmp', INPUT, TICKET, SHOTS, ['this-binary-does-not-exist-anywhere'])
+    const result = await implementTask('/tmp', INPUT, TICKET, ['this-binary-does-not-exist-anywhere'])
     expect(result.output).toContain('claude command failed to start')
     expect(result.costUsd).toBeNull()
   })
 
   it('captures combined stdout and stderr when stdout is not Claude Code JSON', async () => {
-    const result = await implementTask('/tmp', INPUT, TICKET, SHOTS, [
+    const result = await implementTask('/tmp', INPUT, TICKET, [
       'bun',
       '-e',
       "console.log('did some work'); console.error('a warning')",
@@ -55,7 +54,7 @@ describe('implementTask', () => {
   })
 
   it('parses Claude Code\'s --output-format json result for the output text and cost', async () => {
-    const result = await implementTask('/tmp', INPUT, TICKET, SHOTS, [
+    const result = await implementTask('/tmp', INPUT, TICKET, [
       'bun',
       '-e',
       "console.log(JSON.stringify({ result: 'did the thing', total_cost_usd: 0.1234 }))",
@@ -65,7 +64,7 @@ describe('implementTask', () => {
   })
 
   it('falls back to raw output when stdout is JSON but not the Claude Code result shape', async () => {
-    const result = await implementTask('/tmp', INPUT, TICKET, SHOTS, ['bun', '-e', "console.log(JSON.stringify({ foo: 'bar' }))"])
+    const result = await implementTask('/tmp', INPUT, TICKET, ['bun', '-e', "console.log(JSON.stringify({ foo: 'bar' }))"])
     expect(result.output).toContain('"foo"')
     expect(result.costUsd).toBeNull()
   })
@@ -78,7 +77,7 @@ describe('defaultImplementCommand', () => {
   })
 
   it('runs claude in unattended print mode with the jira_key and description in the prompt', () => {
-    const command = defaultImplementCommand(INPUT, TICKET, SHOTS)
+    const command = defaultImplementCommand(INPUT, TICKET)
     expect(command[0]).toBe('claude')
     expect(command).toContain('--dangerously-skip-permissions')
     expect(command).toContain('-p')
@@ -86,7 +85,7 @@ describe('defaultImplementCommand', () => {
   })
 
   it('pins the model to the 1M-context Opus 5 and the effort level, by default', () => {
-    const command = defaultImplementCommand(INPUT, TICKET, SHOTS)
+    const command = defaultImplementCommand(INPUT, TICKET)
     expect(flagValue(command, '--model')).toBe('claude-opus-5[1m]')
     expect(flagValue(command, '--effort')).toBe('high')
   })
@@ -95,20 +94,20 @@ describe('defaultImplementCommand', () => {
     process.env.MINION_CLAUDE_MODEL = 'claude-sonnet-5'
     process.env.MINION_CLAUDE_EFFORT = 'max'
 
-    const command = defaultImplementCommand(INPUT, TICKET, SHOTS)
+    const command = defaultImplementCommand(INPUT, TICKET)
     expect(flagValue(command, '--model')).toBe('claude-sonnet-5')
     expect(flagValue(command, '--effort')).toBe('max')
   })
 
   it('tells Claude Code to implement directly rather than propose and wait for confirmation', () => {
-    const prompt = promptOf(defaultImplementCommand(INPUT, TICKET, SHOTS))
+    const prompt = promptOf(defaultImplementCommand(INPUT, TICKET))
     expect(prompt).toMatch(/implement the fix/i)
     expect(prompt).toMatch(/unattended/i)
     expect(prompt).toMatch(/do not stop to describe or propose/i)
   })
 
   it('tells Claude Code to run the project\'s own checks and fix what they report', () => {
-    const prompt = flowed(defaultImplementCommand(INPUT, TICKET, SHOTS))
+    const prompt = flowed(defaultImplementCommand(INPUT, TICKET))
     expect(prompt).toMatch(/pre-commit hook/i)
     expect(prompt).toMatch(/fix what they report/i)
     // The exact gate command, so the agent runs what the gate will run rather
@@ -124,14 +123,14 @@ describe('defaultImplementCommand', () => {
   it("names the deployment's overridden gate command, when there is one", () => {
     process.env.MINION_VERIFY_COMMAND = 'npm run lint && npm run test'
     try {
-      expect(promptOf(defaultImplementCommand(INPUT, TICKET, SHOTS))).toContain('npm run lint && npm run test')
+      expect(promptOf(defaultImplementCommand(INPUT, TICKET))).toContain('npm run lint && npm run test')
     } finally {
       delete process.env.MINION_VERIFY_COMMAND
     }
   })
 
   it('tells Claude Code to leave the changes uncommitted', () => {
-    const prompt = promptOf(defaultImplementCommand(INPUT, TICKET, SHOTS))
+    const prompt = promptOf(defaultImplementCommand(INPUT, TICKET))
     expect(prompt).toMatch(/do not run `git commit`/i)
   })
 })
@@ -145,7 +144,7 @@ async function runOverEvents(events: unknown[]): Promise<{ result: Awaited<Retur
   })
   try {
     const script = events.map((e) => `console.log(${JSON.stringify(JSON.stringify(e))})`).join('; ')
-    const result = await implementTask('/tmp', INPUT, TICKET, SHOTS, ['bun', '-e', script])
+    const result = await implementTask('/tmp', INPUT, TICKET, ['bun', '-e', script])
     return { result, progress }
   } finally {
     spy.mockRestore()
@@ -197,13 +196,13 @@ describe('implementTask stream-json progress', () => {
 
 describe('the ticket in the prompt', () => {
   it('leads with the summary, so the agent knows what it is fixing', () => {
-    const prompt = promptOf(defaultImplementCommand(INPUT, TICKET, SHOTS))
+    const prompt = promptOf(defaultImplementCommand(INPUT, TICKET))
     expect(prompt.startsWith('KAZ-1: Fix the thing')).toBe(true)
   })
 
   it('says so plainly when a ticket has no description, instead of leaving a blank', () => {
     // RPG-5427 was dispatched as `RPG-5427: ` with nothing after it.
-    const prompt = promptOf(defaultImplementCommand(INPUT, { ...TICKET, description: '' }, SHOTS))
+    const prompt = promptOf(defaultImplementCommand(INPUT, { ...TICKET, description: '' }))
     expect(prompt).toContain('KAZ-1: Fix the thing')
     expect(prompt).toContain('(this ticket has no text description)')
   })
@@ -216,7 +215,6 @@ describe('the ticket in the prompt', () => {
           ...TICKET,
           attachments: [{ filename: 'shot.png', mimeType: 'image/png', path: '/tmp/minion-t1-attachments/1-shot.png' }],
         },
-        SHOTS,
       ),
     )
 
@@ -226,25 +224,14 @@ describe('the ticket in the prompt', () => {
   })
 
   it('says nothing about attachments when there are none', () => {
-    expect(promptOf(defaultImplementCommand(INPUT, TICKET, SHOTS))).not.toContain('This ticket has attachments')
-  })
-
-  it('asks for before/after screenshots when the change is visual, by absolute path', () => {
-    const prompt = promptOf(defaultImplementCommand(INPUT, TICKET, SHOTS))
-
-    expect(prompt).toContain(SHOTS + '/before.png')
-    expect(prompt).toContain(SHOTS + '/after.png')
-    // The ordering instruction is the whole point — once the code is edited the
-    // "before" no longer exists.
-    expect(prompt).toContain('while the bug is still there')
-    expect(prompt).toContain('same window size')
+    expect(promptOf(defaultImplementCommand(INPUT, TICKET))).not.toContain('This ticket has attachments')
   })
 
   it('asks for the smallest change, not the thorough one', () => {
     // The counterweight to "implement it, don't just propose it": an unattended
     // agent with full tool access will otherwise return a refactor for a
     // one-line bug, and every line of it needs a human to take responsibility.
-    const prompt = promptOf(defaultImplementCommand(INPUT, TICKET, SHOTS))
+    const prompt = promptOf(defaultImplementCommand(INPUT, TICKET))
 
     expect(prompt).toContain('smallest change')
     expect(prompt).toContain('Do not refactor code that is not broken')
@@ -252,11 +239,11 @@ describe('the ticket in the prompt', () => {
   })
 
   it('asks for a closing report covering questions and unreviewed decisions', () => {
-    const prompt = promptOf(defaultImplementCommand(INPUT, TICKET, SHOTS))
+    const prompt = promptOf(defaultImplementCommand(INPUT, TICKET))
     expect(prompt).toContain(REPORT_MARKER)
     expect(prompt).toContain('## What changed')
     expect(prompt).toContain('## Questions for a human')
-    expect(prompt).toContain('## Decisions taken without review')
+    expect(prompt).toContain('## Decisions taken without human review')
   })
 })
 

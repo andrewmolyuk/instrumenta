@@ -110,11 +110,11 @@ describe('buildSessionRecord', () => {
 describe('buildPrDescription', () => {
   it("uses the agent's own report, which is what a reviewer reads", () => {
     const report = ['## What changed', '', 'Rewrote the pager.', '', '## Questions for a human', '', '- Which sort order was intended?'].join('\n')
-    expect(buildPrDescription(ticket(), report)).toBe(report)
+    expect(buildPrDescription(input(), ticket(), report)).toContain(report)
   })
 
   it('falls back to the ticket description when the agent produced no report', () => {
-    const body = buildPrDescription(ticket({ description: 'Columns drift.' }), null)
+    const body = buildPrDescription(input(), ticket({ description: 'Columns drift.' }), null)
 
     expect(body).toContain('did not produce a report')
     expect(body).toContain('Columns drift.')
@@ -122,23 +122,50 @@ describe('buildPrDescription', () => {
 
   it('never produces an empty body, even for a ticket with no description', () => {
     // RPG-5427's pull request shipped with an empty body.
-    const body = buildPrDescription(ticket({ description: '' }), null)
+    const body = buildPrDescription(input(), ticket({ description: '' }), null)
 
     expect(body.trim().length).toBeGreaterThan(0)
     expect(body).toContain('no text description')
   })
 
   it('redacts credentials the agent may have echoed into its report', () => {
-    const body = buildPrDescription(ticket(), 'I ran git push https://x-token-auth:SECRET@bitbucket.org/CGS/webui.git')
+    const body = buildPrDescription(input(), ticket(), 'I ran git push https://x-token-auth:SECRET@bitbucket.org/CGS/webui.git')
 
     expect(body).not.toContain('SECRET')
     expect(body).toContain('x-token-auth:***@bitbucket.org')
   })
 
   it("keeps the tail when a report runs past Bitbucket's limit", () => {
-    const body = buildPrDescription(ticket(), 'x'.repeat(40_000) + '\nTHE END')
+    const body = buildPrDescription(input(), ticket(), 'x'.repeat(40_000) + '\nTHE END')
 
     expect(body.length).toBeLessThanOrEqual(MAX_PR_DESCRIPTION_CHARS + 20)
     expect(body).toContain('THE END')
+  })
+})
+
+describe('the ticket footer', () => {
+  afterEach(() => {
+    delete process.env.JIRA_BASE_URL
+  })
+
+  it('links the ticket, so a reviewer can see what is being fixed', () => {
+    // The title carries the key as plain text; there was nothing to click and
+    // no summary beyond the truncated title.
+    process.env.JIRA_BASE_URL = 'https://x.atlassian.net'
+    const body = buildPrDescription(input(), ticket(), '## What changed\n\nRewrote it.')
+
+    expect(body).toContain('[KAZ-1](https://x.atlassian.net/browse/KAZ-1)')
+    expect(body).toContain('Fix the thing')
+  })
+
+  it('tolerates a trailing slash on the base URL', () => {
+    process.env.JIRA_BASE_URL = 'https://x.atlassian.net/'
+    expect(buildPrDescription(input(), ticket(), 'x')).toContain('(https://x.atlassian.net/browse/KAZ-1)')
+  })
+
+  it('still names the ticket when no base URL is configured', () => {
+    const body = buildPrDescription(input(), ticket(), 'x')
+    expect(body).toContain('KAZ-1')
+    expect(body).not.toContain('](')
   })
 })

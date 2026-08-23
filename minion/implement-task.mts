@@ -17,7 +17,7 @@ export function extractReport(output: string): string | null {
   const report = output.slice(at + REPORT_MARKER.length).trim()
   return report.length > 0 ? report : null
 }
-import { MAX_IMPLEMENT_OUTPUT_CHARS, MAX_RESULT_CHARS, MAX_STEP_CHARS, SHOT_NAMES } from './constants.mts'
+import { MAX_IMPLEMENT_OUTPUT_CHARS, MAX_RESULT_CHARS, MAX_STEP_CHARS } from './constants.mts'
 
 /** The model and effort an attempt runs under — resolved once, so the argv and the session report can't disagree. */
 export function claudeModel(): string {
@@ -97,36 +97,11 @@ ${list}
  * orchestrate.mts reports as `crashed` even though the real work had already
  * landed in a commit — a false crash on a fully successful attempt.
  */
-/**
- * Asks for before/after screenshots when the change is a visual one.
- *
- * Only the agent can produce these — it is the one that knows which page shows
- * the bug and how to reach it — so Minion supplies the paths and collects
- * whatever is there afterwards. Nothing is reported back: fixed filenames mean
- * an agent that could not render anything simply leaves the directory empty,
- * with no failure to handle.
- */
-function screenshotSection(shotDir: string): string {
-  return `
-If this ticket is about how something looks — layout, spacing, alignment,
-styling — capture the difference and leave it for review:
-
-- ${shotDir}/${SHOT_NAMES[0]} — the broken rendering, captured BEFORE you change anything
-- ${shotDir}/${SHOT_NAMES[1]} — the same view after your fix
-
-Take the "before" first, while the bug is still there; once you have edited the
-code it is gone. Frame both on the same element at the same window size, or the
-pair proves nothing. If you cannot render the view at all, skip this and say so
-in your report rather than substituting something else. These are attached to
-the Jira ticket, where the person who reported it is looking.
-`
-}
-
-export function defaultImplementCommand(input: MinionInput, ticket: JiraTicket, shotDir: string): string[] {
+export function defaultImplementCommand(input: MinionInput, ticket: JiraTicket): string[] {
   const prompt = `${input.jira_key}: ${ticket.summary}
 
 ${ticket.description || '(this ticket has no text description)'}
-${attachmentSection(ticket)}${screenshotSection(shotDir)}
+${attachmentSection(ticket)}
 
 This is an unattended, one-shot run — there is no human available to answer
 questions or approve a plan. Investigate the issue and implement the fix
@@ -187,7 +162,7 @@ Also anything you noticed was wrong but deliberately left alone as out of scope,
 so someone can judge whether it deserves its own ticket. One bullet each. Write
 "None." only if there were genuinely none.
 
-## Decisions taken without review
+## Decisions taken without human review
 
 Judgement calls you made alone, and what you assumed in making them: a guess at
 intent, a chosen approach where others existed, anything a reviewer should check
@@ -271,8 +246,7 @@ export async function implementTask(
   workDir: string,
   input: MinionInput,
   ticket: JiraTicket,
-  shotDir: string,
-  command: string[] = defaultImplementCommand(input, ticket, shotDir),
+  command: string[] = defaultImplementCommand(input, ticket),
 ): Promise<ImplementResult> {
   const result = await captureImplementOutput(workDir, command)
   if (result.output) console.error(`--- Claude Code output (${input.jira_key}) ---\n${result.output}`)

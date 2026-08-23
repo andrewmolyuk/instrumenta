@@ -95,7 +95,7 @@ export function buildSessionRecord(report: SessionReport): string {
  * requested form — an empty pull request body is what RPG-5427 shipped, and it
  * is worse than a stale one.
  */
-export function buildPrDescription(ticket: JiraTicket, agentReport: string | null): string {
+export function buildPrDescription(input: MinionInput, ticket: JiraTicket, agentReport: string | null): string {
   const body =
     agentReport ??
     [
@@ -103,5 +103,20 @@ export function buildPrDescription(ticket: JiraTicket, agentReport: string | nul
       '',
       ticket.description || '_This ticket has no text description._',
     ].join('\n')
-  return tail(redactCredentials(body), MAX_PR_DESCRIPTION_CHARS)
+  return tail(redactCredentials(`${body}\n\n---\n${ticketFooter(input, ticket)}`), MAX_PR_DESCRIPTION_CHARS)
+}
+
+/**
+ * The ticket this pull request is for, linked, at the bottom of the body.
+ *
+ * The title carries the key already, but as plain text — a reviewer asking
+ * "what is this fixing?" had nothing to click and no summary beyond the
+ * truncated title. `JIRA_BASE_URL` is read from the environment rather than
+ * threaded through, the same way the model and the gate command are; without it
+ * the key still appears, just not as a link.
+ */
+function ticketFooter(input: MinionInput, ticket: JiraTicket): string {
+  const base = process.env.JIRA_BASE_URL?.trim().replace(/\/$/, '')
+  const key = base ? `[${input.jira_key}](${base}/browse/${encodeURIComponent(input.jira_key)})` : input.jira_key
+  return ticket.summary.trim() ? `${key} — ${ticket.summary.trim()}` : key
 }
