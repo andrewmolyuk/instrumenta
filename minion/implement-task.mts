@@ -210,6 +210,15 @@ export interface ImplementResult {
    * account of its work rather than a record of it.
    */
   transcript: string[]
+  /**
+   * True when the run ended because the subscription's usage limit is
+   * exhausted rather than because the agent finished (ADR-017). Minion
+   * authenticates against a subscription, not a metered key (ADR-006), so the
+   * five-hour window and the weekly cap are real failure modes — and every one
+   * of the statuses this could otherwise be reported as says something untrue
+   * about the ticket.
+   */
+  usageLimited: boolean
 }
 
 /**
@@ -294,6 +303,14 @@ function agentEnv(): Record<string, string | undefined> {
   const { JIRA_BASE_URL, JIRA_EMAIL, JIRA_API_TOKEN, ...rest } = process.env
   return rest
 }
+
+/**
+ * How Claude Code says the subscription has no capacity left. Matched loosely
+ * — the wording is Anthropic's and may be reworded — and only ever in
+ * combination with a non-zero exit (see captureImplementOutput), which is what
+ * keeps it from misreading an attempt that merely *talked* about rate limiting.
+ */
+const USAGE_LIMIT_PATTERN = /usage limit|rate limit|too many requests|\b429\b/i
 
 /** Cap on the raw stdout held in memory for the fallback path — a real stream-json run is megabytes of NDJSON that the `result` event makes redundant. */
 const MAX_RAW_STDOUT_CHARS = MAX_IMPLEMENT_OUTPUT_CHARS * 2
@@ -447,19 +464,28 @@ async function captureImplementOutput(workDir: string, command: string[]): Promi
       }),
       new Response(proc.stderr).text(),
     ])
-    await proc.exited
+    const exitCode = await proc.exited
 
     const stdout = tail(rawStdout.trim(), MAX_RAW_STDOUT_CHARS)
     const stderr = rawStderr.trim()
     const output = resultText !== null ? [resultText, stderr].filter(Boolean).join('\n') : [stdout, stderr].filter(Boolean).join('\n')
 
-    return { output: tail(output, MAX_IMPLEMENT_OUTPUT_CHARS), costUsd, transcript }
+    // The exit code was previously read and discarded — deliberately, since a
+    // failing `claude` binary must not abort the run (see this function's
+    // comment). It is still not fatal here; it is the guard that makes the text
+    // match safe. An attempt that finished normally exits 0, so a report
+    // discussing the *target's* rate limiting can never be mistaken for our own
+    // exhausted quota, and no real work is ever thrown away by this branch.
+    const usageLimited = exitCode !== 0 && USAGE_LIMIT_PATTERN.test(output)
+
+    return { output: tail(output, MAX_IMPLEMENT_OUTPUT_CHARS), costUsd, transcript, usageLimited }
   } catch (err) {
     // Command not available — caller doesn't treat this as fatal (see above).
     return {
       output: `(claude command failed to start: ${err instanceof Error ? err.message : String(err)})`,
       costUsd: null,
       transcript: [],
+      usageLimited: false,
     }
   }
 }

@@ -168,6 +168,63 @@ describe('openDb migrations', () => {
     expect(listAttempts(db, 10).find((r) => r.task_id === 't1')?.status).toBe('no_change')
   })
 
+  it('widens it again for usage_limit, on a database the previous release built', () => {
+    // This is the migration that actually runs on the live database: the whole
+    // current schema minus the one status ADR-017 added. It rebuilds `tasks` a
+    // second time, and every column of every existing row has to come through.
+    dir = mkdtempSync(join(tmpdir(), 'instrumenta-db-'))
+    const path = join(dir, 'foreman.db')
+    const old = new Database(path, { create: true })
+    old.run(`CREATE TABLE tasks (
+      task_id TEXT PRIMARY KEY,
+      jira_key TEXT NOT NULL,
+      attempt_number INTEGER NOT NULL,
+      status TEXT NOT NULL CHECK (
+        status IN ('success', 'no_change', 'failed_verify', 'blocked_no_verify', 'crashed', 'timeout', 'given_up')
+      ),
+      pr_url TEXT,
+      output TEXT,
+      cost_usd REAL,
+      session TEXT,
+      dispatched_at TEXT NOT NULL,
+      finished_at TEXT
+    )`)
+    old.run(
+      `INSERT INTO tasks (task_id, jira_key, attempt_number, status, pr_url, output, cost_usd, session, dispatched_at, finished_at)
+       VALUES ('t0', 'RPG-6012', 1, 'success', 'https://bitbucket.org/o/r/pull-requests/9', 'gate output', 8.51,
+               '## Minion session', '2026-08-23T00:00:00Z', '2026-08-23T00:16:00Z')`,
+    )
+    old.run(
+      "INSERT INTO tasks (task_id, jira_key, attempt_number, status, dispatched_at) VALUES ('t1', 'RPG-6006', 2, 'no_change', '2026-08-23T01:00:00Z')",
+    )
+    old.close()
+
+    const db = openDb(path)
+
+    const rows = listAttempts(db, 10)
+    expect(rows).toHaveLength(2)
+    expect(rows.find((r) => r.task_id === 't0')).toEqual({
+      task_id: 't0',
+      jira_key: 'RPG-6012',
+      attempt_number: 1,
+      status: 'success',
+      pr_url: 'https://bitbucket.org/o/r/pull-requests/9',
+      output: 'gate output',
+      cost_usd: 8.51,
+      session: '## Minion session',
+      dispatched_at: '2026-08-23T00:00:00Z',
+      finished_at: '2026-08-23T00:16:00Z',
+    })
+    expect(rows.find((r) => r.task_id === 't1')).toMatchObject({ status: 'no_change', attempt_number: 2 })
+
+    recordAttempt(db, {
+      task_id: 't2', jira_key: 'RPG-6004', attempt_number: 1, status: 'usage_limit', pr_url: null,
+      output: 'Claude AI usage limit reached', cost_usd: null, session: null,
+      dispatched_at: '2026-08-23T02:00:00Z', finished_at: null,
+    })
+    expect(listAttempts(db, 10).find((r) => r.task_id === 't2')?.status).toBe('usage_limit')
+  })
+
   it('still rejects a status outside the widened vocabulary', () => {
     const db = openDb(':memory:')
     expect(() =>

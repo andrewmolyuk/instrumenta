@@ -22,7 +22,7 @@ function fakeDeps(overrides: Partial<MinionDeps> = {}): MinionDeps {
     cloneAndBranch: vi.fn(async () => {}),
     fetchTicket: vi.fn(async () => ticket()),
     hasOpenPrForBranch: vi.fn(async () => false),
-    implementTask: vi.fn(async () => ({ output: '', costUsd: null, transcript: [] })),
+    implementTask: vi.fn(async () => ({ output: '', costUsd: null, transcript: [], usageLimited: false })),
     hasVerifyScript: vi.fn(async () => true),
     runVerify: vi.fn(async () => ({ passed: true, output: '' })),
     runPreCommitChecks: vi.fn(async () => ({ ran: true, passed: true, output: '' })),
@@ -85,7 +85,7 @@ describe('runMinion', () => {
   })
 
   it('carries implementTask\'s reported cost through to a successful result', async () => {
-    const deps = fakeDeps({ implementTask: vi.fn(async () => ({ output: '', costUsd: 0.42, transcript: [] })) })
+    const deps = fakeDeps({ implementTask: vi.fn(async () => ({ output: '', costUsd: 0.42, transcript: [], usageLimited: false })) })
     const result = await runMinion(input(), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
 
     expect(result.cost_usd).toBe(0.42)
@@ -170,7 +170,7 @@ describe('runMinion', () => {
   it('includes implementTask output on blocked_no_verify when there was some', async () => {
     const deps = fakeDeps({
       hasVerifyScript: vi.fn(async () => false),
-      implementTask: vi.fn(async () => ({ output: 'claude: nothing to change here', costUsd: null, transcript: [] })),
+      implementTask: vi.fn(async () => ({ output: 'claude: nothing to change here', costUsd: null, transcript: [], usageLimited: false })),
     })
     const result = await runMinion(input({ attempt_number: 1 }), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
 
@@ -196,7 +196,7 @@ describe('runMinion', () => {
 
   it('combines implementTask output with verify output on failed_verify when there was both', async () => {
     const deps = fakeDeps({
-      implementTask: vi.fn(async () => ({ output: 'claude did something', costUsd: null, transcript: [] })),
+      implementTask: vi.fn(async () => ({ output: 'claude did something', costUsd: null, transcript: [], usageLimited: false })),
       runVerify: vi.fn(async () => ({ passed: false, output: 'test 1 failed' })),
     })
     const result = await runMinion(input({ attempt_number: 1 }), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
@@ -227,7 +227,7 @@ describe('runMinion', () => {
 
   it('reports given_up when the pre-commit checks fail', async () => {
     const deps = fakeDeps({
-      implementTask: vi.fn(async () => ({ output: 'claude did something', costUsd: 1.5, transcript: [] })),
+      implementTask: vi.fn(async () => ({ output: 'claude did something', costUsd: 1.5, transcript: [], usageLimited: false })),
       runPreCommitChecks: vi.fn(async () => ({ ran: true, passed: false, output: 'eslint: 2 problems' })),
     })
     const result = await runMinion(input({ attempt_number: 1 }), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
@@ -374,6 +374,7 @@ describe('runMinion when the agent changed nothing', () => {
         output: 'narration\n<!-- minion-report -->\n## What changed\n\nAlready fixed in ab12cd.',
         costUsd: 1.5,
         transcript: [],
+        usageLimited: false,
       })),
     })
 
@@ -408,5 +409,64 @@ describe('runMinion when the agent changed nothing', () => {
 
     expect(result.status).toBe('given_up')
     expect(deps.commentOnTicket).not.toHaveBeenCalled()
+  })
+})
+
+describe('runMinion when the usage limit is reached', () => {
+  const LIMIT = 'Claude AI usage limit reached|1755000000'
+
+  function limitedDeps(overrides: Partial<MinionDeps> = {}): MinionDeps {
+    return fakeDeps({
+      implementTask: vi.fn(async () => ({ output: LIMIT, costUsd: null, transcript: [], usageLimited: true })),
+      ...overrides,
+    })
+  }
+
+  it('reports usage_limit and stops before the gate, the commit and the ticket', async () => {
+    const deps = limitedDeps()
+    const result = await runMinion(input(), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
+
+    expect(result.status).toBe('usage_limit')
+    expect(result.pr_url).toBeNull()
+    expect(deps.hasVerifyScript).not.toHaveBeenCalled()
+    expect(deps.runVerify).not.toHaveBeenCalled()
+    expect(deps.runPreCommitChecks).not.toHaveBeenCalled()
+    expect(deps.commitAndPush).not.toHaveBeenCalled()
+    expect(deps.createPullRequest).not.toHaveBeenCalled()
+    expect(deps.writeNote).not.toHaveBeenCalled()
+    expect(deps.commentOnTicket).not.toHaveBeenCalled()
+  })
+
+  it('does not become no_change on the exact live shape that produced one', async () => {
+    // ADR-017's whole reason: a target whose `verify` is the literal string
+    // `true` passes the gate vacuously, a clone with no install has no
+    // pre-commit hook to fail, and the tree is empty because the agent never
+    // ran — which reported `no_change`, terminal per ADR-014, and told a human
+    // on Jira that the ticket needed no change.
+    const deps = limitedDeps({
+      hasChanges: vi.fn(async () => false),
+      runPreCommitChecks: vi.fn(async () => ({ ran: false, passed: true, output: '' })),
+    })
+    const result = await runMinion(input(), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
+
+    expect(result.status).toBe('usage_limit')
+    expect(deps.commentOnTicket).not.toHaveBeenCalled()
+  })
+
+  it('keeps the limit message and the session, so the record says what happened', async () => {
+    const deps = limitedDeps()
+    const result = await runMinion(input(), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
+
+    expect(result.output).toContain('usage limit reached')
+    expect(result.session).toContain('Minion session')
+  })
+
+  it('is not the final-attempt give-up path, however many attempts have run', async () => {
+    // MAX_ATTEMPTS is 1 (ADR-015), so every attempt is the final one — routing
+    // this through the isFinalAttempt branches would retire the ticket.
+    const deps = limitedDeps()
+    const result = await runMinion(input({ attempt_number: 9 }), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
+
+    expect(result.status).toBe('usage_limit')
   })
 })

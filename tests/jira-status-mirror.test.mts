@@ -118,3 +118,37 @@ describe('JiraStatusMirror', () => {
     })
   })
 })
+
+describe('onComplete and a usage_limit attempt (ADR-017)', () => {
+  it('walks the ticket back out of In Progress, so Pick can see it again', async () => {
+    const { fn, posted } = fakeFetch()
+    await new JiraStatusMirror(CONFIG, fn).onComplete(row({ status: 'usage_limit' }))
+
+    expect(posted).toHaveLength(1)
+    expect(posted[0]?.body).toEqual({ transition: { id: '11' } })
+  })
+
+  it('leaves every other status where onDispatch left it (ADR-007)', async () => {
+    const { fn, posted } = fakeFetch()
+    const mirror = new JiraStatusMirror(CONFIG, fn)
+    await mirror.onComplete(row({ status: 'success' }))
+    await mirror.onComplete(row({ status: 'no_change' }))
+    await mirror.onComplete(row({ status: 'crashed' }))
+
+    expect(posted).toHaveLength(0)
+  })
+
+  it('does nothing when the workflow offers no backlog status to go back to', async () => {
+    const { fn, posted } = fakeFetch({ transitions: [{ id: '31', to: { name: 'Done' } }] })
+    await new JiraStatusMirror(CONFIG, fn).onComplete(row({ status: 'usage_limit' }))
+
+    expect(posted).toHaveLength(0)
+  })
+
+  it('takes the first backlog name the workflow actually offers', async () => {
+    const { fn, posted } = fakeFetch({ transitions: [{ id: '41', to: { name: 'Backlog' } }] })
+    await new JiraStatusMirror(CONFIG, fn).onComplete(row({ status: 'usage_limit' }))
+
+    expect(posted[0]?.body).toEqual({ transition: { id: '41' } })
+  })
+})

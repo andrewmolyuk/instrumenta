@@ -155,3 +155,19 @@ describe('the give-up threshold', () => {
     expect(GIVE_UP_THRESHOLD).toBe(MAX_ATTEMPTS)
   })
 })
+
+describe('pick and a usage_limit attempt (ADR-017)', () => {
+  it('leaves the ticket eligible — the limit says nothing about the ticket', async () => {
+    recordAttempt(db, attempt({ task_id: 't1', jira_key: 'KAZ-1', status: 'usage_limit' }))
+
+    const picked = await pick(db, fakeTaskProvider([{ jira_key: 'KAZ-1', summary: 'still open' }]), BITBUCKET, fakeBitbucketFetch())
+
+    expect(picked?.jira_key).toBe('KAZ-1')
+  })
+
+  it('does not count toward give-up', () => {
+    recordAttempt(db, attempt({ task_id: 't1', jira_key: 'KAZ-1', status: 'usage_limit' }))
+
+    expect(giveUpAttemptCount(db, 'KAZ-1')).toBe(0)
+  })
+})

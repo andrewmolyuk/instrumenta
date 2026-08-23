@@ -532,3 +532,60 @@ describe('runLoop', () => {
     expect(db.query('SELECT jira_key FROM tasks').all()).toEqual([{ jira_key: 'KAZ-1' }])
   })
 })
+
+describe('runLoop and a usage_limit attempt (ADR-017)', () => {
+  const backlog = [
+    { jira_key: 'KAZ-1', summary: 'first' },
+    { jira_key: 'KAZ-2', summary: 'second' },
+  ]
+
+  function loopWith(runner: MinionRunner, statusMirror: StatusMirror = noopStatusMirror) {
+    return runLoop({
+      db,
+      taskProvider: { listBacklog: async () => backlog },
+      bitbucket: BITBUCKET,
+      runner,
+      statusMirror,
+      timeoutMs: 1000,
+      pollIntervalMs: 1000,
+      fetchImpl: fakeFetch(),
+      sleep: noSleep,
+    })
+  }
+
+  it('stops the run instead of spending the rest of the backlog the same way', async () => {
+    const run = vi.fn(fakeRunner('usage_limit').run)
+    await loopWith({ run })
+
+    expect(run).toHaveBeenCalledTimes(1)
+    expect(isStopped(db)).toBe(true)
+  })
+
+  it('does not spend budget on an attempt that never ran', async () => {
+    setBudget(db, 5)
+    await loopWith(fakeRunner('usage_limit'))
+
+    expect(getBudget(db)).toBe(5)
+  })
+
+  it('still records the attempt, and still mirrors it, before stopping', async () => {
+    const onComplete = vi.fn(async () => {})
+    await loopWith(fakeRunner('usage_limit'), { onDispatch: async () => {}, onComplete })
+
+    expect(onComplete).toHaveBeenCalledWith(expect.objectContaining({ status: 'usage_limit' }))
+  })
+
+  it('stays stopped even when the mirror fails on the way out', async () => {
+    // The mirror walks the ticket back out of "In Progress" here, so it is the
+    // one onComplete that can throw — and the catch it lands in must not leave
+    // the loop free to pick the next ticket.
+    const onComplete = vi.fn(async () => {
+      throw new Error('Jira unreachable')
+    })
+    const run = vi.fn(fakeRunner('usage_limit').run)
+    await loopWith({ run }, { onDispatch: async () => {}, onComplete })
+
+    expect(run).toHaveBeenCalledTimes(1)
+    expect(isStopped(db)).toBe(true)
+  })
+})

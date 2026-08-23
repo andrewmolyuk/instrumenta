@@ -18,6 +18,14 @@ interface TransitionsResponse {
 }
 
 /**
+ * Where a ticket goes when an attempt has to be undone (ADR-017), tried in
+ * order. Three names rather than one because "the backlog column" has no
+ * canonical name across Jira workflows; these are the defaults Jira itself
+ * ships with, most-likely first.
+ */
+const BACKLOG_STATUS_NAMES = ['To Do', 'Open', 'Backlog']
+
+/**
  * ADR-001's mirror, write-only for human visibility: Jira's live query stays
  * the authority on eligibility, this never reads status back. Looks up the
  * issue's available transitions and matches by target status *name* rather
@@ -33,6 +41,15 @@ interface TransitionsResponse {
  * attempt status now; a ticket stays wherever `onDispatch` left it ("In
  * Progress") until a human moves it to Done themselves, after actually
  * merging the PR.
+ *
+ * ADR-017 carves one exception back out of that no-op: a `usage_limit` attempt
+ * never ran the agent, so the ticket is untouched work rather than work that
+ * was tried — and Foreman deliberately leaves it eligible. But `onDispatch`
+ * has already moved it to "In Progress", which drops it out of the target's
+ * backlog JQL, and ADR-001 makes that live query the authority on eligibility.
+ * Without walking the transition back, "the ticket is not retired" would hold
+ * only inside Foreman's own database. Every other status either produced a pull
+ * request or is a verdict on the ticket, so ADR-007's no-op stands for them.
  *
  * Found live: some target workflows don't expose "In Progress" as a direct,
  * one-hop transition from every starting status — Jira's transitions
@@ -54,7 +71,23 @@ export class JiraStatusMirror implements StatusMirror {
     await this.transitionTo(jiraKey, 'In Progress', 'Approved')
   }
 
-  async onComplete(_row: TaskRow): Promise<void> {}
+  /**
+   * Best-effort and name-based like every other transition here: the first of
+   * these targets the workflow actually offers wins, and a workflow offering
+   * none of them leaves the ticket in "In Progress" for a human to move — the
+   * same "don't invent a convention the target didn't provide" rule the rest of
+   * this class follows. Transitions are listed once and matched in order, so a
+   * ticket is never moved twice.
+   */
+  async onComplete(row: TaskRow): Promise<void> {
+    if (row.status !== 'usage_limit') return
+
+    const transitions = await this.listTransitions(row.jira_key)
+    for (const name of BACKLOG_STATUS_NAMES) {
+      const match = transitions.find((t) => t.to.name.toLowerCase() === name.toLowerCase())
+      if (match) return await this.applyTransition(row.jira_key, match.id)
+    }
+  }
 
   private async transitionTo(jiraKey: string, statusName: string, viaStatusName?: string): Promise<void> {
     const transitions = await this.listTransitions(jiraKey)

@@ -33,7 +33,7 @@ function flagValue(command: string[], flag: string): string | undefined {
 
 describe('implementTask', () => {
   it('runs the given command and returns empty output when it prints nothing', async () => {
-    await expect(implementTask('/tmp', INPUT, TICKET, ['true'])).resolves.toEqual({ output: '', costUsd: null, transcript: [] })
+    await expect(implementTask('/tmp', INPUT, TICKET, ['true'])).resolves.toEqual({ output: '', costUsd: null, transcript: [], usageLimited: false })
   })
 
   it('does not throw when the command does not exist, and says so in its output', async () => {
@@ -362,5 +362,37 @@ describe('what the transcript records', () => {
     ])
 
     expect(progress[0]?.line).toMatch(/^\[\d{2}:\d{2}\] looking$/)
+  })
+})
+
+describe('implementTask when the subscription has no capacity left', () => {
+  it('flags a non-zero exit whose output names the usage limit', async () => {
+    const command = ['sh', '-c', 'echo "Claude AI usage limit reached|1755000000" >&2; exit 1']
+    const result = await implementTask('/tmp', INPUT, TICKET, command)
+
+    expect(result.usageLimited).toBe(true)
+  })
+
+  it('does not flag a clean run whose report merely discusses rate limiting', async () => {
+    // `output` is the agent's own report, and a ticket about the *target's*
+    // rate limiting would otherwise be read as our own exhausted quota — and
+    // a finished attempt's work thrown away. The zero exit is the guard.
+    const command = ['sh', '-c', 'echo "fixed the 429 retry on the rate limit path"']
+    const result = await implementTask('/tmp', INPUT, TICKET, command)
+
+    expect(result.usageLimited).toBe(false)
+  })
+
+  it('does not flag an ordinary failure', async () => {
+    const command = ['sh', '-c', 'echo "segmentation fault" >&2; exit 139']
+    const result = await implementTask('/tmp', INPUT, TICKET, command)
+
+    expect(result.usageLimited).toBe(false)
+  })
+
+  it('does not flag a command that could not start at all', async () => {
+    const result = await implementTask('/tmp', INPUT, TICKET, ['this-binary-does-not-exist-anywhere'])
+
+    expect(result.usageLimited).toBe(false)
   })
 })

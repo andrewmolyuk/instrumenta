@@ -21,7 +21,11 @@ import { pick, pickSpecific } from './pick.mts'
  * ADR-001 names two mirrored events, at two different points in the loop:
  * "In Progress" the moment a task is dispatched, "Done" once it succeeds.
  * The other four attempt statuses aren't given a Jira mapping by the ADR, so
- * onComplete is free to no-op for them rather than guess one.
+ * onComplete is free to no-op for them rather than guess one — which, after
+ * ADR-007 dropped the "Done" mirror, is every status except the one ADR-017
+ * added: a `usage_limit` attempt has to be walked back out of "In Progress",
+ * or the ticket Foreman deliberately left un-retired drops out of the backlog
+ * query anyway.
  */
 export interface StatusMirror {
   onDispatch(jiraKey: string): Promise<void>
@@ -128,7 +132,18 @@ export async function runLoop(deps: LoopDeps): Promise<void> {
           appendCurrentProgress(deps.db, progress),
         )
         recordAttempt(deps.db, row)
+
+        // ADR-017: the attempt hit the subscription's usage limit, so no agent
+        // work happened and none will until the window resets — dispatching the
+        // next ticket would burn it the same way. Stop the run, the way an
+        // exhausted budget does. Set before the mirror call so a Jira failure
+        // there (which lands in the catch below) still leaves the loop stopped,
+        // and before the budget decrement so an attempt that never ran does not
+        // spend one.
+        const usageLimited = row.status === 'usage_limit'
+        if (usageLimited) setStopped(deps.db, true)
         await deps.statusMirror.onComplete(row)
+        if (usageLimited) break
 
         // Read again rather than decrementing the value from the top of the
         // iteration: the dispatch above just took tens of minutes, which is

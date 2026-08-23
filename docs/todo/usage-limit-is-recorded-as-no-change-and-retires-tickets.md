@@ -1,6 +1,6 @@
 ---
 type: adr-candidate
-status: open
+status: resolved
 date: 2026-08-23
 source: session e51bd41f-5fad-402f-b5b7-ebdb1acf2f4e
 ---
@@ -44,6 +44,11 @@ Claude Code's own error text, which reaches `tasks.session` and the Jira comment
 fixing on the same pass: that comment path (`noChangeComment` → `commentOnTicket`) is the
 one egress that does not run through `redactCredentials` — minion/session.mts:81 and :106
 both do, minion/jira.mts does not.
+
+**Resolved** by [ADR-017](../adr/017-a-usage-limit-is-not-a-verdict-on-the-ticket.md),
+which took the first alternative below and added a fifth part nobody had noticed: the
+ticket also has to be walked back out of "In Progress", or ADR-001's live-query eligibility
+keeps it invisible to Pick however un-retired Foreman's own database leaves it.
 
 Alternatives considered:
 

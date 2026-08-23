@@ -65,6 +65,12 @@ and dated.
   consequence)
 
 
+- [ADR-017](017-a-usage-limit-is-not-a-verdict-on-the-ticket.md) — an exhausted Claude
+  usage limit reports its own `usage_limit` status and stops the run: nothing committed, no
+  Jira comment, the ticket stays eligible and is walked back out of "In Progress" (amends
+  ADR-014's meaning of an empty diff and carves one exception out of ADR-007's no-op mirror)
+
+
 ## Superseded
 
 None yet.

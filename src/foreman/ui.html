@@ -453,10 +453,13 @@
   // ADR-002's Minion sandboxing). Every dynamic value below is set via
   // textContent/value, never innerHTML, so nothing here can inject markup.
 
-  const STATUSES = ['all', 'success', 'no_change', 'failed_verify', 'blocked_no_verify', 'crashed', 'timeout', 'given_up']
+  const STATUSES = ['all', 'success', 'no_change', 'failed_verify', 'blocked_no_verify', 'crashed', 'timeout', 'given_up', 'usage_limit']
   // no_change is outlined rather than accented: the attempt finished cleanly,
   // but it produced no pull request and is waiting on a human to decide.
-  const TAG_CLASS = { success: 'tag-accent', no_change: 'tag-outline', given_up: 'tag-outline' }
+  // usage_limit is outlined too: nothing happened to the ticket, and the run
+  // stopped itself — an attempt to re-read once the window resets, not a failure
+  // anyone needs to act on (ADR-017).
+  const TAG_CLASS = { success: 'tag-accent', no_change: 'tag-outline', given_up: 'tag-outline', usage_limit: 'tag-outline' }
   const tagClassFor = (status) => TAG_CLASS[status] ?? 'tag-neutral'
 
   let currentTab = 'cockpit'

@@ -199,10 +199,25 @@ export async function runMinion(
 
   const hasOpenPr = await deps.hasOpenPrForBranch(input.jira_key)
   await deps.cloneAndBranch(repoUrl, input.jira_key, workDir, !hasOpenPr)
-  const { output: implementOutput, costUsd, transcript } = await deps.implementTask(workDir, input, ticket)
+  const { output: implementOutput, costUsd, transcript, usageLimited } = await deps.implementTask(workDir, input, ticket)
   // Built once, here, so every exit below reports the same record — including
   // the `success` path, which is the one that had no diagnostic at all before.
   const session = buildSessionRecord({ input, ticket, transcript, agentSummary: implementOutput, costUsd })
+
+  // ADR-017: the subscription's usage limit is exhausted, so the agent never
+  // worked on this ticket. Every other exit below would say something untrue
+  // about it — and left to run on, this one reached the worst of them: the gate
+  // passes (a target whose `verify` is the literal string `true` passes it
+  // vacuously, and a clone with no install has no pre-commit hook to fail),
+  // `hasChanges` is false, and the attempt reported `no_change` — terminal per
+  // ADR-014 — with a Jira comment telling a human the ticket needed no change.
+  // Reported before the gate rather than after, since there is nothing here to
+  // gate: no commit, no pull request, no comment, and nothing pushed. Foreman
+  // stops its loop on this status rather than spending the rest of the backlog
+  // the same way.
+  if (usageLimited) {
+    return { status: 'usage_limit', pr_url: null, output: implementOutput, cost_usd: costUsd, session }
+  }
 
   if (!(await deps.hasVerifyScript(workDir))) {
     await deps.writeNote(workDir, notesPath, blockedNoVerifyFilename(input.jira_key), blockedNoVerifyNote(input))
