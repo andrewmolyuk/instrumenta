@@ -32,6 +32,13 @@ CREATE TABLE IF NOT EXISTS tasks (
   -- request existed and nothing in this database could say what had produced
   -- it, or that the agent had been handed an empty problem statement.
   session TEXT,
+  -- The ticket's Jira title, copied from the BacklogItem at dispatch rather than
+  -- looked up when anyone asks — the same reason `foreman_state.current_summary`
+  -- is stored: mirroring a dispatched task to "In Progress" (ADR-001) drops it
+  -- out of the backlog JQL, and an attempt with a pull request keeps it out, so
+  -- by the time an attempt is history the live queue no longer has a title to
+  -- offer. Null on rows written before this column existed.
+  summary TEXT,
   dispatched_at TEXT NOT NULL,
   finished_at TEXT
 );

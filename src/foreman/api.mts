@@ -10,6 +10,7 @@ import {
   getCurrentTask,
   getQueueTicket,
   isStopped,
+  attemptTotals,
   listAttempts,
   setBudget,
   setBudgetTotal,
@@ -122,6 +123,9 @@ export function createApiHandler(deps: ApiDeps): (req: Request) => Promise<Respo
         queueTotal,
         queueError,
         history: listAttempts(deps.db, deps.historyLimit ?? 50),
+        // Over every attempt, not over `history` above — which is capped, and
+        // would give the Cockpit a total that stops growing at the cap.
+        totals: attemptTotals(deps.db),
       })
     }
 

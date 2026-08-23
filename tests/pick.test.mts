@@ -25,6 +25,7 @@ function attempt(overrides: Partial<TaskRow> = {}): TaskRow {
     output: null,
     cost_usd: null,
   session: null,
+    summary: null,
     dispatched_at: '2026-08-13T00:00:00Z',
     finished_at: '2026-08-13T00:05:00Z',
     ...overrides,

@@ -37,6 +37,8 @@ export async function dispatch(
     output: result.output,
     cost_usd: result.cost_usd,
     session: result.session,
+    // Carried from the BacklogItem rather than looked up later: see schema.sql.
+    summary: task.summary,
     dispatched_at,
     finished_at: new Date().toISOString(),
   }

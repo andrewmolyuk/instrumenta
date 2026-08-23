@@ -7,7 +7,7 @@ import { openDb } from '../src/db/index.mts'
 import { appendCurrentProgress, getCurrentTask, listAttempts, recordAttempt, setCurrentTask } from '../src/db/queries.mts'
 
 describe('openDb', () => {
-  it('creates the tasks table with ADR-001\'s columns, plus ADR-008\'s cost_usd and the session record', () => {
+  it('creates the tasks table with ADR-001\'s columns, plus ADR-008\'s cost_usd, the session record and the ticket title', () => {
     const db = openDb(':memory:')
     const columns = db
       .query('PRAGMA table_info(tasks)')
@@ -23,6 +23,7 @@ describe('openDb', () => {
       'output',
       'cost_usd',
       'session',
+      'summary',
       'dispatched_at',
       'finished_at',
     ])
@@ -126,7 +127,7 @@ describe('openDb migrations', () => {
     expect(listAttempts(db, 10)[0]).toMatchObject({ task_id: 't0', session: null })
     recordAttempt(db, {
       task_id: 't1', jira_key: 'KAZ-2', attempt_number: 1, status: 'success', pr_url: null,
-      output: null, cost_usd: null, session: '## Minion session', dispatched_at: '2026-08-02T00:00:00Z', finished_at: null,
+      output: null, cost_usd: null, session: '## Minion session', summary: null, dispatched_at: '2026-08-02T00:00:00Z', finished_at: null,
     })
     expect(listAttempts(db, 10).find((r) => r.task_id === 't1')?.session).toBe('## Minion session')
   })
@@ -163,7 +164,7 @@ describe('openDb migrations', () => {
     // And the new status is now accepted.
     recordAttempt(db, {
       task_id: 't1', jira_key: 'KAZ-2', attempt_number: 1, status: 'no_change', pr_url: null,
-      output: null, cost_usd: null, session: null, dispatched_at: '2026-08-02T00:00:00Z', finished_at: null,
+      output: null, cost_usd: null, session: null, summary: null, dispatched_at: '2026-08-02T00:00:00Z', finished_at: null,
     })
     expect(listAttempts(db, 10).find((r) => r.task_id === 't1')?.status).toBe('no_change')
   })
@@ -212,6 +213,7 @@ describe('openDb migrations', () => {
       output: 'gate output',
       cost_usd: 8.51,
       session: '## Minion session',
+      summary: null,
       dispatched_at: '2026-08-23T00:00:00Z',
       finished_at: '2026-08-23T00:16:00Z',
     })
@@ -220,9 +222,41 @@ describe('openDb migrations', () => {
     recordAttempt(db, {
       task_id: 't2', jira_key: 'RPG-6004', attempt_number: 1, status: 'usage_limit', pr_url: null,
       output: 'Claude AI usage limit reached', cost_usd: null, session: null,
+      summary: null,
       dispatched_at: '2026-08-23T02:00:00Z', finished_at: null,
     })
     expect(listAttempts(db, 10).find((r) => r.task_id === 't2')?.status).toBe('usage_limit')
+  })
+
+  it('carries a populated summary through a CHECK rebuild', () => {
+    // widenTaskStatusCheck names the columns it copies, so a column missing
+    // from that list is silently dropped for every existing row. The case the
+    // test above cannot cover: a database that already has the column, with
+    // data in it, when the constraint next needs widening.
+    dir = mkdtempSync(join(tmpdir(), 'instrumenta-db-'))
+    const path = join(dir, 'foreman.db')
+    const old = new Database(path, { create: true })
+    old.run(`CREATE TABLE tasks (
+      task_id TEXT PRIMARY KEY,
+      jira_key TEXT NOT NULL,
+      attempt_number INTEGER NOT NULL,
+      status TEXT NOT NULL CHECK (status IN ('success', 'crashed')),
+      pr_url TEXT,
+      output TEXT,
+      cost_usd REAL,
+      session TEXT,
+      summary TEXT,
+      dispatched_at TEXT NOT NULL,
+      finished_at TEXT
+    )`)
+    old.run(
+      "INSERT INTO tasks (task_id, jira_key, attempt_number, status, summary, dispatched_at) VALUES ('t0','RPG-5981',1,'success','Web UI: long tag does not look good','2026-08-23T00:00:00Z')",
+    )
+    old.close()
+
+    const db = openDb(path)
+
+    expect(listAttempts(db, 10)[0]?.summary).toBe('Web UI: long tag does not look good')
   })
 
   it('still rejects a status outside the widened vocabulary', () => {
@@ -230,7 +264,7 @@ describe('openDb migrations', () => {
     expect(() =>
       recordAttempt(db, {
         task_id: 't1', jira_key: 'KAZ-1', attempt_number: 1, status: 'invented' as never, pr_url: null,
-        output: null, cost_usd: null, session: null, dispatched_at: '2026-08-01T00:00:00Z', finished_at: null,
+        output: null, cost_usd: null, session: null, summary: null, dispatched_at: '2026-08-01T00:00:00Z', finished_at: null,
       }),
     ).toThrow()
   })

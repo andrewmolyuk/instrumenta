@@ -78,6 +78,7 @@ describe('GET /api/status', () => {
       pr_url: 'https://x/pr/1',
       output: null,
       cost_usd: null, session: null,
+      summary: null,
       dispatched_at: '2026-08-13T00:00:00Z',
       finished_at: '2026-08-13T00:05:00Z',
     })
@@ -277,6 +278,7 @@ describe('POST /api/delete-attempts', () => {
       pr_url: null,
       output: null,
       cost_usd: null, session: null,
+      summary: null,
       dispatched_at: '2026-08-13T00:00:00Z',
       finished_at: '2026-08-13T00:01:00Z',
     })
@@ -288,6 +290,7 @@ describe('POST /api/delete-attempts', () => {
       pr_url: null,
       output: null,
       cost_usd: null, session: null,
+      summary: null,
       dispatched_at: '2026-08-13T00:02:00Z',
       finished_at: '2026-08-13T00:03:00Z',
     })
@@ -320,6 +323,33 @@ describe('POST /api/delete-attempts', () => {
   })
 })
 
+describe('GET /api/status totals', () => {
+  it('counts every attempt, not just the ones the capped history returned', async () => {
+    // The reason totals are computed in SQL rather than summed from `history`:
+    // that list is capped (default 50), so a card built from it would stop
+    // growing at the cap and disagree with the Attempts tab.
+    handler = createApiHandler({ db, taskProvider, bitbucket: BITBUCKET, fetchImpl: fakeBitbucketFetch(), historyLimit: 1 })
+    for (const [i, cost] of [2.2, 0.8, 5].entries()) {
+      recordAttempt(db, {
+        task_id: 't' + i, jira_key: 'KAZ-' + i, attempt_number: 1, status: 'success', pr_url: null,
+        output: null, cost_usd: cost, session: null, summary: null,
+        dispatched_at: '2026-08-23T0' + i + ':00:00Z', finished_at: '2026-08-23T0' + i + ':10:00Z',
+      })
+    }
+
+    const body = (await (await handler(req('GET', '/api/status'))).json()) as {
+      history: unknown[]
+      totals: { attempts: number; costTotal: number; costCount: number; durationCount: number }
+    }
+
+    expect(body.history).toHaveLength(1)
+    expect(body.totals.attempts).toBe(3)
+    expect(body.totals.costTotal).toBeCloseTo(8)
+    expect(body.totals.costCount).toBe(3)
+    expect(body.totals.durationCount).toBe(3)
+  })
+})
+
 describe('GET /api/attempts', () => {
   it('returns every attempt, past the 50 that /api/status caps at', async () => {
     // The bug this endpoint exists for: the Attempts tab rendered
@@ -335,6 +365,7 @@ describe('GET /api/attempts', () => {
         pr_url: null,
         output: null,
         cost_usd: 1, session: null,
+        summary: null,
         dispatched_at: '2026-08-' + String((i % 28) + 1).padStart(2, '0') + 'T00:00:00Z',
         finished_at: null,
       })
@@ -360,11 +391,11 @@ describe('GET /api/attempts', () => {
   it('orders most recent first, like the history it replaces', async () => {
     recordAttempt(db, {
       task_id: 'old', jira_key: 'KAZ-1', attempt_number: 1, status: 'success', pr_url: null,
-      output: null, cost_usd: null, session: null, dispatched_at: '2026-08-01T00:00:00Z', finished_at: null,
+      output: null, cost_usd: null, session: null, summary: null, dispatched_at: '2026-08-01T00:00:00Z', finished_at: null,
     })
     recordAttempt(db, {
       task_id: 'new', jira_key: 'KAZ-2', attempt_number: 1, status: 'success', pr_url: null,
-      output: null, cost_usd: null, session: null, dispatched_at: '2026-08-20T00:00:00Z', finished_at: null,
+      output: null, cost_usd: null, session: null, summary: null, dispatched_at: '2026-08-20T00:00:00Z', finished_at: null,
     })
 
     const body = (await (await handler(new Request('http://x/api/attempts'))).json()) as {

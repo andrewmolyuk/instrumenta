@@ -42,6 +42,8 @@ export interface TaskRow {
   cost_usd: number | null
   /** The full agent session for this attempt (minion/session.mts) — see schema.sql. */
   session: string | null
+  /** The ticket's Jira title as of dispatch — see schema.sql. Null on rows written before the column existed. */
+  summary: string | null
   dispatched_at: string
   finished_at: string | null
 }
@@ -59,6 +61,7 @@ const ADDED_COLUMNS: Array<[table: string, column: string, type: string]> = [
   ['foreman_state', 'current_output', 'TEXT'],
   ['foreman_state', 'current_cost_usd', 'REAL'],
   ['tasks', 'session', 'TEXT'],
+  ['tasks', 'summary', 'TEXT'],
 ]
 
 /** Opens (creating if needed) the SQLite file at `path` and applies the schema. */
@@ -100,7 +103,7 @@ function widenTaskStatusCheck(db: Database): void {
   if (missing.length === 0) return
 
   const columns =
-    'task_id, jira_key, attempt_number, status, pr_url, output, cost_usd, session, dispatched_at, finished_at'
+    'task_id, jira_key, attempt_number, status, pr_url, output, cost_usd, session, summary, dispatched_at, finished_at'
   db.run('PRAGMA foreign_keys = OFF')
   db.transaction(() => {
     db.run(`ALTER TABLE tasks RENAME TO tasks_old`)

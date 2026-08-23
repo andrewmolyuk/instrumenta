@@ -15,8 +15,8 @@ export function nextAttemptNumber(db: Database, jiraKey: string): number {
 
 export function recordAttempt(db: Database, row: TaskRow): void {
   db.run(
-    `INSERT INTO tasks (task_id, jira_key, attempt_number, status, pr_url, output, cost_usd, session, dispatched_at, finished_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO tasks (task_id, jira_key, attempt_number, status, pr_url, output, cost_usd, session, summary, dispatched_at, finished_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       row.task_id,
       row.jira_key,
@@ -26,6 +26,7 @@ export function recordAttempt(db: Database, row: TaskRow): void {
       row.output,
       row.cost_usd,
       row.session,
+      row.summary,
       row.dispatched_at,
       row.finished_at,
     ],
@@ -211,6 +212,52 @@ export function listAttempts(db: Database, limit: number | null): TaskRow[] {
   return db
     .query<TaskRow, [number]>('SELECT * FROM tasks ORDER BY dispatched_at DESC LIMIT ?')
     .all(limit ?? -1)
+}
+
+/**
+ * What every recorded attempt adds up to: how many, what they cost, and how
+ * long they ran.
+ *
+ * Computed in SQL over the whole table rather than summed from the rows
+ * `/api/status` already returns, because that endpoint caps its history at 50
+ * (see api.mts). Summing the capped list would give the Cockpit a total that
+ * silently stops growing at the cap and disagrees with the Attempts tab — the
+ * same shape of bug as the backlog count that reported 50 for a 121-ticket
+ * backlog (src/task-provider/jira.mts).
+ *
+ * The two counts are reported alongside the two sums because the averages are
+ * taken over the attempts that actually have the value: an attempt that crashed
+ * before Claude Code reported anything has a null cost, and one still in flight
+ * has no finish time. Dividing either sum by `attempts` would understate it.
+ * Durations come from julianday arithmetic, and the `finished_at >=
+ * dispatched_at` guard keeps a clock skew from contributing a negative span —
+ * ISO-8601 UTC strings compare correctly as text.
+ */
+export interface AttemptTotals {
+  attempts: number
+  costTotal: number
+  costCount: number
+  durationTotalMs: number
+  durationCount: number
+}
+
+export function attemptTotals(db: Database): AttemptTotals {
+  const row = db
+    .query<AttemptTotals, []>(
+      `SELECT COUNT(*) AS attempts,
+              COALESCE(SUM(cost_usd), 0) AS costTotal,
+              COUNT(cost_usd) AS costCount,
+              COALESCE(SUM(
+                CASE WHEN finished_at IS NOT NULL AND finished_at >= dispatched_at
+                     THEN (julianday(finished_at) - julianday(dispatched_at)) * 86400000 END
+              ), 0) AS durationTotalMs,
+              COUNT(
+                CASE WHEN finished_at IS NOT NULL AND finished_at >= dispatched_at THEN 1 END
+              ) AS durationCount
+       FROM tasks`,
+    )
+    .get()
+  return row ?? { attempts: 0, costTotal: 0, costCount: 0, durationTotalMs: 0, durationCount: 0 }
 }
 
 /**

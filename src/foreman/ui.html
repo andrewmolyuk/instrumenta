@@ -79,7 +79,7 @@
   .stat { font-family: var(--font-heading); font-size: 38px; line-height: 1; text-transform: uppercase; }
   .note { font-size: 11px; color: var(--color-neutral-700); }
 
-  .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-8); }
+  .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: var(--space-8); }
   .stat-card { display: flex; flex-direction: column; gap: var(--space-2); min-height: 104px; position: relative; }
   /* baseline, not the default stretch: the link is 11px against the metrics'
      14px, and only a shared baseline lines their text up on one row. */
@@ -224,6 +224,13 @@
       </div>
       <div class="note" id="stat-current-note"></div>
     </div>
+    <div class="blueprint stat-card">
+      <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+      <div class="kicker">Attempts to date</div>
+      <div class="stat" id="stat-totals">&ndash;</div>
+      <div class="note tabular" id="stat-totals-detail"></div>
+      <div class="note" style="margin-top:auto">Every attempt in Foreman&rsquo;s SQLite, all statuses.</div>
+    </div>
   </div>
 
   <div class="cockpit-grid">
@@ -298,7 +305,7 @@
         </div>
         <table class="table">
           <thead>
-            <tr><th style="width:120px">Jira key</th><th style="width:170px">Status</th><th style="width:70px">PR</th><th style="width:90px">Cost</th><th style="width:110px">Duration</th><th>Dispatched</th></tr>
+            <tr><th style="width:120px">Jira key</th><th>Summary</th><th style="width:170px">Status</th><th style="width:70px">PR</th><th style="width:90px">Cost</th><th style="width:110px">Duration</th><th style="width:170px">Dispatched</th></tr>
           </thead>
           <tbody id="recent-body"></tbody>
         </table>
@@ -321,7 +328,7 @@
     <table class="table">
       <thead>
         <tr>
-          <th style="width:120px">Jira key</th><th style="width:170px">Status</th>
+          <th style="width:120px">Jira key</th><th>Summary</th><th style="width:170px">Status</th>
           <th style="width:130px">PR &middot; Branch</th><th style="width:90px">Cost</th><th style="width:170px">Dispatched</th>
           <th style="width:170px">Finished</th><th style="width:110px">Duration</th><th style="width:110px">Detail</th>
         </tr>
@@ -528,6 +535,17 @@
     return cell
   }
 
+  /**
+   * The ticket's title, as the queue shows it. Stored per attempt (see
+   * schema.sql) because by the time an attempt is history its ticket has left
+   * the live queue, so there is nothing to look it up in. Rows recorded before
+   * the column existed have none, and read as an em dash rather than blank —
+   * "not recorded" and "no title" would otherwise look the same.
+   */
+  function summaryCell(summary) {
+    return td(typeof summary === 'string' && summary.length > 0 ? summary : '\u2014')
+  }
+
   function prCell(prUrl) {
     const cell = document.createElement('td')
     if (typeof prUrl === 'string' && /^https?:\/\//.test(prUrl)) {
@@ -725,6 +743,10 @@
 
     document.getElementById('stat-queued').textContent = s.queueTicket ?? '—'
 
+    const totals = s.totals
+    document.getElementById('stat-totals').textContent = totals ? String(totals.attempts) : '—'
+    document.getElementById('stat-totals-detail').textContent = totals ? summariseTotals(totals, false) : ''
+
     renderCurrent(s.current)
 
     const toggleLabel = s.stopped ? 'Start' : 'Stop'
@@ -780,7 +802,7 @@
       const dispatchedTd = td(row.dispatched_at)
       dispatchedTd.classList.add('tabular')
       dispatchedTd.style.color = 'var(--color-neutral-700)'
-      tr.append(keyCell(row.jira_key), tagCell(row.status), prCell(row.pr_url), costTd, durationTd, dispatchedTd)
+      tr.append(keyCell(row.jira_key), summaryCell(row.summary), tagCell(row.status), prCell(row.pr_url), costTd, durationTd, dispatchedTd)
       tbody.append(tr)
     }
   }
@@ -828,6 +850,21 @@
      all of them: a crash before Claude Code reported anything has a null cost,
      and an attempt still in flight has no finish time. Dividing by the full row
      count would quietly understate both. */
+  /* The one place these numbers are turned into words. Two things print them
+     from different scopes — the Attempts tab, over whatever the status filter
+     currently shows, and the Cockpit's card, over every attempt ever recorded
+     (GET /api/status's `totals`, computed in SQL because that endpoint's history
+     is capped at 50). Wording that drifted apart would read as a disagreement
+     about the data. `withCount` is false where the count is already the card's
+     headline figure. */
+  function summariseTotals(t, withCount) {
+    const parts = []
+    if (withCount !== false) parts.push(t.attempts + (t.attempts === 1 ? ' attempt' : ' attempts'))
+    if (t.costCount) parts.push('$' + t.costTotal.toFixed(2) + ' · avg $' + (t.costTotal / t.costCount).toFixed(2))
+    if (t.durationCount) parts.push(spanLabel(t.durationTotalMs) + ' · avg ' + spanLabel(t.durationTotalMs / t.durationCount))
+    return parts.join('  ·  ')
+  }
+
   function summarise(rows) {
     const costs = rows.map((r) => r.cost_usd).filter((c) => typeof c === 'number')
     const spans = rows
@@ -835,13 +872,13 @@
       .map((r) => new Date(r.finished_at).getTime() - new Date(r.dispatched_at).getTime())
       .filter((ms) => Number.isFinite(ms) && ms >= 0)
 
-    const totalCost = costs.reduce((a, c) => a + c, 0)
-    const totalMs = spans.reduce((a, ms) => a + ms, 0)
-
-    const parts = [rows.length + (rows.length === 1 ? ' attempt' : ' attempts')]
-    if (costs.length) parts.push('$' + totalCost.toFixed(2) + ' · avg $' + (totalCost / costs.length).toFixed(2))
-    if (spans.length) parts.push(spanLabel(totalMs) + ' · avg ' + spanLabel(totalMs / spans.length))
-    return parts.join('  ·  ')
+    return summariseTotals({
+      attempts: rows.length,
+      costTotal: costs.reduce((a, c) => a + c, 0),
+      costCount: costs.length,
+      durationTotalMs: spans.reduce((a, ms) => a + ms, 0),
+      durationCount: spans.length,
+    })
   }
 
   function renderAttempts(history) {
@@ -866,6 +903,7 @@
       const detailTd = detailCell(row)
       tr.append(
         keyCell(row.jira_key),
+        summaryCell(row.summary),
         tagCell(row.status),
         prAndBranchCell(row),
         costTd,

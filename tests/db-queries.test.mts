@@ -3,6 +3,7 @@ import type { Database } from 'bun:sqlite'
 import { openDb, type TaskRow } from '../src/db/index.mts'
 import {
   appendCurrentProgress,
+  attemptTotals,
   CURRENT_OUTPUT_LINES,
   deleteAttempts,
   getBudget,
@@ -38,6 +39,7 @@ function attempt(overrides: Partial<TaskRow> = {}): TaskRow {
     output: null,
     cost_usd: null,
   session: null,
+    summary: null,
     dispatched_at: '2026-08-13T00:00:00Z',
     finished_at: '2026-08-13T00:05:00Z',
     ...overrides,
@@ -208,6 +210,49 @@ describe('appendCurrentProgress', () => {
   })
 })
 
+describe('attemptTotals', () => {
+  it('returns zeros on an empty table', () => {
+    expect(attemptTotals(db)).toEqual({
+      attempts: 0,
+      costTotal: 0,
+      costCount: 0,
+      durationTotalMs: 0,
+      durationCount: 0,
+    })
+  })
+
+  it('counts and sums every attempt, whatever its status', () => {
+    recordAttempt(db, attempt({ task_id: 't1', status: 'success', cost_usd: 2.2, dispatched_at: '2026-08-23T16:40:00Z', finished_at: '2026-08-23T16:50:00Z' }))
+    recordAttempt(db, attempt({ task_id: 't2', status: 'crashed', cost_usd: 0.8, dispatched_at: '2026-08-23T17:00:00Z', finished_at: '2026-08-23T17:05:00Z' }))
+
+    const totals = attemptTotals(db)
+    expect(totals.attempts).toBe(2)
+    expect(totals.costTotal).toBeCloseTo(3)
+    expect(totals.costCount).toBe(2)
+    expect(totals.durationTotalMs).toBeCloseTo(15 * 60_000, -1)
+    expect(totals.durationCount).toBe(2)
+  })
+
+  it('reports the counts separately, so an average is not taken over rows without the value', () => {
+    // A crash before Claude Code reported anything has a null cost; an attempt
+    // still in flight has no finish time. Both must stay out of their divisor.
+    recordAttempt(db, attempt({ task_id: 't1', cost_usd: 4, dispatched_at: '2026-08-23T10:00:00Z', finished_at: '2026-08-23T10:10:00Z' }))
+    recordAttempt(db, attempt({ task_id: 't2', cost_usd: null, dispatched_at: '2026-08-23T11:00:00Z', finished_at: null }))
+
+    const totals = attemptTotals(db)
+    expect(totals.attempts).toBe(2)
+    expect(totals.costCount).toBe(1)
+    expect(totals.costTotal).toBeCloseTo(4)
+    expect(totals.durationCount).toBe(1)
+  })
+
+  it('leaves a backwards span out rather than subtracting it', () => {
+    recordAttempt(db, attempt({ task_id: 't1', cost_usd: null, dispatched_at: '2026-08-23T12:00:00Z', finished_at: '2026-08-23T11:00:00Z' }))
+
+    expect(attemptTotals(db)).toMatchObject({ attempts: 1, durationCount: 0, durationTotalMs: 0 })
+  })
+})
+
 describe('listAttempts', () => {
   it('returns most recent first, capped at the limit', () => {
     recordAttempt(db, attempt({ task_id: 't1', dispatched_at: '2026-08-13T00:00:00Z' }))
@@ -231,6 +276,15 @@ describe('listAttempts', () => {
     const rows = listAttempts(db, 10)
     expect(rows.find((r) => r.task_id === 't1')?.session).toContain('Read: src/foo.ts')
     expect(rows.find((r) => r.task_id === 't2')?.session).toBeNull()
+  })
+
+  it("round-trips the ticket's title, and leaves it null on rows that never had one", () => {
+    recordAttempt(db, attempt({ task_id: 't1', summary: 'Web UI: long tag doesn\u2019t look good' }))
+    recordAttempt(db, attempt({ task_id: 't2', summary: null }))
+
+    const rows = listAttempts(db, 10)
+    expect(rows.find((r) => r.task_id === 't1')?.summary).toBe('Web UI: long tag doesn\u2019t look good')
+    expect(rows.find((r) => r.task_id === 't2')?.summary).toBeNull()
   })
 
   it('returns every attempt when the limit is null', () => {

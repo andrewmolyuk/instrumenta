@@ -49,6 +49,20 @@ describe('dispatch', () => {
     expect(row.output).toBe('test 1 failed')
   })
 
+  it("carries the ticket's title into the row, since the queue will not have it later", async () => {
+    // A dispatched ticket is mirrored to "In Progress" and drops out of the
+    // backlog JQL, so the title has to be copied now or it is unrecoverable —
+    // the same reason foreman_state.current_summary exists (schema.sql).
+    const row = await dispatch(
+      db,
+      fakeRunner({ status: 'success', pr_url: null, output: null, cost_usd: null, session: null }),
+      TASK,
+      60_000,
+    )
+
+    expect(row.summary).toBe(TASK.summary)
+  })
+
   it('increments attempt_number on a retry', async () => {
     recordAttempt(db, {
       task_id: 'prior',
@@ -58,6 +72,7 @@ describe('dispatch', () => {
       pr_url: null,
       output: null,
       cost_usd: null, session: null,
+      summary: null,
       dispatched_at: '2026-08-13T00:00:00Z',
       finished_at: '2026-08-13T00:01:00Z',
     })
