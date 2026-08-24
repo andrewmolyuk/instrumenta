@@ -440,7 +440,8 @@
   <div class="modal blueprint" role="dialog" aria-modal="true" aria-labelledby="detail-title">
     <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
     <div class="modal-head">
-      <div class="kicker" id="detail-title"></div>
+      <div class="kicker" id="detail-title" style="flex:1"></div>
+      <button type="button" id="detail-copy" class="btn btn-secondary" style="padding-inline:var(--space-4)">Copy</button>
       <button type="button" id="detail-close" class="btn btn-secondary" style="padding-inline:var(--space-4)">Close</button>
     </div>
     <pre id="detail-body" class="modal-body"></pre>
@@ -623,6 +624,31 @@
   function closeDetail() {
     liveDetail = false
     document.getElementById('detail-modal').hidden = true
+  }
+
+  /* Copies what the modal is currently showing. These are the texts worth
+     taking somewhere else — a session record runs to tens of thousands of
+     characters, and selecting it by hand out of a scrolled <pre> is miserable.
+     The button reports what happened rather than failing silently:
+     `navigator.clipboard` needs a secure context, which localhost is and a
+     plain-http LAN address is not, so a Cockpit opened by IP lands in the
+     catch. Restores its own label either way. */
+  let copyResetTimer
+  async function copyDetail() {
+    const btn = document.getElementById('detail-copy')
+    const text = document.getElementById('detail-body').textContent
+    let ok = false
+    try {
+      await navigator.clipboard.writeText(text)
+      ok = true
+    } catch {
+      ok = false
+    }
+    btn.textContent = ok ? 'Copied' : 'Copy failed'
+    clearTimeout(copyResetTimer)
+    copyResetTimer = setTimeout(() => {
+      btn.textContent = 'Copy'
+    }, 1500)
   }
 
   /* PR and branch side by side. The branch is named after the jira_key
@@ -1166,6 +1192,7 @@
   setTab('cockpit')
   loadConfig()
   document.getElementById('detail-close').addEventListener('click', closeDetail)
+  document.getElementById('detail-copy').addEventListener('click', copyDetail)
   document.getElementById('detail-modal').addEventListener('click', (e) => {
     // Backdrop only — a click inside the dialog must not dismiss it.
     if (e.target === document.getElementById('detail-modal')) closeDetail()
