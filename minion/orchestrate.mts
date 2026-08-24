@@ -115,6 +115,39 @@ function commitSubject(description: string): string {
   return lowercased.slice(0, MAX_SUBJECT_DESCRIPTION_CHARS).trimEnd()
 }
 
+/**
+ * Runs one half of the gate, and runs it a second time if it failed.
+ *
+ * Found live on RPG-6062 (ADR-019): the agent fixed a bash CGI script in the
+ * legacy app, ran the target's own checks and watched them pass, and the gate
+ * then failed two minutes later on three vitest cases in a *different*
+ * workspace — `branding-info` and `deviceConfig`, both about module-level state
+ * leaking between tests, one of them reporting a mock called five times instead
+ * of once. Nothing in the diff could reach them. With ADR-015's single attempt,
+ * that flake retired the ticket permanently and threw away a finished $1.80
+ * diff.
+ *
+ * A retry is the cheapest thing that tells a flake from a real failure: it costs
+ * one more run of the failing command (~2 minutes here) and only on the failure
+ * path, where the alternative is losing the whole attempt. The agent is not
+ * re-run — its work is already in the tree.
+ *
+ * Exactly once, not until it passes: a check that fails twice is a check that
+ * fails, and a loop here would burn the attempt's timeout discovering that.
+ */
+async function runGateWithRetry<T extends VerifyResult>(run: () => Promise<T>): Promise<{ result: T; retried: boolean }> {
+  const first = await run()
+  if (first.passed) return { result: first, retried: false }
+  return { result: await run(), retried: true }
+}
+
+/**
+ * Appended to a gate failure that survived its retry, so a human reading the
+ * captured output knows the difference between "this failed" and "this failed
+ * twice" without counting stack traces.
+ */
+const FAILED_TWICE = '(this check was run twice — it failed both times, so it is not a flake)'
+
 /** Runs commitAndPush; returns the error message instead of throwing on failure. */
 async function tryCommitAndPush(
   deps: MinionDeps,
@@ -269,23 +302,23 @@ export async function runMinion(
     }
   }
 
-  const verify = await deps.runVerify(workDir)
-  if (!verify.passed) {
+  const verify = await runGateWithRetry(() => deps.runVerify(workDir))
+  if (!verify.result.passed) {
     return await reportFailedGate(deps, input, workDir, notesPath, {
       isFinalAttempt,
       costUsd,
       session,
-      output: combineOutputs(implementOutput, verify.output),
+      output: combineOutputs(implementOutput, verify.result.output, FAILED_TWICE),
     })
   }
 
-  const preCommit = await deps.runPreCommitChecks(workDir)
-  if (!preCommit.passed) {
+  const preCommit = await runGateWithRetry(() => deps.runPreCommitChecks(workDir))
+  if (!preCommit.result.passed) {
     return await reportFailedGate(deps, input, workDir, notesPath, {
       isFinalAttempt,
       costUsd,
       session,
-      output: combineOutputs(implementOutput, preCommit.output),
+      output: combineOutputs(implementOutput, preCommit.result.output, FAILED_TWICE),
     })
   }
 

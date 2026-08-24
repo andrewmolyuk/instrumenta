@@ -77,6 +77,12 @@ and dated.
   and widens ADR-017 past matching the provider's wording)
 
 
+- [ADR-019](019-a-gate-check-gets-one-retry.md) — a failed gate check is run once more
+  before it retires a ticket: a flaky test in the target repo cost RPG-6062 its whole
+  attempt (qualifies ADR-009's gate and softens ADR-015's single attempt without
+  redispatching the agent)
+
+
 ## Superseded
 
 None yet.

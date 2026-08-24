@@ -186,7 +186,7 @@ describe('runMinion', () => {
     expect(result).toEqual({
       status: 'given_up',
       pr_url: null,
-      output: 'test 1 failed',
+      output: expect.stringContaining('test 1 failed'),
       cost_usd: null,
       session: expect.any(String),
     })
@@ -251,7 +251,7 @@ describe('runMinion', () => {
     expect(result).toEqual({
       status: 'given_up',
       pr_url: null,
-      output: 'eslint: 2 problems',
+      output: expect.stringContaining('eslint: 2 problems'),
       cost_usd: null,
       session: expect.any(String),
     })
@@ -288,7 +288,7 @@ describe('runMinion', () => {
     expect(result).toEqual({
       status: 'given_up',
       pr_url: null,
-      output: 'test 1 failed',
+      output: expect.stringContaining('test 1 failed'),
       cost_usd: null,
       session: expect.any(String),
     })
@@ -590,5 +590,68 @@ describe('runMinion when an upstream API call fails', () => {
     })
 
     expect((await runMinion(input(), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)).status).toBe('success')
+  })
+})
+
+describe('runMinion and a flaky gate (ADR-019)', () => {
+  /** Fails on its first call, passes on every one after. */
+  function flaky(output: string) {
+    let call = 0
+    return vi.fn(async () => ({ passed: call++ > 0, output, ran: true }))
+  }
+
+  it('re-runs a failed verify once, and commits when the second run passes', async () => {
+    const runVerify = flaky('3 failed | 760 passed')
+    const deps = fakeDeps({ runVerify })
+    const result = await runMinion(input(), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
+
+    expect(runVerify).toHaveBeenCalledTimes(2)
+    expect(result.status).toBe('success')
+    expect(deps.commitAndPush).toHaveBeenCalled()
+  })
+
+  it('re-runs failed pre-commit checks once — the half that retired RPG-6062', async () => {
+    // The live case: the agent changed one bash script in the legacy app, and
+    // the hook failed on vitest cases in another workspace that nothing in the
+    // diff could reach.
+    const runPreCommitChecks = flaky('husky - pre-commit script failed (code 1)')
+    const deps = fakeDeps({ runPreCommitChecks })
+    const result = await runMinion(input(), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
+
+    expect(runPreCommitChecks).toHaveBeenCalledTimes(2)
+    expect(result.status).toBe('success')
+    expect(deps.createPullRequest).toHaveBeenCalled()
+  })
+
+  it('gives up when the check fails both times, and says it failed twice', async () => {
+    const runVerify = vi.fn(async () => ({ passed: false, output: 'test 1 failed' }))
+    const deps = fakeDeps({ runVerify })
+    const result = await runMinion(input(), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
+
+    expect(runVerify).toHaveBeenCalledTimes(2)
+    expect(result.status).toBe('given_up')
+    expect(result.output).toContain('test 1 failed')
+    expect(result.output).toContain('failed both times')
+    expect(deps.createPullRequest).not.toHaveBeenCalled()
+  })
+
+  it('does not retry a check that passed, so the happy path costs nothing extra', async () => {
+    const deps = fakeDeps()
+    await runMinion(input(), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
+
+    expect(deps.runVerify).toHaveBeenCalledTimes(1)
+    expect(deps.runPreCommitChecks).toHaveBeenCalledTimes(1)
+  })
+
+  it('retries exactly once rather than until it passes', async () => {
+    // A check that only passes on the third run still gives up: a loop here
+    // would spend the attempt's timeout finding that out.
+    let call = 0
+    const runVerify = vi.fn(async () => ({ passed: call++ >= 2, output: 'still failing' }))
+    const deps = fakeDeps({ runVerify })
+    const result = await runMinion(input(), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
+
+    expect(runVerify).toHaveBeenCalledTimes(2)
+    expect(result.status).toBe('given_up')
   })
 })
