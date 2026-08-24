@@ -101,10 +101,14 @@ kill that lands on a Minion which *had* already reported is recorded under the s
 reported, not as a timeout), `given_up` (final allowed attempt still didn't succeed),
 `usage_limit` (the Claude subscription's usage limit was reached, so the agent never worked
 on the ticket — nothing committed, no Jira comment, the ticket stays eligible, and the loop
-stops the way an exhausted budget stops it).
+stops the way an exhausted budget stops it), `agent_error` (the attempt ended without the
+agent producing a report: an upstream API failure, a toolchain that died, or an agent that
+returned having done nothing — same handling as `usage_limit`, since none of it is a verdict
+on the ticket).
 _Decided in_: [architecture.md](docs/architecture.md#minion-container-ephemeral-one-per-dispatched-task),
 [ADR-001](docs/adr/001-task-state-three-sources.md), [ADR-014](docs/adr/014-no-change-is-an-outcome.md),
-[ADR-017](docs/adr/017-a-usage-limit-is-not-a-verdict-on-the-ticket.md).
+[ADR-017](docs/adr/017-a-usage-limit-is-not-a-verdict-on-the-ticket.md),
+[ADR-018](docs/adr/018-an-api-failure-is-not-a-conclusion-about-the-ticket.md).
 
 ## Human control surface
 

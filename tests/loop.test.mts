@@ -561,6 +561,30 @@ describe('runLoop and a usage_limit attempt (ADR-017)', () => {
     expect(isStopped(db)).toBe(true)
   })
 
+  it('stops on an upstream API failure too, which is not this ticket\'s fault either', async () => {
+    // ADR-018: RPG-5827's failed attempt still took 3m50s, so carrying on would
+    // spend the backlog at four minutes a ticket for nothing.
+    const run = vi.fn(fakeRunner('agent_error').run)
+    await loopWith({ run })
+
+    expect(run).toHaveBeenCalledTimes(1)
+    expect(isStopped(db)).toBe(true)
+  })
+
+  it('keeps going on a status that is a verdict on the ticket', async () => {
+    // Budgeted at two so the loop ends on its own: what is under test is that a
+    // no_change attempt does not stop it, and the budget is then the only thing
+    // that does. Without a bound this spins — `pick` returns nothing once both
+    // tickets have a no_change attempt, and the empty-queue branch sleeps, which
+    // in tests is a resolved promise.
+    setBudget(db, 2)
+    const run = vi.fn(fakeRunner('no_change').run)
+    await loopWith({ run })
+
+    expect(run).toHaveBeenCalledTimes(2)
+    expect(getBudget(db)).toBe(0)
+  })
+
   it('does not spend budget on an attempt that never ran', async () => {
     setBudget(db, 5)
     await loopWith(fakeRunner('usage_limit'))

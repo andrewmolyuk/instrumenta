@@ -42,9 +42,10 @@ export function recordAttempt(db: Database, row: TaskRow): void {
  * the whole of give-up: declined PRs on the target repo used to count too, and
  * no longer do — see architecture.md's "Where task/claim state actually lives".
  *
- * `usage_limit` is deliberately absent (ADR-017): the run ended because the
- * subscription had no capacity left, which says nothing about the ticket. Note
- * that the count is a positive list — a status added to the vocabulary is
+ * `usage_limit` and `agent_error` are deliberately absent (ADR-017, ADR-018):
+ * those runs ended because the subscription had no capacity left, or because an
+ * upstream API call failed, neither of which says anything about the ticket.
+ * Note that the count is a positive list — a status added to the vocabulary is
  * non-terminal here until someone names it, which is the safer default.
  */
 export function giveUpAttemptCount(db: Database, jiraKey: string): number {

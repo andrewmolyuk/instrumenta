@@ -71,6 +71,12 @@ and dated.
   ADR-014's meaning of an empty diff and carves one exception out of ADR-007's no-op mirror)
 
 
+- [ADR-018](018-an-api-failure-is-not-a-conclusion-about-the-ticket.md) — an upstream API
+  failure reports `agent_error` and stops the run, and `no_change` now requires the agent's
+  report as evidence that it concluded anything (amends ADR-014's meaning of an empty diff
+  and widens ADR-017 past matching the provider's wording)
+
+
 ## Superseded
 
 None yet.

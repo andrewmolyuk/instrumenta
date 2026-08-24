@@ -33,7 +33,7 @@ function flagValue(command: string[], flag: string): string | undefined {
 
 describe('implementTask', () => {
   it('runs the given command and returns empty output when it prints nothing', async () => {
-    await expect(implementTask('/tmp', INPUT, TICKET, ['true'])).resolves.toEqual({ output: '', costUsd: null, transcript: [], usageLimited: false })
+    await expect(implementTask('/tmp', INPUT, TICKET, ['true'])).resolves.toEqual({ output: '', costUsd: null, transcript: [], usageLimited: false, apiError: false })
   })
 
   it('does not throw when the command does not exist, and says so in its output', async () => {
@@ -394,5 +394,43 @@ describe('implementTask when the subscription has no capacity left', () => {
     const result = await implementTask('/tmp', INPUT, TICKET, ['this-binary-does-not-exist-anywhere'])
 
     expect(result.usageLimited).toBe(false)
+  })
+})
+
+describe('implementTask when an upstream API call fails', () => {
+  // Verbatim from the RPG-5827 attempt Foreman recorded as `no_change`.
+  const LIVE_529 =
+    'API Error: 529 Overloaded. This is a server-side issue, usually temporary — try again in a moment. If it persists, check https://status.claude.com.'
+
+  it('flags the exact result Claude Code produced on RPG-5827', async () => {
+    const result = await implementTask('/tmp', INPUT, TICKET, ['sh', '-c', `echo '${LIVE_529}'`])
+
+    expect(result.apiError).toBe(true)
+    // Not a usage limit: that distinction is what tells "wait for the window"
+    // from "wait a minute", and 529 is neither 429 nor a quota message.
+    expect(result.usageLimited).toBe(false)
+  })
+
+  it('flags it even on a clean exit, since the CLI reported it as its result', async () => {
+    // The reason this is not guarded on the exit code: RPG-5827 arrived with a
+    // result event, a cost and three transcript steps.
+    const result = await implementTask('/tmp', INPUT, TICKET, ['sh', '-c', `echo '${LIVE_529}'; exit 0`])
+
+    expect(result.apiError).toBe(true)
+  })
+
+  it('does not flag a report that merely mentions an API error it read somewhere', async () => {
+    const command = ['sh', '-c', 'echo "the log was full of API Error: 500 lines from the target service"']
+    const result = await implementTask('/tmp', INPUT, TICKET, command)
+
+    expect(result.apiError).toBe(false)
+  })
+
+  it('prefers the usage limit when both could match', async () => {
+    const command = ['sh', '-c', 'echo "API Error: 429 usage limit reached" >&2; exit 1']
+    const result = await implementTask('/tmp', INPUT, TICKET, command)
+
+    expect(result.usageLimited).toBe(true)
+    expect(result.apiError).toBe(false)
   })
 })

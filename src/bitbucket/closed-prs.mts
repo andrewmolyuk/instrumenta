@@ -130,7 +130,7 @@ const BRANCHES_PER_QUERY = 25
  * No state filter, because the whole point is to distinguish DECLINED and
  * SUPERSEDED from the two states the give-up logic cares about. A branch with
  * no PR at all is simply absent from the map: an attempt that reported
- * `no_change`, `usage_limit` or `failed_verify` never opened one.
+ * `no_change`, `usage_limit`, `agent_error` or `failed_verify` never opened one.
  */
 export async function prStatusByBranch(
   config: BitbucketConfig,

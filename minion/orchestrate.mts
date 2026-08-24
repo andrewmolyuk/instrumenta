@@ -199,7 +199,7 @@ export async function runMinion(
 
   const hasOpenPr = await deps.hasOpenPrForBranch(input.jira_key)
   await deps.cloneAndBranch(repoUrl, input.jira_key, workDir, !hasOpenPr)
-  const { output: implementOutput, costUsd, transcript, usageLimited } = await deps.implementTask(workDir, input, ticket)
+  const { output: implementOutput, costUsd, transcript, usageLimited, apiError } = await deps.implementTask(workDir, input, ticket)
   // Built once, here, so every exit below reports the same record — including
   // the `success` path, which is the one that had no diagnostic at all before.
   const session = buildSessionRecord({ input, ticket, transcript, agentSummary: implementOutput, costUsd })
@@ -215,8 +215,32 @@ export async function runMinion(
   // gate: no commit, no pull request, no comment, and nothing pushed. Foreman
   // stops its loop on this status rather than spending the rest of the backlog
   // the same way.
-  if (usageLimited) {
-    return { status: 'usage_limit', pr_url: null, output: implementOutput, cost_usd: costUsd, session }
+  // The attempt ended on something that was never about this ticket: no
+  // capacity left on the subscription (ADR-017), or an upstream API failure
+  // (ADR-018 — `API Error: 529 Overloaded`, found live on RPG-5827). Every
+  // other exit below would say something untrue about the ticket, and left to
+  // run on this reached the worst of them: the gate passes (a target whose
+  // `verify` is the literal string `true` passes it vacuously, and a clone with
+  // no install has no pre-commit hook to fail), `hasChanges` is false, and the
+  // attempt reported `no_change` — terminal per ADR-014 — with a Jira comment
+  // telling a human the ticket needed no change.
+  //
+  // The absence of a report is the guard, and it is what makes this safe to act
+  // on: ADR-014's terminality rests on the agent having *concluded* something,
+  // and the report is the only evidence of a conclusion. An attempt that did the
+  // work and wrote it up falls through to the gate as usual even if the CLI then
+  // exited badly, so this branch can never discard real work. Reported before
+  // the gate, since there is nothing here to gate: no commit, no pull request,
+  // no note, no comment, nothing pushed. Foreman stops its loop on either
+  // status rather than spending the rest of the backlog the same way.
+  if ((usageLimited || apiError) && extractReport(implementOutput) === null) {
+    return {
+      status: usageLimited ? 'usage_limit' : 'agent_error',
+      pr_url: null,
+      output: implementOutput,
+      cost_usd: costUsd,
+      session,
+    }
   }
 
   if (!(await deps.hasVerifyScript(workDir))) {
@@ -276,6 +300,16 @@ export async function runMinion(
   // agent's account, not something this can verify — so the account goes to
   // Jira for a human, and the status says only what was seen.
   if (!(await deps.hasChanges(workDir))) {
+    // An empty tree is only a *conclusion* if the agent reached one, and the
+    // report is the only evidence of that (ADR-018). Without it there is nothing
+    // to tell a human and nothing to retire the ticket on — the attempt simply
+    // did not happen, whatever the reason. This is the structural half of the
+    // fix: the API-error pattern above names the cause when it recognises it,
+    // and this catches the same failure when Anthropic rewords the message, when
+    // the CLI dies quietly, or when the agent returns having done nothing at all.
+    if (extractReport(implementOutput) === null) {
+      return { status: 'agent_error', pr_url: null, output: implementOutput, cost_usd: costUsd, session }
+    }
     await deps.commentOnTicket(input.jira_key, noChangeComment(input, implementOutput))
     return { status: 'no_change', pr_url: null, output: implementOutput, cost_usd: costUsd, session }
   }

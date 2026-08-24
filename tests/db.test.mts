@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { openDb } from '../src/db/index.mts'
+import { TASK_STATUSES, openDb } from '../src/db/index.mts'
 import { appendCurrentProgress, getCurrentTask, listAttempts, recordAttempt, setCurrentTask } from '../src/db/queries.mts'
 
 describe('openDb', () => {
@@ -41,7 +41,10 @@ describe('openDb', () => {
 
   it('accepts each status in the vocabulary', () => {
     const db = openDb(':memory:')
-    const statuses = ['success', 'failed_verify', 'blocked_no_verify', 'crashed', 'timeout', 'given_up']
+    // Driven off the vocabulary itself rather than a copy of it: this list had
+    // gone stale twice (no_change, then usage_limit), which is exactly the case
+    // the CHECK constraint has to keep up with.
+    const statuses = TASK_STATUSES
     for (const [i, status] of statuses.entries()) {
       expect(() =>
         db.run(

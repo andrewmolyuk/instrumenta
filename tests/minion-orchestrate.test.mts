@@ -22,7 +22,7 @@ function fakeDeps(overrides: Partial<MinionDeps> = {}): MinionDeps {
     cloneAndBranch: vi.fn(async () => {}),
     fetchTicket: vi.fn(async () => ticket()),
     hasOpenPrForBranch: vi.fn(async () => false),
-    implementTask: vi.fn(async () => ({ output: '', costUsd: null, transcript: [], usageLimited: false })),
+    implementTask: vi.fn(async () => ({ output: '', costUsd: null, transcript: [], usageLimited: false, apiError: false })),
     hasVerifyScript: vi.fn(async () => true),
     runVerify: vi.fn(async () => ({ passed: true, output: '' })),
     runPreCommitChecks: vi.fn(async () => ({ ran: true, passed: true, output: '' })),
@@ -85,7 +85,7 @@ describe('runMinion', () => {
   })
 
   it('carries implementTask\'s reported cost through to a successful result', async () => {
-    const deps = fakeDeps({ implementTask: vi.fn(async () => ({ output: '', costUsd: 0.42, transcript: [], usageLimited: false })) })
+    const deps = fakeDeps({ implementTask: vi.fn(async () => ({ output: '', costUsd: 0.42, transcript: [], usageLimited: false, apiError: false })) })
     const result = await runMinion(input(), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
 
     expect(result.cost_usd).toBe(0.42)
@@ -170,7 +170,7 @@ describe('runMinion', () => {
   it('includes implementTask output on blocked_no_verify when there was some', async () => {
     const deps = fakeDeps({
       hasVerifyScript: vi.fn(async () => false),
-      implementTask: vi.fn(async () => ({ output: 'claude: nothing to change here', costUsd: null, transcript: [], usageLimited: false })),
+      implementTask: vi.fn(async () => ({ output: 'claude: nothing to change here', costUsd: null, transcript: [], usageLimited: false, apiError: false })),
     })
     const result = await runMinion(input({ attempt_number: 1 }), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
 
@@ -196,7 +196,7 @@ describe('runMinion', () => {
 
   it('combines implementTask output with verify output on failed_verify when there was both', async () => {
     const deps = fakeDeps({
-      implementTask: vi.fn(async () => ({ output: 'claude did something', costUsd: null, transcript: [], usageLimited: false })),
+      implementTask: vi.fn(async () => ({ output: 'claude did something', costUsd: null, transcript: [], usageLimited: false, apiError: false })),
       runVerify: vi.fn(async () => ({ passed: false, output: 'test 1 failed' })),
     })
     const result = await runMinion(input({ attempt_number: 1 }), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
@@ -227,7 +227,7 @@ describe('runMinion', () => {
 
   it('reports given_up when the pre-commit checks fail', async () => {
     const deps = fakeDeps({
-      implementTask: vi.fn(async () => ({ output: 'claude did something', costUsd: 1.5, transcript: [], usageLimited: false })),
+      implementTask: vi.fn(async () => ({ output: 'claude did something', costUsd: 1.5, transcript: [], usageLimited: false, apiError: false })),
       runPreCommitChecks: vi.fn(async () => ({ ran: true, passed: false, output: 'eslint: 2 problems' })),
     })
     const result = await runMinion(input({ attempt_number: 1 }), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
@@ -352,7 +352,19 @@ describe('runMinion', () => {
 
 describe('runMinion when the agent changed nothing', () => {
   function noChangeDeps(overrides: Partial<MinionDeps> = {}): MinionDeps {
-    return fakeDeps({ hasChanges: vi.fn(async () => false), ...overrides })
+    return fakeDeps({
+      hasChanges: vi.fn(async () => false),
+      // A report is what makes an empty tree a conclusion rather than an aborted
+      // attempt (ADR-018), so every test about the ADR-014 path has to have one.
+      implementTask: vi.fn(async () => ({
+        output: '<!-- minion-report -->\n## What changed\n\nNothing needed changing.',
+        costUsd: null,
+        transcript: [],
+        usageLimited: false,
+        apiError: false,
+      })),
+      ...overrides,
+    })
   }
 
   it('reports no_change instead of crashing on "nothing to commit"', async () => {
@@ -375,6 +387,7 @@ describe('runMinion when the agent changed nothing', () => {
         costUsd: 1.5,
         transcript: [],
         usageLimited: false,
+        apiError: false,
       })),
     })
 
@@ -417,7 +430,7 @@ describe('runMinion when the usage limit is reached', () => {
 
   function limitedDeps(overrides: Partial<MinionDeps> = {}): MinionDeps {
     return fakeDeps({
-      implementTask: vi.fn(async () => ({ output: LIMIT, costUsd: null, transcript: [], usageLimited: true })),
+      implementTask: vi.fn(async () => ({ output: LIMIT, costUsd: null, transcript: [], usageLimited: true, apiError: false })),
       ...overrides,
     })
   }
@@ -468,5 +481,114 @@ describe('runMinion when the usage limit is reached', () => {
     const result = await runMinion(input({ attempt_number: 9 }), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
 
     expect(result.status).toBe('usage_limit')
+  })
+})
+
+describe('runMinion when an upstream API call fails', () => {
+  const API_ERROR = 'API Error: 529 Overloaded. This is a server-side issue, usually temporary — try again in a moment.'
+
+  function apiErrorDeps(overrides: Partial<MinionDeps> = {}): MinionDeps {
+    return fakeDeps({
+      implementTask: vi.fn(async () => ({
+        output: API_ERROR,
+        costUsd: 0.002208,
+        transcript: ['[00:02] session started', '[03:25] ' + API_ERROR, '[03:25] finished'],
+        usageLimited: false,
+        apiError: true,
+      })),
+      hasChanges: vi.fn(async () => false),
+      ...overrides,
+    })
+  }
+
+  it('reports agent_error instead of the no_change it recorded on RPG-5827', async () => {
+    const deps = apiErrorDeps()
+    const result = await runMinion(input(), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
+
+    expect(result.status).toBe('agent_error')
+    expect(result.pr_url).toBeNull()
+    expect(deps.hasVerifyScript).not.toHaveBeenCalled()
+    expect(deps.commitAndPush).not.toHaveBeenCalled()
+    // The comment that told a human the ticket needed no change.
+    expect(deps.commentOnTicket).not.toHaveBeenCalled()
+  })
+
+  it('keeps the error text and the session, so the record says what happened', async () => {
+    const result = await runMinion(input(), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', apiErrorDeps())
+
+    expect(result.output).toContain('529')
+    expect(result.session).toContain('Minion session')
+    // A cost is still reported: the failed call was billed, however little.
+    expect(result.cost_usd).toBeCloseTo(0.002208)
+  })
+
+  it('does not discard an attempt that did the work and reported it, whatever the CLI printed after', async () => {
+    // The guard that makes this branch safe: a report means a conclusion, and a
+    // conclusion goes through the gate like any other.
+    const deps = apiErrorDeps({
+      implementTask: vi.fn(async () => ({
+        output: 'narration\n<!-- minion-report -->\n## What changed\n\nFixed it.\n' + API_ERROR,
+        costUsd: 3,
+        transcript: [],
+        usageLimited: false,
+        apiError: true,
+      })),
+      hasChanges: vi.fn(async () => true),
+    })
+    const result = await runMinion(input(), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
+
+    expect(result.status).toBe('success')
+    expect(deps.commitAndPush).toHaveBeenCalled()
+  })
+
+  it('will not record no_change for an empty tree with no report, whatever the cause', async () => {
+    // The durable half of ADR-018: this holds even when nothing recognises the
+    // error text, which is how the 529 got through in the first place.
+    const deps = fakeDeps({
+      implementTask: vi.fn(async () => ({
+        output: 'Some future error nobody has a pattern for',
+        costUsd: 0.01,
+        transcript: [],
+        usageLimited: false,
+        apiError: false,
+      })),
+      hasChanges: vi.fn(async () => false),
+    })
+    const result = await runMinion(input(), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
+
+    expect(result.status).toBe('agent_error')
+    expect(deps.commentOnTicket).not.toHaveBeenCalled()
+  })
+
+  it('still records no_change when the agent actually concluded that, in the required form', async () => {
+    const deps = fakeDeps({
+      implementTask: vi.fn(async () => ({
+        output: '<!-- minion-report -->\n## What changed\n\nAlready fixed in ab12cd.',
+        costUsd: 1.5,
+        transcript: [],
+        usageLimited: false,
+        apiError: false,
+      })),
+      hasChanges: vi.fn(async () => false),
+    })
+    const result = await runMinion(input(), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
+
+    expect(result.status).toBe('no_change')
+    expect(deps.commentOnTicket).toHaveBeenCalled()
+  })
+
+  it('applies the same guard to a usage limit', async () => {
+    const deps = apiErrorDeps({
+      implementTask: vi.fn(async () => ({
+        output: '<!-- minion-report -->\n## What changed\n\nDone.',
+        costUsd: 2,
+        transcript: [],
+        usageLimited: true,
+        apiError: false,
+      })),
+      hasChanges: vi.fn(async () => true),
+    })
+
+    expect((await runMinion(input(), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)).status).toBe('success')
   })
 })

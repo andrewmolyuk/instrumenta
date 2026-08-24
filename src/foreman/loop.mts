@@ -23,7 +23,8 @@ import { pick, pickSpecific } from './pick.mts'
  * The other four attempt statuses aren't given a Jira mapping by the ADR, so
  * onComplete is free to no-op for them rather than guess one — which, after
  * ADR-007 dropped the "Done" mirror, is every status except the one ADR-017
- * added: a `usage_limit` attempt has to be walked back out of "In Progress",
+ * added and ADR-018 widened: an aborted attempt has to be walked back out of
+ * "In Progress",
  * or the ticket Foreman deliberately left un-retired drops out of the backlog
  * query anyway.
  */
@@ -36,6 +37,12 @@ export const noopStatusMirror: StatusMirror = {
   async onDispatch() {},
   async onComplete() {},
 }
+
+/**
+ * Statuses that say the attempt never got to the ticket, so the run itself
+ * should stop rather than move on to the next one (ADR-017, ADR-018).
+ */
+const ABORTED_STATUSES = new Set<TaskRow['status']>(['usage_limit', 'agent_error'])
 
 export interface LoopDeps {
   db: Database
@@ -133,17 +140,19 @@ export async function runLoop(deps: LoopDeps): Promise<void> {
         )
         recordAttempt(deps.db, row)
 
-        // ADR-017: the attempt hit the subscription's usage limit, so no agent
-        // work happened and none will until the window resets — dispatching the
-        // next ticket would burn it the same way. Stop the run, the way an
-        // exhausted budget does. Set before the mirror call so a Jira failure
-        // there (which lands in the catch below) still leaves the loop stopped,
-        // and before the budget decrement so an attempt that never ran does not
-        // spend one.
-        const usageLimited = row.status === 'usage_limit'
-        if (usageLimited) setStopped(deps.db, true)
+        // ADR-017/ADR-018: the attempt ended on something outside this ticket —
+        // no capacity on the subscription, or an upstream API failure — so no
+        // agent work happened, and dispatching the next ticket would spend it
+        // the same way at the same cost in wall-clock (RPG-5827's failed attempt
+        // still took 3m50s). Stop the run, the way an exhausted budget does, and
+        // let a human press Start once the cause has passed. Set before the
+        // mirror call so a Jira failure there (which lands in the catch below)
+        // still leaves the loop stopped, and before the budget decrement so an
+        // attempt that never ran does not spend one.
+        const aborted = ABORTED_STATUSES.has(row.status)
+        if (aborted) setStopped(deps.db, true)
         await deps.statusMirror.onComplete(row)
-        if (usageLimited) break
+        if (aborted) break
 
         // Read again rather than decrementing the value from the top of the
         // iteration: the dispatch above just took tens of minutes, which is

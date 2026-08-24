@@ -219,6 +219,17 @@ export interface ImplementResult {
    * about the ticket.
    */
   usageLimited: boolean
+  /**
+   * True when the run ended on an upstream API failure rather than on the
+   * agent's own work (ADR-018) — a 5xx, an overload, anything Claude Code
+   * reports as `API Error: <status>` in place of a result.
+   *
+   * Separate from `usageLimited` because the two mean different things to
+   * whoever is watching: no capacity until the window resets, versus a blip to
+   * wait out. Both mean the same thing for the ticket, which is that nothing
+   * about it was decided.
+   */
+  apiError: boolean
 }
 
 /**
@@ -311,6 +322,17 @@ function agentEnv(): Record<string, string | undefined> {
  * keeps it from misreading an attempt that merely *talked* about rate limiting.
  */
 const USAGE_LIMIT_PATTERN = /usage limit|rate limit|too many requests|\b429\b/i
+
+/**
+ * How Claude Code reports an upstream failure it could not work through:
+ * `API Error: 529 Overloaded. …`, printed as its whole result.
+ *
+ * Found live on RPG-5827 (ADR-018). That attempt is the reason this is matched
+ * at the start of a line rather than anywhere in the text: the agent's own
+ * report could quote an API error it read in a log, and only the CLI puts one
+ * where its result should be.
+ */
+const API_ERROR_PATTERN = /^API Error: \d{3}\b/m
 
 /** Cap on the raw stdout held in memory for the fallback path — a real stream-json run is megabytes of NDJSON that the `result` event makes redundant. */
 const MAX_RAW_STDOUT_CHARS = MAX_IMPLEMENT_OUTPUT_CHARS * 2
@@ -478,7 +500,16 @@ async function captureImplementOutput(workDir: string, command: string[]): Promi
     // exhausted quota, and no real work is ever thrown away by this branch.
     const usageLimited = exitCode !== 0 && USAGE_LIMIT_PATTERN.test(output)
 
-    return { output: tail(output, MAX_IMPLEMENT_OUTPUT_CHARS), costUsd, transcript, usageLimited }
+    // Not guarded on the exit code, unlike the usage limit above: RPG-5827
+    // showed Claude Code reporting `API Error: 529` as a perfectly well-formed
+    // *result* — a `result` event, a cost, three transcript steps — so an
+    // attempt that never began work can still look like one that finished. The
+    // guard that replaces it is in orchestrate.mts: this only redirects an
+    // attempt that produced no report, so a run that did the work and wrote it
+    // up is never thrown away by this branch.
+    const apiError = !usageLimited && API_ERROR_PATTERN.test(output)
+
+    return { output: tail(output, MAX_IMPLEMENT_OUTPUT_CHARS), costUsd, transcript, usageLimited, apiError }
   } catch (err) {
     // Command not available — caller doesn't treat this as fatal (see above).
     return {
@@ -486,6 +517,7 @@ async function captureImplementOutput(workDir: string, command: string[]): Promi
       costUsd: null,
       transcript: [],
       usageLimited: false,
+      apiError: false,
     }
   }
 }

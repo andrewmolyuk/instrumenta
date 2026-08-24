@@ -467,13 +467,19 @@
   // ADR-002's Minion sandboxing). Every dynamic value below is set via
   // textContent/value, never innerHTML, so nothing here can inject markup.
 
-  const STATUSES = ['all', 'success', 'no_change', 'failed_verify', 'blocked_no_verify', 'crashed', 'timeout', 'given_up', 'usage_limit']
+  const STATUSES = ['all', 'success', 'no_change', 'failed_verify', 'blocked_no_verify', 'crashed', 'timeout', 'given_up', 'usage_limit', 'agent_error']
   // no_change is outlined rather than accented: the attempt finished cleanly,
   // but it produced no pull request and is waiting on a human to decide.
-  // usage_limit is outlined too: nothing happened to the ticket, and the run
-  // stopped itself — an attempt to re-read once the window resets, not a failure
-  // anyone needs to act on (ADR-017).
-  const TAG_CLASS = { success: 'tag-accent', no_change: 'tag-outline', given_up: 'tag-outline', usage_limit: 'tag-outline' }
+  // usage_limit and agent_error are outlined too: nothing happened to the ticket
+  // and the run stopped itself, so they are something to re-run once the cause
+  // has passed rather than a failure to act on (ADR-017, ADR-018).
+  const TAG_CLASS = {
+    success: 'tag-accent',
+    no_change: 'tag-outline',
+    given_up: 'tag-outline',
+    usage_limit: 'tag-outline',
+    agent_error: 'tag-outline',
+  }
   const tagClassFor = (status) => TAG_CLASS[status] ?? 'tag-neutral'
 
   let currentTab = 'cockpit'
@@ -640,8 +646,8 @@
 
   function prStateCell(row) {
     const cell = document.createElement('td')
-    // No PR on this branch is the normal outcome for no_change, usage_limit and
-    // failed_verify — nothing was ever opened, so there is no state to show.
+    // No PR on this branch is the normal outcome for no_change, usage_limit,
+    // agent_error and failed_verify — nothing was opened, so there is no state.
     if (typeof row.pr_url !== 'string' || !/^https?:\/\//.test(row.pr_url)) {
       cell.textContent = '—'
       return cell

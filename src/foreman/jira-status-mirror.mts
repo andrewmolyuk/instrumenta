@@ -26,6 +26,12 @@ interface TransitionsResponse {
 const BACKLOG_STATUS_NAMES = ['To Do', 'Open', 'Backlog']
 
 /**
+ * The attempt statuses that leave the ticket untouched work, so the "In
+ * Progress" onDispatch set has to be walked back (ADR-017, ADR-018).
+ */
+const ABORTED_STATUSES = new Set<TaskRow['status']>(['usage_limit', 'agent_error'])
+
+/**
  * ADR-001's mirror, write-only for human visibility: Jira's live query stays
  * the authority on eligibility, this never reads status back. Looks up the
  * issue's available transitions and matches by target status *name* rather
@@ -42,9 +48,9 @@ const BACKLOG_STATUS_NAMES = ['To Do', 'Open', 'Backlog']
  * Progress") until a human moves it to Done themselves, after actually
  * merging the PR.
  *
- * ADR-017 carves one exception back out of that no-op: a `usage_limit` attempt
- * never ran the agent, so the ticket is untouched work rather than work that
- * was tried — and Foreman deliberately leaves it eligible. But `onDispatch`
+ * ADR-017 carves one exception back out of that no-op, widened by ADR-018 to
+ * `agent_error`: neither attempt ran the agent, so the ticket is untouched work
+ * rather than work that was tried — and Foreman deliberately leaves it eligible. But `onDispatch`
  * has already moved it to "In Progress", which drops it out of the target's
  * backlog JQL, and ADR-001 makes that live query the authority on eligibility.
  * Without walking the transition back, "the ticket is not retired" would hold
@@ -80,7 +86,7 @@ export class JiraStatusMirror implements StatusMirror {
    * ticket is never moved twice.
    */
   async onComplete(row: TaskRow): Promise<void> {
-    if (row.status !== 'usage_limit') return
+    if (!ABORTED_STATUSES.has(row.status)) return
 
     const transitions = await this.listTransitions(row.jira_key)
     for (const name of BACKLOG_STATUS_NAMES) {

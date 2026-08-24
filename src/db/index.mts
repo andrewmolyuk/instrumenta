@@ -19,6 +19,7 @@ export const TASK_STATUSES = [
   'timeout',
   'given_up',
   'usage_limit',
+  'agent_error',
 ] as const
 
 /** Matches CONTEXT.md's Status glossary entry and the schema's CHECK constraint. */
@@ -31,6 +32,7 @@ export type TaskStatus =
   | 'timeout'
   | 'given_up'
   | 'usage_limit'
+  | 'agent_error'
 
 export interface TaskRow {
   task_id: string

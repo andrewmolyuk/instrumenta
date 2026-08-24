@@ -171,4 +171,13 @@ describe('pick and a usage_limit attempt (ADR-017)', () => {
 
     expect(giveUpAttemptCount(db, 'KAZ-1')).toBe(0)
   })
+
+  it('leaves a ticket eligible after an upstream API failure, and out of give-up', async () => {
+    recordAttempt(db, attempt({ task_id: 't1', jira_key: 'KAZ-1', status: 'agent_error' }))
+
+    const picked = await pick(db, fakeTaskProvider([{ jira_key: 'KAZ-1', summary: 'still open' }]), BITBUCKET, fakeBitbucketFetch())
+
+    expect(picked?.jira_key).toBe('KAZ-1')
+    expect(giveUpAttemptCount(db, 'KAZ-1')).toBe(0)
+  })
 })

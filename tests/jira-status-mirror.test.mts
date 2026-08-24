@@ -129,6 +129,14 @@ describe('onComplete and a usage_limit attempt (ADR-017)', () => {
     expect(posted[0]?.body).toEqual({ transition: { id: '11' } })
   })
 
+  it('walks an agent_error attempt back too (ADR-018)', async () => {
+    const { fn, posted } = fakeFetch()
+    await new JiraStatusMirror(CONFIG, fn).onComplete(row({ status: 'agent_error' }))
+
+    expect(posted).toHaveLength(1)
+    expect(posted[0]?.body).toEqual({ transition: { id: '11' } })
+  })
+
   it('leaves every other status where onDispatch left it (ADR-007)', async () => {
     const { fn, posted } = fakeFetch()
     const mirror = new JiraStatusMirror(CONFIG, fn)
