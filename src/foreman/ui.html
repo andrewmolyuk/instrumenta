@@ -564,6 +564,8 @@
     if (typeof prUrl === 'string' && /^https?:\/\//.test(prUrl)) {
       const a = document.createElement('a')
       a.href = prUrl
+      a.target = '_blank'
+      a.rel = 'noopener noreferrer'
       a.textContent = 'PR'
       cell.append(a)
     }
