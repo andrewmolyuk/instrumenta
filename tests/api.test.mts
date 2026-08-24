@@ -350,6 +350,137 @@ describe('GET /api/status totals', () => {
   })
 })
 
+describe('GET /api/attempts and live PR state', () => {
+  const PR = {
+    values: [
+      { state: 'OPEN', source: { branch: { name: 'KAZ-1' } }, participants: [{ approved: true }] },
+      { state: 'DECLINED', source: { branch: { name: 'KAZ-1' } }, participants: [] },
+    ],
+  }
+
+  function bitbucketFetch() {
+    return vi.fn(async () => ({ ok: true, status: 200, statusText: 'OK', json: async () => PR }))
+  }
+
+  function attempt(taskId: string, jiraKey: string) {
+    return {
+      task_id: taskId, jira_key: jiraKey, attempt_number: 1, status: 'success' as const,
+      pr_url: 'https://bitbucket.org/o/r/pull-requests/1', output: null, cost_usd: null,
+      session: null, summary: null, dispatched_at: '2026-08-24T00:00:00Z', finished_at: '2026-08-24T00:10:00Z',
+    }
+  }
+
+  it('reports the most decisive state per branch, and flags an approval', async () => {
+    const fetchImpl = bitbucketFetch()
+    handler = createApiHandler({ db, taskProvider, bitbucket: BITBUCKET, fetchImpl: fetchImpl as unknown as typeof fetch })
+    recordAttempt(db, attempt('t1', 'KAZ-1'))
+
+    const body = (await (await handler(req('GET', '/api/attempts'))).json()) as {
+      prStatus: Record<string, { state: string; approved: boolean }>
+      prStatusAt?: string
+    }
+
+    expect(body.prStatus['KAZ-1']).toEqual({ state: 'OPEN', approved: true })
+    expect(body.prStatusAt).toBeDefined()
+  })
+
+  it('reuses the cached state instead of asking Bitbucket on every five-second poll', async () => {
+    let now = 1_000_000
+    const fetchImpl = bitbucketFetch()
+    handler = createApiHandler({
+      db, taskProvider, bitbucket: BITBUCKET, fetchImpl: fetchImpl as unknown as typeof fetch, now: () => now,
+    })
+    recordAttempt(db, attempt('t1', 'KAZ-1'))
+
+    await handler(req('GET', '/api/attempts'))
+    now += 60_000
+    await handler(req('GET', '/api/attempts'))
+
+    expect(fetchImpl).toHaveBeenCalledTimes(1)
+  })
+
+  it('re-reads once the five minutes are up', async () => {
+    let now = 1_000_000
+    const fetchImpl = bitbucketFetch()
+    handler = createApiHandler({
+      db, taskProvider, bitbucket: BITBUCKET, fetchImpl: fetchImpl as unknown as typeof fetch, now: () => now,
+    })
+    recordAttempt(db, attempt('t1', 'KAZ-1'))
+
+    await handler(req('GET', '/api/attempts'))
+    now += 300_001
+    await handler(req('GET', '/api/attempts'))
+
+    expect(fetchImpl).toHaveBeenCalledTimes(2)
+  })
+
+  it('re-reads on demand, which is what the page button asks for', async () => {
+    const fetchImpl = bitbucketFetch()
+    handler = createApiHandler({
+      db, taskProvider, bitbucket: BITBUCKET, fetchImpl: fetchImpl as unknown as typeof fetch, now: () => 1_000_000,
+    })
+    recordAttempt(db, attempt('t1', 'KAZ-1'))
+
+    await handler(req('GET', '/api/attempts'))
+    await handler(req('GET', '/api/attempts?refreshPrStatus=1'))
+
+    expect(fetchImpl).toHaveBeenCalledTimes(2)
+  })
+
+  it('re-reads when a new attempt appears rather than leaving its column blank', async () => {
+    const fetchImpl = bitbucketFetch()
+    handler = createApiHandler({
+      db, taskProvider, bitbucket: BITBUCKET, fetchImpl: fetchImpl as unknown as typeof fetch, now: () => 1_000_000,
+    })
+    recordAttempt(db, attempt('t1', 'KAZ-1'))
+    await handler(req('GET', '/api/attempts'))
+
+    recordAttempt(db, attempt('t2', 'KAZ-2'))
+    await handler(req('GET', '/api/attempts'))
+
+    expect(fetchImpl).toHaveBeenCalledTimes(2)
+  })
+
+  it('still returns the attempts when Bitbucket is unreachable, and says why', async () => {
+    const failing = vi.fn(async () => ({ ok: false, status: 503, statusText: 'Service Unavailable', json: async () => ({}) }))
+    handler = createApiHandler({ db, taskProvider, bitbucket: BITBUCKET, fetchImpl: failing as unknown as typeof fetch })
+    recordAttempt(db, attempt('t1', 'KAZ-1'))
+
+    const res = await handler(req('GET', '/api/attempts'))
+    const body = (await res.json()) as { attempts: unknown[]; prStatus: Record<string, unknown>; prStatusError?: string }
+
+    expect(res.status).toBe(200)
+    expect(body.attempts).toHaveLength(1)
+    expect(body.prStatus).toEqual({})
+    expect(body.prStatusError).toContain('503')
+  })
+
+  it('keeps serving the last good state when a later read fails', async () => {
+    let ok = true
+    let now = 1_000_000
+    const flaky = vi.fn(async () =>
+      ok
+        ? { ok: true, status: 200, statusText: 'OK', json: async () => PR }
+        : { ok: false, status: 503, statusText: 'Service Unavailable', json: async () => ({}) },
+    )
+    handler = createApiHandler({
+      db, taskProvider, bitbucket: BITBUCKET, fetchImpl: flaky as unknown as typeof fetch, now: () => now,
+    })
+    recordAttempt(db, attempt('t1', 'KAZ-1'))
+    await handler(req('GET', '/api/attempts'))
+
+    ok = false
+    now += 300_001
+    const body = (await (await handler(req('GET', '/api/attempts'))).json()) as {
+      prStatus: Record<string, { state: string }>
+      prStatusError?: string
+    }
+
+    expect(body.prStatus['KAZ-1']?.state).toBe('OPEN')
+    expect(body.prStatusError).toContain('503')
+  })
+})
+
 describe('GET /api/attempts', () => {
   it('returns every attempt, past the 50 that /api/status caps at', async () => {
     // The bug this endpoint exists for: the Attempts tab rendered
@@ -385,7 +516,9 @@ describe('GET /api/attempts', () => {
   it('returns an empty list rather than failing when nothing has been attempted', async () => {
     const res = await handler(new Request('http://x/api/attempts'))
     expect(res.status).toBe(200)
-    expect(await res.json()).toEqual({ attempts: [] })
+    // Not an exact shape: the response also carries the timestamp of the PR-state
+    // read, which is a clock value and not what this test is about.
+    expect(await res.json()).toMatchObject({ attempts: [], prStatus: {} })
   })
 
   it('orders most recent first, like the history it replaces', async () => {

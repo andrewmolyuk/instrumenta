@@ -19,7 +19,7 @@ import {
 } from '../db/queries.mts'
 import type { TaskProvider } from '../task-provider/types.mts'
 import type { ForemanConfig } from './config.mts'
-import { branchesWithBlockingPr, hasBlockingPrForBranch } from '../bitbucket/closed-prs.mts'
+import { branchesWithBlockingPr, hasBlockingPrForBranch, prStatusByBranch } from '../bitbucket/closed-prs.mts'
 
 const UI_HTML = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'ui.html'), 'utf-8')
 
@@ -68,6 +68,27 @@ function json(body: unknown, status = 200): Response {
  */
 const BLOCKING_PR_CACHE_MS = 60_000
 
+/**
+ * How long live PR states are reused for.
+ *
+ * The same reason the sweep above is cached, and a sharper one: the UI polls
+ * every five seconds and re-fetches /api/attempts on every poll while the
+ * Attempts tab is open, so an uncached lookup would be a Bitbucket request
+ * every five seconds for as long as anyone leaves that tab on screen. Measured
+ * against the real repository, one such request takes ~1s for ten branches.
+ *
+ * Five minutes rather than the minute the sweep above uses, because nothing
+ * automatic depends on this — it is a column a human reads, a PR is merged or
+ * declined on human time, and `?refreshPrStatus=1` re-reads it on demand
+ * (the Attempt history page has a button for exactly that). Worst case while
+ * the tab sits open is one request per five minutes, and none at all when it
+ * is closed.
+ *
+ * Keyed by the set of branches asked about, so a newly recorded attempt is not
+ * left blank waiting for the previous answer to expire.
+ */
+const PR_STATE_CACHE_MS = 300_000
+
 export function createApiHandler(deps: ApiDeps): (req: Request) => Promise<Response> {
   // Per-handler, not module-level, so tests get a fresh cache each time.
   let cached: { at: number; branches: Set<string> } | null = null
@@ -78,6 +99,8 @@ export function createApiHandler(deps: ApiDeps): (req: Request) => Promise<Respo
     cached = { at: now, branches }
     return branches
   }
+
+  let cachedPrStatus: { at: number; key: string; status: Record<string, { state: string; approved: boolean }> } | null = null
 
   return async (req: Request): Promise<Response> => {
     const url = new URL(req.url)
@@ -137,7 +160,51 @@ export function createApiHandler(deps: ApiDeps): (req: Request) => Promise<Respo
       // table nobody is looking at up to date is the cost this split avoids:
       // the Attempts tab fetches this when it's actually open, and the Cockpit's
       // Recent Attempts panel only ever shows five rows.
-      return json({ attempts: listAttempts(deps.db, null) })
+      const attempts = listAttempts(deps.db, null)
+
+      // The PR's own state has to be read live: a human merges or declines long
+      // after the attempt that opened it finished, so there is nothing useful to
+      // store on the row. Batched by branch (a branch is the jira_key), so this
+      // is a request per 25 attempts rather than one per attempt — and, unlike
+      // the queue's blocking-PR sweep, it asks only about what this table shows.
+      //
+      // A Bitbucket outage must not cost the whole history: the attempts are
+      // local and worth showing regardless, so the failure is reported
+      // alongside them and the column falls back to "unknown" (same shape as
+      // /api/status's queueError).
+      let prStatus: Record<string, { state: string; approved: boolean }> = {}
+      let prStatusError: string | undefined
+      const branches = [...new Set(attempts.map((a) => a.jira_key))].sort()
+      const cacheKey = branches.join(',')
+      const now = deps.now?.() ?? Date.now()
+      // `?refreshPrStatus=1` is the button on the Attempt history page: a human
+      // who just merged something should not have to wait out the cache. Still a
+      // GET — it re-reads someone else's state and changes nothing here but the
+      // cached copy.
+      const forced = url.searchParams.get('refreshPrStatus') === '1'
+      const fresh = cachedPrStatus && cachedPrStatus.key === cacheKey && now - cachedPrStatus.at < PR_STATE_CACHE_MS
+      if (fresh && !forced) {
+        prStatus = cachedPrStatus!.status
+      } else {
+        try {
+          prStatus = Object.fromEntries(await prStatusByBranch(deps.bitbucket, branches, deps.fetchImpl))
+          cachedPrStatus = { at: now, key: cacheKey, status: prStatus }
+        } catch (err) {
+          prStatusError = err instanceof Error ? err.message : String(err)
+          // Serve the stale copy rather than blanking the column over one bad
+          // request; the response says how old it is and what went wrong.
+          if (cachedPrStatus?.key === cacheKey) prStatus = cachedPrStatus.status
+        }
+      }
+
+      return json({
+        attempts,
+        prStatus,
+        prStatusError,
+        // When the served copy was actually read from Bitbucket, so the page can
+        // say how stale it is instead of implying it is live.
+        prStatusAt: cachedPrStatus?.key === cacheKey ? new Date(cachedPrStatus.at).toISOString() : undefined,
+      })
     }
 
     if (req.method === 'GET' && url.pathname === '/api/config') {
