@@ -122,7 +122,9 @@ this is a retry, and scoped credentials for the target repository. Destroyed aft
 Inside:
 
 1. Checkout the target project; branch named after `jira_key` (not the internal UUID —
-   the branch name is what a human reviewing the target repo actually sees).
+   the branch name is what a human reviewing the target repo actually sees). The
+   deployment's optional setup command (`MINION_SETUP_COMMAND`) then runs in the fresh
+   checkout — see below.
 2. The agent implements the task (Claude Code, run with
    `--dangerously-skip-permissions` — the container boundary is what compensates for
    turning off interactive tool approval; see [ADR-002](adr/002-foreman-minion-execution-boundary.md)).
@@ -152,6 +154,19 @@ targets that need `sudo` and a container. `MINION_VERIFY_COMMAND` lets a
 deployment name the command instead — run through `sh -c`, so several checks can
 be chained. The same command is quoted into the agent's prompt, so what it runs
 and what the gate runs cannot drift apart (ADR-009).
+
+`MINION_SETUP_COMMAND`, in the same spirit, is an optional one-time setup run in
+the fresh checkout between the clone and the agent — also through `sh -c`, from
+the repo root; unset means no setup step. It exists because a target can need
+its checkout prepared before the agent's session *starts*, not merely before it
+finishes: CGS/webui's setup runs `npm ci` and installs the repo's external
+Claude Code skills from its skills-lock.json, and Claude Code discovers skills
+at session start, so a prompt instruction to run it would come too late. (Its
+own `make skills-install` target cannot run here — webui's Makefile includes a
+build tree that only exists inside its build container, so make dies at parse
+time; found live on KAZ-8877, the setup step's first dispatch.) A failing setup
+reports `crashed` without running the agent — fatal, but not a verdict on the
+ticket, so the attempt is retried like any other crash.
 
 Where that note goes is configurable, unlike `verify` — there's a safe default
 (`docs/todo/`), so a missing convention isn't a hard stop the way a missing gate is. A

@@ -91,7 +91,9 @@ You are given a bare checkout. If you need the project's *own* toolchain — its
 linter, its test runner, its type checker — run its install once, up front, and
 use the versions it pins. Installing individual tools ad hoc as you discover you
 need them costs several minutes each and gives you versions the project does not
-use, so its config may not even load against them.
+use, so its config may not even load against them. A deployment may also have
+run that install for you before your session started — if `node_modules` is
+already there, use it as is rather than installing again.
 
 ## Done means verified, not written
 

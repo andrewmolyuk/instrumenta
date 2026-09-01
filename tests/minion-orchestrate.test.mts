@@ -22,6 +22,7 @@ function fakeDeps(overrides: Partial<MinionDeps> = {}): MinionDeps {
     cloneAndBranch: vi.fn(async () => {}),
     fetchTicket: vi.fn(async () => ticket()),
     hasOpenPrForBranch: vi.fn(async () => false),
+    runSetup: vi.fn(async () => ({ passed: true, output: '' })),
     implementTask: vi.fn(async () => ({ output: '', costUsd: null, transcript: [], usageLimited: false, apiError: false })),
     hasVerifyScript: vi.fn(async () => true),
     runVerify: vi.fn(async () => ({ passed: true, output: '' })),
@@ -60,6 +61,33 @@ describe('runMinion', () => {
     await runMinion(input(), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
 
     expect(deps.cloneAndBranch).toHaveBeenCalledWith('https://x/repo.git', 'KAZ-1', '/tmp/wd', false)
+  })
+
+  it('runs the setup command in the checkout after the clone and before the agent', async () => {
+    const deps = fakeDeps()
+    await runMinion(input(), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
+
+    expect(deps.runSetup).toHaveBeenCalledWith('/tmp/wd')
+    // Before the agent, not merely before the gate: Claude Code discovers the
+    // target's skills at session start, so a setup that ran later would be
+    // invisible to it.
+    const setupOrder = vi.mocked(deps.runSetup).mock.invocationCallOrder[0]!
+    const cloneOrder = vi.mocked(deps.cloneAndBranch).mock.invocationCallOrder[0]!
+    const implementOrder = vi.mocked(deps.implementTask).mock.invocationCallOrder[0]!
+    expect(setupOrder).toBeGreaterThan(cloneOrder)
+    expect(setupOrder).toBeLessThan(implementOrder)
+  })
+
+  it('reports crashed, without running the agent, when the setup command fails', async () => {
+    const deps = fakeDeps({ runSetup: vi.fn(async () => ({ passed: false, output: 'npm ERR! network timeout' })) })
+    const result = await runMinion(input(), 'https://x/repo.git', '/tmp/wd', 'docs/todo/', deps)
+
+    expect(result.status).toBe('crashed')
+    expect(result.pr_url).toBeNull()
+    expect(result.output).toContain('MINION_SETUP_COMMAND')
+    expect(result.output).toContain('npm ERR! network timeout')
+    expect(deps.implementTask).not.toHaveBeenCalled()
+    expect(deps.commitAndPush).not.toHaveBeenCalled()
   })
 
   it('reports success with the PR url when verify passes', async () => {

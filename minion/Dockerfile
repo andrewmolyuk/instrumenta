@@ -59,8 +59,14 @@ COPY --from=bun /usr/local/bin/bun /usr/local/bin/bun
 # geometry it could have rendered directly, and still no way to check its own
 # fix. `fonts-liberation` is not optional either: headless Chromium with no
 # fonts renders text as empty boxes, which is worthless for a text-alignment bug.
+# `make` is here because a target project's own conventions can be make-based
+# (CGS/webui's are) and the slim base image ships no make at all — without it a
+# setup command (MINION_SETUP_COMMAND) or the agent itself dies on the first
+# make target it reaches for. Note webui's own targets still fail here for a
+# different reason: its Makefile includes a build tree that only exists inside
+# its build container, which is why its setup installs skills directly instead.
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends ca-certificates chromium ffmpeg file fonts-liberation git python3 python3-pil \
+  && apt-get install -y --no-install-recommends ca-certificates chromium ffmpeg file fonts-liberation git make python3 python3-pil \
   && rm -rf /var/lib/apt/lists/* \
   && npm install -g @anthropic-ai/claude-code sass clean-css stylelint stylelint-config-standard-scss
 

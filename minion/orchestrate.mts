@@ -9,6 +9,8 @@ import type { PreCommitResult, VerifyResult } from './verify-gate.mts'
 export interface MinionDeps {
   cloneAndBranch(repoUrl: string, branch: string, workDir: string, reuseExisting: boolean): Promise<void>
   hasOpenPrForBranch(branch: string): Promise<boolean>
+  /** Runs the deployment's setup command (MINION_SETUP_COMMAND) in the fresh checkout; passes vacuously when none is configured. */
+  runSetup(workDir: string): Promise<VerifyResult>
   /** Reads the ticket from Jira, downloading its attachments into `attachmentDir`. */
   fetchTicket(jiraKey: string, attachmentDir: string): Promise<JiraTicket>
   implementTask(workDir: string, input: MinionInput, ticket: JiraTicket): Promise<ImplementResult>
@@ -31,7 +33,7 @@ function combineOutputs(...parts: (string | null | undefined)[]): string | null 
 }
 
 /**
- * Minion's contract, end to end (architecture.md): checkout -> implement ->
+ * Minion's contract, end to end (architecture.md): checkout -> setup -> implement ->
  * look for a verify gate -> commit/PR or note, one structured MinionResult at
  * the end. `input.attempt_number >= MAX_ATTEMPTS` is Minion's own final-attempt
  * check (architecture.md: "If this was the final allowed attempt and it still
@@ -232,6 +234,28 @@ export async function runMinion(
 
   const hasOpenPr = await deps.hasOpenPrForBranch(input.jira_key)
   await deps.cloneAndBranch(repoUrl, input.jira_key, workDir, !hasOpenPr)
+
+  // The deployment's setup command (MINION_SETUP_COMMAND, e.g. CGS/webui's
+  // npm install plus installing its external skills from its skills-lock.json)
+  // runs in the fresh checkout *before* the agent is spawned: Claude Code
+  // discovers the target's skills when its
+  // session starts, so anything installed later — or left to a prompt
+  // instruction the agent may or may not follow — is invisible to it. A failed
+  // setup is fatal the way a failed fetchTicket is: the attempt never had the
+  // environment it was promised, and nothing the agent did in it could be
+  // trusted. `crashed`, not `failed_verify` — nothing here is a verdict on the
+  // ticket, and a crash is retried.
+  const setup = await deps.runSetup(workDir)
+  if (!setup.passed) {
+    return {
+      status: 'crashed',
+      pr_url: null,
+      output: combineOutputs('setup command (MINION_SETUP_COMMAND) failed — the agent was not run', setup.output),
+      cost_usd: null,
+      session: null,
+    }
+  }
+
   const { output: implementOutput, costUsd, transcript, usageLimited, apiError } = await deps.implementTask(workDir, input, ticket)
   // Built once, here, so every exit below reports the same record — including
   // the `success` path, which is the one that had no diagnostic at all before.

@@ -49,7 +49,7 @@ function truncateTail(text: string): string {
   return text.length > MAX_VERIFY_OUTPUT_CHARS ? `…(truncated)…\n${text.slice(-MAX_VERIFY_OUTPUT_CHARS)}` : text
 }
 
-async function capture(command: string[], workDir: string): Promise<VerifyResult> {
+export async function capture(command: string[], workDir: string): Promise<VerifyResult> {
   const proc = Bun.spawn(command, { cwd: workDir, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' })
   const passed = (await proc.exited) === 0
   const stdout = await new Response(proc.stdout).text()

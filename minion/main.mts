@@ -6,6 +6,7 @@ import { implementTask } from './implement-task.mts'
 import { commentOnTicket, fetchTicket, type MinionJiraConfig } from './jira.mts'
 import type { MinionDeps } from './orchestrate.mts'
 import { runMinion } from './orchestrate.mts'
+import { runSetup } from './setup.mts'
 import { hasVerifyScript, runPreCommitHook, runVerify } from './verify-gate.mts'
 
 function requiredEnv(key: string): string {
@@ -52,6 +53,7 @@ async function main(): Promise<void> {
     cloneAndBranch,
     hasOpenPrForBranch: (branch) => hasOpenPrForBranch(bitbucket, branch),
     fetchTicket: (jiraKey, attachmentDir) => fetchTicket(jira, jiraKey, attachmentDir),
+    runSetup,
     implementTask,
     hasVerifyScript,
     runVerify,
