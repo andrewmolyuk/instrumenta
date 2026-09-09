@@ -29,3 +29,6 @@ coverage/
 
 # document-session-learnings.mts artifacts (log + per-session markers)
 .claude/logs/
+
+# Generated slide exports — rebuilt from the HTML deck, ~11 MB each
+*.pptx

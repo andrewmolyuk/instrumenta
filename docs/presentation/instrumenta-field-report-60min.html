@@ -1,0 +1,1650 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Instrumenta Field Report — 60 min</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  color-scheme: light;
+  --ground:#f1f2f3;
+  --surface:#ffffff;
+  --surface-2:#e7e9eb;
+  --surface-3:#dcdfe2;
+  --ink:#16191c;
+  --ink-2:#4a5158;
+  --ink-3:#7b828a;
+  --rule:rgba(22,25,28,.16);
+  --rule-soft:rgba(22,25,28,.08);
+  --brand:#07509d;
+  --brand-2:#0099b5;
+  --brand-3:#56b5e6;
+  --amber:#c08a2e;
+  --red:#a65959;
+  --font-d:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --font-b:"Barlow","Helvetica Neue",system-ui,sans-serif;
+  --font-m:"IBM Plex Mono","SFMono-Regular",Consolas,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;height:100%;background:var(--ground);color:var(--ink);font-family:var(--font-b)}
+body{overflow:hidden}
+body.overview{overflow:auto}
+
+/* ---------- stage ---------- */
+#viewport{position:fixed;inset:0;display:grid;place-items:center;background:var(--ground)}
+#stage{width:1280px;height:720px;position:relative;transform-origin:center center;background:var(--ground)}
+.slide{position:absolute;inset:0;display:none;flex-direction:column;padding:40px 60px 58px;background:var(--ground)}
+.slide.active{display:flex}
+body.overview #viewport{position:static;display:block;padding:28px}
+body.overview #stage{width:auto;height:auto;transform:none!important;display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:20px}
+body.overview .slide{position:relative;inset:auto;display:flex;width:1280px;height:720px;transform:scale(.234);transform-origin:top left;margin-bottom:-551px;border:1px solid var(--rule);cursor:pointer}
+body.overview .slide::after{content:"";position:absolute;inset:0}
+
+/* ---------- chrome ---------- */
+.eyebrow{font-family:var(--font-d);font-weight:600;font-size:15px;letter-spacing:.22em;text-transform:uppercase;color:var(--ink-3);display:flex;gap:14px;align-items:baseline}
+.eyebrow b{color:var(--brand);font-weight:700}
+h1{font-family:var(--font-d);font-weight:700;font-size:76px;line-height:.98;letter-spacing:.005em;margin:0;text-wrap:balance}
+h2{font-family:var(--font-d);font-weight:600;font-size:40px;line-height:1.04;letter-spacing:.01em;margin:10px 0 0;text-wrap:balance}
+h3{font-family:var(--font-d);font-weight:600;font-size:23px;letter-spacing:.13em;text-transform:uppercase;margin:0 0 10px;color:var(--ink-2)}
+p{margin:0;font-size:20px;line-height:1.46;color:var(--ink-2);max-width:64ch}
+p.lead{font-size:24px;color:var(--ink);line-height:1.4}
+p+p{margin-top:12px}
+strong{color:var(--ink);font-weight:600}
+.body{margin-top:18px;display:flex;flex-direction:column;gap:14px;flex:1;min-height:0}
+.note{font-size:15px;color:var(--ink-3);line-height:1.4;max-width:88ch}
+.foot{position:absolute;left:60px;right:60px;bottom:14px;display:flex;justify-content:space-between;align-items:center;font-family:var(--font-d);font-size:13px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-3);border-top:1px solid var(--rule-soft);padding-top:7px}
+
+/* ---------- title slide ---------- */
+.title-slide{justify-content:center;background:var(--surface)}
+.title-slide .logo{width:230px;margin-bottom:44px}
+.title-slide h1{font-size:104px}
+.rule-accent{width:96px;height:5px;background:var(--brand);margin:26px 0}
+.title-meta{display:flex;gap:44px;margin-top:34px;font-family:var(--font-d);font-size:17px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3)}
+.title-meta b{display:block;font-family:var(--font-b);font-size:19px;letter-spacing:0;text-transform:none;color:var(--ink);font-weight:600;margin-top:3px}
+
+/* ---------- part divider ---------- */
+.part{justify-content:center;background:var(--brand);color:#fff}
+.part h1{color:#fff;font-size:88px}
+.part .eyebrow{color:rgba(255,255,255,.62)}
+.part .eyebrow b{color:var(--brand-3)}
+.part p{color:rgba(255,255,255,.8);font-size:23px;max-width:56ch;margin-top:18px}
+.part .foot{color:rgba(255,255,255,.45);border-color:rgba(255,255,255,.16)}
+
+/* ---------- blueprint panels (motif from the Cockpit UI) ---------- */
+.bp{position:relative;background:var(--surface);padding:17px 20px}
+.bp.tight{padding:13px 18px 15px}
+.bp::before,.bp::after{content:"";position:absolute;width:9px;height:9px;border:1px solid var(--rule);pointer-events:none}
+.bp::before{top:-1px;left:-1px;border-right:0;border-bottom:0}
+.bp::after{bottom:-1px;right:-1px;border-left:0;border-top:0}
+
+/* ---------- stat row ---------- */
+.stats{display:grid;gap:12px}
+.stats.c2{grid-template-columns:repeat(2,1fr)}
+.stats.c3{grid-template-columns:repeat(3,1fr)}
+.stats.c4{grid-template-columns:repeat(4,1fr)}
+.stats.c5{grid-template-columns:repeat(5,1fr)}
+.stat{display:flex;flex-direction:column;gap:5px}
+.stat .k{font-family:var(--font-d);font-size:14px;letter-spacing:.17em;text-transform:uppercase;color:var(--ink-3)}
+.stat .v{font-family:var(--font-d);font-weight:700;font-size:56px;line-height:.94;color:var(--ink);font-variant-numeric:tabular-nums}
+.stat .v.sm{font-size:40px}
+.stat .v.brand{color:var(--brand)}
+.stat .v.teal{color:var(--brand-2)}
+.stat .v.red{color:var(--red)}
+.stat .d{font-size:15px;color:var(--ink-3);line-height:1.35}
+
+/* ---------- two column ---------- */
+.cols{display:grid;gap:24px;flex:1;min-height:0}
+.cols.a{grid-template-columns:1fr 1fr}
+.cols.b{grid-template-columns:1.15fr .85fr}
+.cols.c{grid-template-columns:.8fr 1.2fr}
+.cols.d{grid-template-columns:1fr 1.55fr}
+.stack{display:flex;flex-direction:column;gap:13px;min-height:0}
+
+/* ---------- lists ---------- */
+ul.clean{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:9px}
+ul.clean li{font-size:19px;line-height:1.4;color:var(--ink-2);padding-left:20px;position:relative}
+ul.clean li::before{content:"";position:absolute;left:0;top:.62em;width:8px;height:1px;background:var(--brand)}
+ul.clean li b{color:var(--ink);font-weight:600}
+ol.steps{list-style:none;margin:0;padding:0;counter-reset:s;display:flex;flex-direction:column;gap:11px}
+ol.steps li{counter-increment:s;font-size:19px;line-height:1.4;color:var(--ink-2);padding-left:38px;position:relative}
+ol.steps li::before{content:counter(s);position:absolute;left:0;top:0;width:24px;height:24px;display:grid;place-items:center;font-family:var(--font-d);font-weight:700;font-size:14px;color:#fff;background:var(--brand)}
+ol.steps li b{color:var(--ink);font-weight:600}
+
+/* ---------- tables ---------- */
+table{border-collapse:collapse;width:100%;font-size:17px}
+th{font-family:var(--font-d);font-weight:600;font-size:13px;letter-spacing:.15em;text-transform:uppercase;color:var(--ink-3);text-align:left;padding:0 12px 8px 0;border-bottom:1px solid var(--rule)}
+td{padding:9px 12px 9px 0;border-bottom:1px solid var(--rule-soft);color:var(--ink-2);vertical-align:top;line-height:1.35}
+table.dense{font-size:15.5px}
+table.dense td{padding:6px 10px 6px 0;line-height:1.3}
+table.dense th{padding-bottom:6px}
+td b,th.num{color:var(--ink)}
+.num{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--font-m);font-size:15px}
+tr.hi td{background:rgba(7,80,157,.055)}
+
+/* ---------- pills ---------- */
+.pill{display:inline-block;font-family:var(--font-m);font-size:13px;padding:2px 8px;border:1px solid var(--rule);background:var(--surface-2);color:var(--ink-2);white-space:nowrap}
+.pill.ok{border-color:rgba(0,153,181,.45);background:rgba(0,153,181,.1);color:#00707f}
+.pill.warn{border-color:rgba(192,138,46,.45);background:rgba(192,138,46,.1);color:#8a6115}
+.pill.bad{border-color:rgba(166,89,89,.45);background:rgba(166,89,89,.1);color:var(--red)}
+
+/* ---------- code ---------- */
+pre{margin:0;font-family:var(--font-m);font-size:14.5px;line-height:1.55;color:var(--ink-2);background:var(--surface);padding:18px 20px;overflow:auto;white-space:pre;border-left:3px solid var(--brand)}
+pre.sm{font-size:13px;line-height:1.5}
+pre.xs{font-size:11.8px;line-height:1.46}
+code{font-family:var(--font-m);font-size:.9em;background:var(--surface-2);padding:1px 5px;color:var(--ink)}
+.c-com{color:var(--ink-3)}
+.c-str{color:#00707f}
+.c-kw{color:var(--brand)}
+.c-add{color:#00707f}
+.c-del{color:var(--red)}
+
+/* ---------- media ---------- */
+figure{margin:0;display:flex;flex-direction:column;gap:8px;min-height:0;flex:1}
+figure img{display:block;flex:1;min-height:0;width:100%;object-fit:contain;object-position:top center;border:1px solid var(--rule);background:var(--surface)}
+figcaption{font-size:14px;color:var(--ink-3);line-height:1.35}
+.shot-full{flex:1;min-height:0;display:flex}
+.shot-full img{width:100%;height:100%;object-fit:contain;object-position:center}
+
+/* ---------- quote ---------- */
+.quote{border-left:3px solid var(--brand-2);padding:6px 0 6px 20px;font-size:22px;line-height:1.4;color:var(--ink);max-width:60ch}
+.quote .who{display:block;margin-top:10px;font-size:15px;color:var(--ink-3);font-family:var(--font-d);letter-spacing:.13em;text-transform:uppercase}
+
+/* ---------- callout ---------- */
+.callout{background:var(--brand);color:#fff;padding:22px 26px;display:flex;flex-direction:column;gap:8px}
+.callout .k{font-family:var(--font-d);font-size:14px;letter-spacing:.18em;text-transform:uppercase;color:var(--brand-3)}
+.callout p{color:#fff;font-size:22px;max-width:58ch}
+.callout.red{background:var(--red)}
+.callout.red .k{color:rgba(255,255,255,.7)}
+
+/* ---------- nav ---------- */
+#hud{position:fixed;right:16px;bottom:14px;z-index:50;display:flex;gap:10px;align-items:center;font-family:var(--font-d);font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3);background:rgba(241,242,243,.94);padding:6px 10px;border:1px solid var(--rule);opacity:0;transition:opacity .25s ease}
+#hud.show,#hud:hover,#hud:focus-within{opacity:1}
+body.overview #hud{opacity:1}
+@media (prefers-reduced-motion:reduce){#hud{transition:none}}
+#hud button{font:inherit;letter-spacing:.16em;text-transform:uppercase;background:var(--surface);border:1px solid var(--rule);color:var(--ink-2);padding:4px 9px;cursor:pointer}
+#hud button:hover{border-color:var(--brand);color:var(--brand)}
+#hud button:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+#bar{position:fixed;left:0;top:0;height:3px;background:var(--brand);z-index:60;transition:width .18s ease}
+@media (prefers-reduced-motion:reduce){#bar{transition:none}}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+<div id="viewport"><div id="stage">
+
+<!-- ============ 1 ============ -->
+<section class="slide title-slide" data-part="Instrumenta">
+  <img class="logo" src="img/cgs-logo.svg" alt="CGS Tower Networks">
+  <div class="eyebrow">Engineering review &middot; 15 September 2026</div>
+  <h1>Instrumenta</h1>
+  <div class="rule-accent"></div>
+  <p class="lead">An agent that works the Jira backlog on its own: picks a ticket, fixes it in <code>CGS/webui</code>, opens a pull request, moves to the next one.</p>
+  <div class="title-meta">
+    <div>Built<b>10 &ndash; 24 Aug 2026</b></div>
+    <div>Attempts run<b>121</b></div>
+    <div>Pull requests opened<b>121</b></div>
+    <div>Spend<b>$439.49</b></div>
+  </div>
+  <div class="foot"><span>Instrumenta &middot; Field report</span><span class="pg"></span></div>
+</section>
+
+<!-- ============ 2 ============ -->
+<section class="slide" data-part="Frame">
+  <div class="eyebrow"><b>00</b> How to read this</div>
+  <h2>Written for people who don't use these tools daily</h2>
+  <div class="body">
+    <div class="cols a">
+      <div class="stack">
+        <div class="bp">
+          <h3>What this is</h3>
+          <ul class="clean">
+            <li>A working system, not a demo &mdash; it ran unattended overnight and opened real pull requests against <b>CGS/webui</b>.</li>
+            <li>Every number here comes from a database, a git history or the Bitbucket API. Nothing is estimated unless it says so.</li>
+            <li>Including the numbers that don't flatter it.</li>
+          </ul>
+        </div>
+        <div class="bp">
+          <h3>What it is not</h3>
+          <ul class="clean">
+            <li>Not a claim that this replaces anyone. The interesting result is where the work <b>moved</b>, not where it disappeared.</li>
+            <li>Not a tour of the model. The model is a component; the engineering is everything around it.</li>
+          </ul>
+        </div>
+      </div>
+      <div class="stack">
+        <div class="bp">
+          <h3>Where we're going, in order</h3>
+          <table>
+            <tr><td class="num">01</td><td><b>Why</b> &mdash; what the backlog actually looks like, measured over ten years</td></tr>
+            <tr><td class="num">02</td><td><b>How it's built</b> &mdash; two containers, one loop, one gate</td></tr>
+            <tr><td class="num">03</td><td><b>What happened</b> &mdash; 121 attempts, four run days, the real outcome</td></tr>
+            <tr><td class="num">04</td><td><b>One pull request</b>, start to finish</td></tr>
+            <tr><td class="num">05</td><td><b>The harness in webui</b> &mdash; the part that makes any of this possible</td></tr>
+            <tr><td class="num">06</td><td><b>What broke</b> &mdash; nineteen decisions, most of them written after something failed</td></tr>
+            <tr><td class="num">07</td><td><b>Where it goes next</b> &mdash; four specialists instead of one generalist</td></tr>
+          </table>
+        </div>
+        <p class="note">Screenshots throughout are taken from the real attempt database, not mocked. Interrupt with questions as we go &mdash; the material is denser than it is long.</p>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span>Instrumenta &middot; Field report</span><span class="pg"></span></div>
+</section>
+
+<!-- ============ 3 ============ -->
+<section class="slide" data-part="Frame">
+  <div class="eyebrow"><b>00</b> The claim</div>
+  <h2>Three numbers, and then the one that matters</h2>
+  <div class="body">
+    <div class="stats c3">
+      <div class="bp stat"><span class="k">Attempts dispatched</span><span class="v brand">121</span><span class="d">Each one: clone, read the ticket, fix it, run the project's own checks, commit, open a PR. No human in the loop.</span></div>
+      <div class="bp stat"><span class="k">Median cost per attempt</span><span class="v brand">$2.87</span><span class="d">Mean $3.63. Cheapest $0.60, dearest $14.06. Measured from Claude Code's own reported spend, per attempt.</span></div>
+      <div class="bp stat"><span class="k">Median wall-clock</span><span class="v brand">12m</span><span class="d">Mean 14m 38s. 29 hours 32 minutes of machine time in total across all 121.</span></div>
+    </div>
+    <div class="callout">
+      <span class="k">And the numbers that decide whether any of it was worth it</span>
+      <p><b>20 of those 121 pull requests are merged. Another 32 are approved and waiting to be merged. 67 have never been looked at.</b> Split by which backlog they came from, that becomes the most useful finding in this report.</p>
+    </div>
+    <p class="note">PR states read live from the Bitbucket API on 09 Sep 2026. Attempt data from Foreman's SQLite, dispatches between 23 Aug 15:08 UTC and 01 Sep 08:40 UTC.</p>
+  </div>
+  <div class="foot"><span>Instrumenta &middot; Field report</span><span class="pg"></span></div>
+</section>
+
+<!-- ============ 4 PART ============ -->
+<section class="slide part" data-part="01 Why">
+  <div class="eyebrow"><b>Part 01</b></div>
+  <h1>Why this,<br>and why now</h1>
+  <p>Before writing a line of it, we measured the thing it was supposed to help with &mdash; ten years of the target project's own history.</p>
+  <div class="foot"><span>Instrumenta &middot; Field report</span><span class="pg"></span></div>
+</section>
+
+<!-- ============ 5 ============ -->
+<section class="slide" data-part="01 Why">
+  <div class="eyebrow"><b>01</b> The backlog, measured</div>
+  <h2>The shape of the work, not an opinion about it</h2>
+  <div class="body">
+    <div class="stats c4">
+      <div class="bp stat"><span class="k">The repo's whole life</span><span class="v sm">117 mo</span><span class="d">Dec 2016 &ndash; Sep 2026, every commit on every branch</span></div>
+      <div class="bp stat"><span class="k">Tickets referenced in commits</span><span class="v sm">2,341</span><span class="d">~20 / month, steady across ten years</span></div>
+      <div class="bp stat"><span class="k">Of those, 1&ndash;2 commits</span><span class="v sm brand">95%</span><span class="d">1,858 are a single commit; 369 are two</span></div>
+      <div class="bp stat"><span class="k">Commits</span><span class="v sm">8,338</span><span class="d">3,089 of them name a ticket</span></div>
+    </div>
+    <div class="cols d">
+      <div class="bp">
+        <h3>Why 95% is the whole bet</h3>
+        <p style="font-size:19px">A backlog of 200-file refactors would not be a candidate. A backlog where nearly every ticket is one or two commits is a backlog of <strong>small, local, well-bounded fixes</strong>.</p>
+        <p style="font-size:19px">That is the class of work where an agent can plausibly get from "here is a bug report" to "here is a diff" without a human steering each step.</p>
+      </div>
+      <div class="bp">
+        <h3>How long a ticket took a person</h3>
+        <div class="stat" style="margin:4px 0 10px">
+          <span class="v brand" style="font-size:56px">~40 min <span style="color:var(--ink-3);font-size:34px">typical</span></span>
+          <span class="d" style="font-size:17px;margin-top:6px"><b>~2 h</b> on average &mdash; the mean is pulled up by a small tail of tickets over eight hours</span>
+        </div>
+        <ul class="clean">
+          <li><b>60% of tickets took under an hour.</b> The same story the 95% above tells, measured a second way.</li>
+          <li>Measured on <b>1,944 of the 2,341 tickets</b>: every commit is credited with the time since its author's previous commit that day.</li>
+          <li>Still a floor &mdash; the first commit of a day has nothing to measure against, and reading, reproducing and reviewing leave no commit at all.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span>Instrumenta &middot; Field report</span><span class="pg"></span></div>
+</section>
+
+<!-- ============ 5b ============ -->
+<section class="slide" data-part="01 Why">
+  <div class="eyebrow"><b>01</b> What happens to a ticket here</div>
+  <h2>One in six webui tickets is closed without a fix</h2>
+  <div class="body">
+    <div class="cols b">
+      <div class="bp">
+        <h3>2,204 webui tickets, whole history</h3>
+        <table>
+          <thead><tr><th>Outcome</th><th class="num">Share</th><th>Meaning</th></tr></thead>
+          <tbody>
+            <tr><td><b>Completed</b></td><td class="num">63%</td><td>Fixed and closed</td></tr>
+            <tr class="hi"><td><b>Abandoned</b></td><td class="num">16%</td><td>Won't Do, Cannot Reproduce, Duplicate, Works As Designed, Defer</td></tr>
+            <tr><td><b>Still open</b></td><td class="num">18%</td><td>Never resolved either way</td></tr>
+          </tbody>
+        </table>
+        <p class="note" style="margin-top:14px">Webui work only &mdash; labelled <code>WebUI</code>/<code>Web_UI_2.0</code>, or webui named in the summary. Task / Bug / Story only.</p>
+      </div>
+      <div class="stack">
+        <div class="bp">
+          <h3>Almost all of it does reach code</h3>
+          <p>2,204 webui tickets in Jira; <strong>2,341 tickets referenced in webui commits</strong>.</p>
+          <p class="note" style="margin-top:10px">So the backlog is not full of work nobody ever started. What it has instead is a sixth that gets closed unfixed.</p>
+        </div>
+        <div class="callout">
+          <span class="k">The problem, in one sentence</span>
+          <p>It was never that the fixes were hard. It was that <b>one reported problem in six was never fixed at all</b> &mdash; and the cheapest way to find out whether a "Cannot Reproduce" is real is to have something attempt it.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span>Instrumenta &middot; Field report</span><span class="pg"></span></div>
+</section>
+
+<!-- ============ 7 ============ -->
+<section class="slide" data-part="01 Why">
+  <div class="eyebrow"><b>01</b> The bet</div>
+  <h2>Autonomy means it keeps going when nobody is watching</h2>
+  <div class="body">
+    <div class="cols a">
+      <div class="bp">
+        <h3>The loop we set out to build</h3>
+        <ol class="steps">
+          <li><b>Trigger</b> &mdash; the last task finished, or the poll interval elapsed.</li>
+          <li><b>Pick</b> the next ticket from Jira, live, in Jira's own order.</li>
+          <li><b>Solve</b> it: implement, verify, commit, open a PR. Failure is a recorded outcome, not silence.</li>
+          <li><b>Leave knowledge behind</b> in the target project, so the next ticket is cheaper.</li>
+          <li><b>Wait.</b> An empty queue means poll again later, not sit idle.</li>
+        </ol>
+      </div>
+      <div class="stack">
+        <div class="bp">
+          <h3>What we deliberately did not build</h3>
+          <ul class="clean">
+            <li><b>No new control surface.</b> Priorities in Jira, rules in the repo. The next attempt reads whatever is there now.</li>
+            <li><b>No merging.</b> Autonomy stops at review, on purpose.</li>
+            <li><b>No parallelism, one project.</b> Strictly serial, for the first version.</li>
+          </ul>
+        </div>
+        <div class="bp">
+          <h3>Its scope of control, complete</h3>
+          <p style="font-size:19px"><span class="pill">stop</span> <span class="pill">start</span> <span class="pill">queue[ticket]</span> <span class="pill">budget</span></p>
+          <p class="note" style="margin-top:10px">Four buttons. Everything about <em>what</em> gets worked on stays in Jira and the target repo, where it already lived.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span>Instrumenta &middot; Field report</span><span class="pg"></span></div>
+</section>
+
+<!-- ============ 8 PART ============ -->
+<section class="slide part" data-part="02 Build">
+  <div class="eyebrow"><b>Part 02</b></div>
+  <h1>How it's built</h1>
+  <p>Two containers, one loop, one gate. About 3,800 lines of TypeScript, and 5,700 lines of tests around them.</p>
+  <div class="foot"><span>Instrumenta &middot; Field report</span><span class="pg"></span></div>
+</section>
+
+<!-- ============ 9 ============ -->
+<section class="slide" data-part="02 Build">
+  <div class="eyebrow"><b>02</b> The split</div>
+  <h2>Foreman decides. Minion does the dangerous part.</h2>
+  <div class="body">
+    <div class="cols a">
+      <div class="bp">
+        <h3>Foreman &mdash; long-running daemon</h3>
+        <ul class="clean">
+          <li>Runs continuously: picks, dispatches, records, mirrors status to Jira.</li>
+          <li>Owns <b>SQLite on a persistent volume</b> &mdash; every attempt, status, cost, PR, and what the agent did.</li>
+          <li>Serves a thin JSON API and one HTML page.</li>
+          <li><b>Never executes anything the model or the target repo asked for.</b></li>
+        </ul>
+      </div>
+      <div class="bp">
+        <h3>Minion &mdash; one container per attempt</h3>
+        <ul class="clean">
+          <li>Started with three facts: ticket key, task id, attempt number. Reads the ticket itself.</li>
+          <li>Runs Claude Code with <code>--dangerously-skip-permissions</code> &mdash; nobody is there to approve tool calls.</li>
+          <li><b>The container boundary is what pays for that.</b> Disposable, isolated, destroyed on exit.</li>
+          <li>No API of its own. Foreman waits for exit and reads one result from stdout.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="callout">
+      <span class="k">The design decision this whole system rests on</span>
+      <p>An unattended agent with full tool access is either sandboxed or it is a liability. Everything else &mdash; the gate, the statuses, the one-attempt rule &mdash; is downstream of getting that boundary right first.</p>
+    </div>
+  </div>
+  <div class="foot"><span>Instrumenta &middot; Field report</span><span class="pg"></span></div>
+</section>
+
+<!-- ============ 10 ============ -->
+<section class="slide" data-part="02 Build">
+  <div class="eyebrow"><b>02</b> Inside one attempt</div>
+  <h2>What a Minion actually does, in order</h2>
+  <div class="body">
+    <div class="cols b">
+      <div class="bp">
+        <ol class="steps">
+          <li><b>Clone</b>, on a branch named for the ticket &mdash; <code>KAZ-8880</code>, not a UUID.</li>
+          <li><b>Set up</b> the checkout: <code>npm ci</code>, install the pinned skills. Before the agent starts &mdash; skills load at session start.</li>
+          <li><b>Read its own ticket</b> from Jira, attachments included.</li>
+          <li><b>Implement.</b> Full tool access, no human present.</li>
+          <li><b>Run the gate</b> the project defines, plus its pre-commit checks.</li>
+          <li><b>Commit and open the PR</b> &mdash; only if the gate passed.</li>
+        </ol>
+      </div>
+      <div class="stack">
+        <div class="bp">
+          <h3>Step 3 is not a detail</h3>
+          <p>For a UI bug, <strong>the attached screenshot is the bug report.</strong> An agent that can't open it is guessing.</p>
+          <p class="note" style="margin-top:10px">The cost: Minion holds Jira credentials. Accepted deliberately.</p>
+        </div>
+        <div class="bp">
+          <h3>Step 1 was measured at 5&ndash;7 minutes</h3>
+          <p>Every attempt, because the container is disposable. A shared bare mirror turned it into seconds.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span>Instrumenta &middot; Field report</span><span class="pg"></span></div>
+</section>
+
+<!-- ============ 13 ============ -->
+<section class="slide" data-part="02 Build">
+  <div class="eyebrow"><b>02</b> The gate</div>
+  <h2>The target project defines "done". We never invent it.</h2>
+  <div class="body">
+    <div class="cols a">
+      <div class="bp">
+        <h3>The rule</h3>
+        <p>Before committing, Minion looks for a verify mechanism <strong>already defined in the target project</strong>.</p>
+        <ul class="clean" style="margin-top:14px">
+          <li><b>Missing</b> &rarr; no commit, no PR. Write a note saying so, and stop.</li>
+          <li><b>Fails</b> &rarr; no commit.</li>
+          <li><b>Passes</b> &rarr; run the project's pre-commit hook too, then commit and open the PR.</li>
+        </ul>
+        <p class="note" style="margin-top:14px">The commit uses <code>--no-verify</code> &mdash; those checks already ran once, in the gate. Re-running them inside a commit that can only fail costs a whole attempt.</p>
+      </div>
+      <div class="stack">
+        <div class="bp">
+          <h3>Why this and not our own test rule</h3>
+          <p>We never decide what "working" means in a codebase we don't own. And we only ever change it through the same kind of PR a human would open.</p>
+        </div>
+        <div class="callout">
+          <span class="k">Consequence, stated plainly</span>
+          <p>If the project's gate is weak, the agent's work is gated weakly. Not a bug in the agent &mdash; a property of the project, now visible.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span>Instrumenta &middot; Field report</span><span class="pg"></span></div>
+</section>
+
+<!-- ============ 14 ============ -->
+<section class="slide" data-part="02 Build">
+  <div class="eyebrow"><b>02</b> The gate, found live</div>
+  <h2>The gate that passed unconditionally, for weeks</h2>
+  <div class="body">
+    <div class="cols b">
+      <div class="stack">
+<pre class="sm"><span class="c-com">/**
+ * Found live on CGS/webui, whose `verify` script is the
+ * literal string `true`. hasVerifyScript saw a script and
+ * runVerify ran it, so the gate passed unconditionally on
+ * every attempt — the protection against committing work
+ * that does not build, doing nothing at all.
+ *
+ * Its real checks are `npm run lint` and `npm run test`;
+ * its canonical entry points, `make lint` and `make test`,
+ * wrap those in `sudo webuic/webuic.sh`, needing a container
+ * and root that a Minion has neither of. The commands
+ * underneath are reachable, so a deployment can name them.
+ */</span>
+<span class="c-kw">export function</span> verifyCommand(): <span class="c-kw">string</span> {
+  <span class="c-kw">return</span> process.env.MINION_VERIFY_COMMAND?.trim() || <span class="c-str">'npm run verify'</span>
+}</pre>
+      </div>
+      <div class="stack">
+        <div class="bp">
+          <h3>What went wrong</h3>
+          <p>The convention assumes a project <em>can</em> offer a working <code>verify</code>. This one has a script by that name whose entire body is <code>true</code>. It exits zero. Always.</p>
+        </div>
+        <div class="bp">
+          <h3>What we changed</h3>
+          <p>An environment variable lets a deployment <strong>name the real command</strong>, run through <code>sh -c</code> so several checks can be chained.</p>
+          <p style="margin-top:10px">The same command string is quoted into the agent's prompt &mdash; so what the agent is told to run and what the gate actually runs <strong>cannot drift apart</strong>.</p>
+        </div>
+        <p class="note">Only findable by running it against a real repository.</p>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span>Instrumenta &middot; Field report</span><span class="pg"></span></div>
+</section>
+
+<!-- ============ 15 ============ -->
+<section class="slide" data-part="02 Build">
+  <div class="eyebrow"><b>02</b> The prompt</div>
+  <h2>The instructions, and what each paragraph is defending against</h2>
+  <div class="body">
+    <div class="cols b">
+<pre class="xs">This is an unattended, one-shot run — there is no human available to
+answer questions or approve a plan. Investigate the issue and implement
+the fix directly in the codebase yourself. Do not stop to describe or
+propose a fix and ask for confirmation; make the actual code changes.
+
+Make the smallest change that fixes the stated problem, and stop there.
+Match how the surrounding code already does things rather than
+introducing a pattern of your own. Do not refactor code that is not
+broken, do not add an abstraction for a single use, do not add a
+dependency, a config option or a new file unless the fix genuinely
+cannot be made without it. If a one-line change is enough, the answer
+is that one line.
+
+If you notice something else wrong along the way, leave it alone and say
+so in your report. A diff a reviewer can read in a minute is worth more
+here than a thorough one they will not read at all.
+
+The gate that decides whether your work is committed runs exactly this,
+from the repository root:
+
+    ${verifyCommand()}
+
+Run that same command yourself and see it pass. Report a check as
+passing only if you actually ran it and watched it pass — not because
+it ought to.</pre>
+      <div class="stack">
+        <div class="bp">
+          <h3>Paragraph by paragraph</h3>
+          <ul class="clean">
+            <li><b>"No human available"</b> &mdash; without it the agent writes a plan and waits. The container exits. Attempt wasted.</li>
+            <li><b>"Smallest change"</b> &mdash; the default failure mode is a 400-line diff that fixes 4 lines.</li>
+            <li><b>"Leave it alone and say so"</b> &mdash; somewhere to put what it noticed, instead of fixing it.</li>
+            <li><b>"Watched it pass"</b> &mdash; a model reports a check as passing because it <em>should</em> pass. This sentence exists because that happened.</li>
+          </ul>
+        </div>
+        <p class="note">It then specifies the exact report format &mdash; which becomes the PR description a human reads. You will see one.</p>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span>Instrumenta &middot; Field report</span><span class="pg"></span></div>
+</section>
+
+<!-- ============ 17 ============ -->
+<section class="slide" data-part="02 Build">
+  <div class="eyebrow"><b>02</b> The Cockpit</div>
+  <h2>One page, four controls, three state sources</h2>
+  <div class="body">
+    <div class="shot-full"><img src="img/cockpit-01-cockpit.png" alt="The Cockpit page: loop state RUNNING, unlimited budget, nothing in flight, 121 attempts to date, the live Jira queue, control buttons, and recent attempts."></div>
+    <p class="note">Served from the same container as the API. No build step, no separate CLI &mdash; the JSON API is the only scriptable surface, and this page is its only other consumer.</p>
+  </div>
+  <div class="foot"><span>Instrumenta &middot; Field report</span><span class="pg"></span></div>
+</section>
+
+<!-- ============ 19 ============ -->
+<section class="slide" data-part="02 Build">
+  <div class="eyebrow"><b>02</b> Auditability</div>
+  <h2>The container is gone. The record of what it did is not.</h2>
+  <div class="body">
+    <div class="shot-full"><img src="img/cockpit-03-session.png" alt="Session record for KAZ-8716: ticket, model, cost, attachments read, the exact problem statement given to the agent, and a timestamped log of all 163 steps it took."></div>
+    <p class="note">Written for <em>every</em> outcome, including success. A successful attempt used to record nothing at all &mdash; which meant the one outcome that produces a pull request was also the one nobody could audit.</p>
+  </div>
+  <div class="foot"><span>Instrumenta &middot; Field report</span><span class="pg"></span></div>
+</section>
+
+<!-- ============ 21 ============ -->
+<section class="slide" data-part="02 Build">
+  <div class="eyebrow"><b>02</b> Auditability, read closely</div>
+  <h2>What the agent did in the first 45 seconds of KAZ-8716</h2>
+  <div class="body">
+    <div class="cols b">
+<pre class="xs">- **Ticket:** KAZ-8716 (attempt 1)
+- **Model:** claude-opus-5[1m] (effort high)
+- **Cost:** $5.01
+- **Attachments read:** Screen Recording 2026-08-04 070649.mp4, udf.har
+
+### Problem statement given to the agent
+
+    Defining new UDF does not enable "Commit" button
+    Setup: 10.0.0.0   <span class="c-com">← lab address, redacted</span>
+    defining UDF does ot enable the "Commit"button
+    Errors in console
+    See attached: Screen recording, HAR file
+
+### What the agent did (163 steps)
+
+[00:04] session started
+[00:07] I'll start by looking at the attachments.
+[00:09] Bash: ls -la /tmp/minion-.../attachments/ &amp;&amp; ffprobe -v error
+       -show_entries format=duration ... "1-Screen Recording ....mp4"
+[00:15] Bash: mkdir -p /tmp/frames &amp;&amp; ffmpeg -v error -i "1-Screen
+       Recording ....mp4" -vf fps=1 /tmp/frames/f_%03d.png
+[00:16] → f_001.png f_002.png f_003.png ... f_015.png
+[00:18] Read: /tmp/frames/f_003.png
+[00:26] Read: /tmp/frames/f_011.png
+[00:45] Bash: cd .../attachments &amp;&amp; python3 -c " import json
+       h=json.load(open('2-udf.har')) es=h['log']['entries'] ...</pre>
+      <div class="stack">
+        <div class="bp">
+          <h3>Nobody told it to do this</h3>
+          <p>The ticket body is five broken lines and a typo. The actual bug report is a <strong>screen recording</strong> and a <strong>HAR file</strong>.</p>
+          <p style="margin-top:10px">The agent ran <code>ffprobe</code> to check the video's length, <code>ffmpeg</code> to cut it into one frame per second, read the frames as images, then parsed the HAR with Python to find the failing request.</p>
+        </div>
+        <div class="bp">
+          <h3>Why this slide is here</h3>
+          <p>This is the difference between "it generates code" and "it investigates". And it is only visible because the session record exists.</p>
+        </div>
+        <p class="note">Result: PR #396, merged. $5.01, 18m 51s.</p>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span>Instrumenta &middot; Field report</span><span class="pg"></span></div>
+</section>
+
+<!-- ============ 22 ============ -->
+<section class="slide part" data-part="03 Results">
+  <div class="eyebrow"><b>Part 03</b></div>
+  <h1>What actually<br>happened</h1>
+  <p>121 attempts across four run days. Every figure on the next eight slides is read from Foreman's SQLite or the Bitbucket API, not reconstructed.</p>
+  <div class="foot"><span>Instrumenta &middot; Field report</span><span class="pg"></span></div>
+</section>
+
+<!-- ============ 24 ============ -->
+<section class="slide" data-part="03 Results">
+  <div class="eyebrow"><b>03</b> Four run days</div>
+  <h2>It ran overnight, unattended, and nobody had to be there</h2>
+  <div class="body">
+    <div class="cols b">
+      <div class="bp">
+        <table>
+          <thead><tr><th>Date</th><th>Window (UTC)</th><th>Backlog</th><th class="num">Attempts</th><th class="num">Spend</th></tr></thead>
+          <tbody>
+            <tr class="hi"><td>23 Aug</td><td>15:08 &rarr; 23:55</td><td>legacy</td><td class="num">38</td><td class="num">$138.56</td></tr>
+            <tr class="hi"><td>24 Aug</td><td>00:07 &rarr; 17:04</td><td>legacy</td><td class="num">62</td><td class="num">$230.30</td></tr>
+            <tr><td>25 Aug</td><td>06:34 &rarr; 14:06</td><td>sprint</td><td class="num">16</td><td class="num">$51.73</td></tr>
+            <tr><td>01 Sep</td><td>07:12 &rarr; 08:40</td><td>sprint</td><td class="num">5</td><td class="num">$18.90</td></tr>
+            <tr><td><b>Total</b></td><td>29h 32m of machine time</td><td></td><td class="num"><b>121</b></td><td class="num"><b>$439.49</b></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="stack">
+        <div class="callout">
+          <span class="k">The line worth pausing on</span>
+          <p>23 Aug 15:08 straight through to 24 Aug 17:04. <b>100 attempts, one continuous stretch, across a night.</b> Nobody queued them, watched them or restarted anything.</p>
+          <p style="margin-top:8px;font-size:18px">Historical team rate: ~20 tickets a month reach a commit. This attempted <b>100 in 26 hours</b>.</p>
+        </div>
+        <div class="bp">
+          <h3>Two shaded rows, one batch</h3>
+          <p>23&ndash;24 August was <strong>the official run</strong>, and the last one: 100 attempts against the legacy backlog, closing the build. Development stopped that day.</p>
+          <p style="margin-top:10px">The 21 attempts after it were follow-ups on <strong>live sprint tickets</strong>. Remember that division &mdash; the next few slides turn on it.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span>Instrumenta &middot; Field report</span><span class="pg"></span></div>
+</section>
+
+<!-- ============ 25 ============ -->
+<section class="slide" data-part="03 Results">
+  <div class="eyebrow"><b>03</b> Cost</div>
+  <h2>Cost per attempt, all 121</h2>
+  <div class="body">
+    <div class="cols b">
+      <div class="bp">
+        <svg viewBox="0 0 640 300" width="100%" height="300" role="img" aria-label="Histogram of cost per attempt: under $1, 5 attempts; $1 to $2, 28; $2 to $4, 47; $4 to $8, 34; $8 to $15, 7.">
+          <line x1="56" y1="240" x2="620" y2="240" stroke="#16191c" stroke-opacity="0.3" stroke-width="1"/>
+          <rect x="76" y="217" width="72" height="23" fill="#07509d" rx="4"/>
+          <rect x="189" y="109" width="72" height="131" fill="#07509d" rx="4"/>
+          <rect x="302" y="20" width="72" height="220" fill="#07509d" rx="4"/>
+          <rect x="415" y="81" width="72" height="159" fill="#07509d" rx="4"/>
+          <rect x="528" y="207" width="72" height="33" fill="#07509d" rx="4"/>
+          <g font-family="Barlow Condensed, sans-serif" font-size="22" font-weight="700" fill="#16191c" text-anchor="middle">
+            <text x="112" y="208">5</text><text x="225" y="100">28</text><text x="338" y="11">47</text><text x="451" y="72">34</text><text x="564" y="198">7</text>
+          </g>
+          <g font-family="IBM Plex Mono, monospace" font-size="14" fill="#4a5158" text-anchor="middle">
+            <text x="112" y="262">&lt; $1</text><text x="225" y="262">$1&ndash;2</text><text x="338" y="262">$2&ndash;4</text><text x="451" y="262">$4&ndash;8</text><text x="564" y="262">$8&ndash;14</text>
+          </g>
+          <text x="56" y="288" font-family="Barlow, sans-serif" font-size="14" fill="#7b828a">attempts, by Claude Code's own reported cost for the run</text>
+        </svg>
+      </div>
+      <div class="stack">
+        <div class="stats c2">
+          <div class="bp stat"><span class="k">Median</span><span class="v sm brand">$2.87</span></div>
+          <div class="bp stat"><span class="k">Mean</span><span class="v sm">$3.63</span></div>
+          <div class="bp stat"><span class="k">Cheapest</span><span class="v sm">$0.60</span></div>
+          <div class="bp stat"><span class="k">Dearest</span><span class="v sm">$14.06</span></div>
+        </div>
+        <div class="bp">
+          <h3>Reading the tail</h3>
+          <p>The seven attempts over $8 are the ones where the ticket needed real investigation &mdash; a race condition on a toggle, a branding change touching a dozen icon assets, a state bug that only appears after enable-disable-enable.</p>
+          <p style="margin-top:10px">Those are also, unsurprisingly, the longest ones.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span>Instrumenta &middot; Field report</span><span class="pg"></span></div>
+</section>
+
+<!-- ============ 26 ============ -->
+<section class="slide" data-part="03 Results">
+  <div class="eyebrow"><b>03</b> Time</div>
+  <h2>Wall-clock per attempt, all 121</h2>
+  <div class="body">
+    <div class="cols b">
+      <div class="bp">
+        <svg viewBox="0 0 640 300" width="100%" height="300" role="img" aria-label="Histogram of duration per attempt: under 10 minutes, 42 attempts; 10 to 20 minutes, 57; 20 to 30 minutes, 14; 30 to 60 minutes, 8.">
+          <line x1="56" y1="240" x2="620" y2="240" stroke="#16191c" stroke-opacity="0.3" stroke-width="1"/>
+          <rect x="82" y="78" width="88" height="162" fill="#0099b5" rx="4"/>
+          <rect x="223" y="20" width="88" height="220" fill="#0099b5" rx="4"/>
+          <rect x="364" y="186" width="88" height="54" fill="#0099b5" rx="4"/>
+          <rect x="505" y="209" width="88" height="31" fill="#0099b5" rx="4"/>
+          <g font-family="Barlow Condensed, sans-serif" font-size="22" font-weight="700" fill="#16191c" text-anchor="middle">
+            <text x="126" y="69">42</text><text x="267" y="11">57</text><text x="408" y="177">14</text><text x="549" y="200">8</text>
+          </g>
+          <g font-family="IBM Plex Mono, monospace" font-size="14" fill="#4a5158" text-anchor="middle">
+            <text x="126" y="262">&lt; 10 min</text><text x="267" y="262">10&ndash;20</text><text x="408" y="262">20&ndash;30</text><text x="549" y="262">30&ndash;53</text>
+          </g>
+          <text x="56" y="288" font-family="Barlow, sans-serif" font-size="14" fill="#7b828a">attempts, dispatch to container exit</text>
+        </svg>
+      </div>
+      <div class="stack">
+        <div class="stats c2">
+          <div class="bp stat"><span class="k">Median</span><span class="v sm teal">12m 13s</span></div>
+          <div class="bp stat"><span class="k">Mean</span><span class="v sm">14m 38s</span></div>
+          <div class="bp stat"><span class="k">Fastest</span><span class="v sm">5m 08s</span></div>
+          <div class="bp stat"><span class="k">Slowest</span><span class="v sm">52m 25s</span></div>
+        </div>
+        <div class="bp">
+          <h3>The comparison, with its scope stated</h3>
+          <p>A ticket took a person <strong>~40 minutes</strong> typically, <strong>~2 hours</strong> on average. An attempt here takes <strong>12 minutes</strong>.</p>
+          <p style="margin-top:8px">Both human figures are floors, and the 12 minutes excludes the review that still has to happen. <strong>The gap is real but modest &mdash; this was never going to be a hundredfold story.</strong></p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span>Instrumenta &middot; Field report</span><span class="pg"></span></div>
+</section>
+
+<!-- ============ 27 ============ -->
+<section class="slide" data-part="03 Results">
+  <div class="eyebrow"><b>03</b> Honesty check</div>
+  <h2>All 121 recorded attempts say <span style="color:var(--brand-2)">success</span>. That is not a success rate.</h2>
+  <div class="body">
+    <div class="cols a">
+      <div class="bp">
+        <h3>What the database actually contains</h3>
+        <p>121 rows. Every one <code>success</code>. Every one with a PR.</p>
+        <p style="margin-top:14px">Putting "100%" here would be easy, and wrong:</p>
+        <ul class="clean" style="margin-top:14px">
+          <li>This database was created <b>23 Aug</b> &mdash; after the failures below were found.</li>
+          <li>The Cockpit can <b>clear a ticket's history</b> deliberately.</li>
+          <li><code>success</code> means the gate passed and a PR opened. <b>Not that the fix was right.</b></li>
+        </ul>
+      </div>
+      <div class="stack">
+        <div class="callout red">
+          <span class="k">So don't measure it here</span>
+          <p>The only verdict worth trusting is what a human did with the pull request. Measured, external to us, next slide.</p>
+        </div>
+        <div class="bp">
+          <h3>Evidence the failures were real</h3>
+          <p>Six decision records in three days, 22&ndash;24 August &mdash; each written after an attempt failed in a new way.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span>Instrumenta &middot; Field report</span><span class="pg"></span></div>
+</section>
+
+<!-- ============ 28 ============ -->
+<section class="slide" data-part="03 Results">
+  <div class="eyebrow"><b>03</b> The verdict</div>
+  <h2>121 pull requests, judged by humans</h2>
+  <div class="body">
+    <div class="stats c4">
+      <div class="bp stat"><span class="k">Merged</span><span class="v teal">20</span><span class="d">reviewed, approved, in <code>master</code></span></div>
+      <div class="bp stat"><span class="k">Approved, awaiting merge</span><span class="v brand">32</span><span class="d">a reviewer said yes. Not merged &mdash; these fixes aren't in the current version plan</span></div>
+      <div class="bp stat"><span class="k">Never reviewed</span><span class="v" style="color:var(--amber)">67</span><span class="d">no approval, no comment, no verdict of any kind</span></div>
+      <div class="bp stat"><span class="k">Rejected or reworked</span><span class="v red">2</span><span class="d">1 declined, 1 with changes requested</span></div>
+    </div>
+    <div class="cols a">
+      <div class="bp">
+        <h3>The honest denominator is 54, not 121</h3>
+        <p>54 of these pull requests got a review verdict of any kind. <strong>52 of those 54 were positive</strong> &mdash; 20 merged, 32 approved.</p>
+        <p style="margin-top:12px">Not one of the 100 open pull requests carries a single review comment. Where a reviewer engaged, they approved; where they didn't, they didn't open it at all.</p>
+      </div>
+      <div class="bp">
+        <h3>Approved but unmerged is a different problem</h3>
+        <p>Those 32 are not a quality backlog. A human read the diff and said yes. They are unmerged because <strong>the fixes don't belong to a version anyone is currently shipping</strong>.</p>
+        <p class="note" style="margin-top:12px">For context: 422 pull requests exist in <code>CGS/webui</code> across its whole history. Instrumenta opened 121 of them, in four days.</p>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span>Instrumenta &middot; Field report</span><span class="pg"></span></div>
+</section>
+
+<!-- ============ 29 ============ -->
+<section class="slide" data-part="03 Results">
+  <div class="eyebrow"><b>03</b> The finding</div>
+  <h2>Two backlogs, the same agent, opposite outcomes</h2>
+  <div class="body">
+    <div class="bp">
+      <svg viewBox="0 0 720 252" width="100%" height="228" role="img" aria-label="Pull request outcomes by backlog, on one shared scale. Current sprint follow-up runs: 21 pull requests, 19 merged, 1 with changes requested, 1 never reviewed. Legacy August batch: 100 pull requests, 1 merged, 32 approved and awaiting merge, 66 never reviewed, 1 declined.">
+        <g font-family="Barlow Condensed, sans-serif" font-size="19" font-weight="600" fill="#16191c" text-anchor="end">
+          <text x="140" y="54">SPRINT FOLLOW-UPS</text>
+          <text x="140" y="144">AUGUST BATCH</text>
+        </g>
+        <g font-family="Barlow, sans-serif" font-size="13" fill="#7b828a" text-anchor="end">
+          <text x="140" y="72">21 pull requests</text>
+          <text x="140" y="162">100 pull requests</text>
+        </g>
+        <!-- row 1 — scale 5.4px per pull request -->
+        <rect x="150" y="32" width="102.6" height="34" fill="#0099b5" rx="4"/>
+        <rect x="254.6" y="32" width="5.4" height="34" fill="#a65959" rx="2"/>
+        <rect x="262" y="32" width="5.4" height="34" fill="#c08a2e" rx="2"/>
+        <text x="201" y="55" font-family="Barlow Condensed, sans-serif" font-size="20" font-weight="700" fill="#ffffff" text-anchor="middle">19</text>
+        <text x="282" y="55" font-family="Barlow, sans-serif" font-size="15" fill="#4a5158">1 reworked &middot; 1 unreviewed &middot; <tspan font-weight="600" fill="#16191c">90% merged</tspan></text>
+        <!-- row 2 -->
+        <rect x="150" y="122" width="5.4" height="34" fill="#0099b5" rx="2"/>
+        <rect x="157.4" y="122" width="172.8" height="34" fill="#07509d" rx="4"/>
+        <rect x="332.2" y="122" width="356.4" height="34" fill="#c08a2e" rx="4"/>
+        <rect x="690.6" y="122" width="5.4" height="34" fill="#a65959" rx="2"/>
+        <text x="244" y="145" font-family="Barlow Condensed, sans-serif" font-size="20" font-weight="700" fill="#ffffff" text-anchor="middle">32 APPROVED</text>
+        <text x="510" y="145" font-family="Barlow Condensed, sans-serif" font-size="20" font-weight="700" fill="#ffffff" text-anchor="middle">66 NEVER REVIEWED</text>
+        <text x="150" y="178" font-family="Barlow, sans-serif" font-size="15" fill="#4a5158">1 merged &middot; 1 declined &middot; <tspan font-weight="600" fill="#16191c">33% approved or better, 66% never opened</tspan></text>
+        <!-- legend -->
+        <g font-family="Barlow, sans-serif" font-size="14" fill="#4a5158">
+          <rect x="150" y="212" width="12" height="12" fill="#0099b5" rx="2"/><text x="168" y="223">Merged</text>
+          <rect x="238" y="212" width="12" height="12" fill="#07509d" rx="2"/><text x="256" y="223">Approved, awaiting merge</text>
+          <rect x="424" y="212" width="12" height="12" fill="#c08a2e" rx="2"/><text x="442" y="223">Never reviewed</text>
+          <rect x="556" y="212" width="12" height="12" fill="#a65959" rx="2"/><text x="574" y="223">Declined or reworked</text>
+          <text x="150" y="244" fill="#7b828a">One shared scale &mdash; bar length is count, not share.</text>
+        </g>
+      </svg>
+    </div>
+    <div class="cols a" style="flex:0 0 auto">
+      <div class="bp"><h3>Current sprint tickets &mdash; the follow-up runs</h3><p>21 attempts on 25 Aug and 1 Sep. $70.63 total, average $3.36. Someone owned these tickets, wanted them this sprint, and reviewed the PRs within a day or two.</p></div>
+      <div class="bp"><h3>Legacy backlog &mdash; the official 23&ndash;24 Aug batch</h3><p>100 attempts, $368.85 total, average $3.69. Old tickets nobody was waiting on. A third were reviewed and approved; <strong>two thirds have never been opened</strong> since 24 August.</p></div>
+    </div>
+  </div>
+  <div class="foot"><span>Instrumenta &middot; Field report</span><span class="pg"></span></div>
+</section>
+
+<!-- ============ 30 ============ -->
+<section class="slide" data-part="03 Results">
+  <div class="eyebrow"><b>03</b> The takeaway</div>
+  <h2>Writing the code stopped being the constraint</h2>
+  <div class="body">
+    <div class="callout">
+      <span class="k">The single most useful sentence in this report</span>
+      <p style="font-size:26px;line-height:1.28">An agent produces pull requests far faster than this team historically closed tickets. <b>It cannot produce review capacity, and it cannot put a fix into a release nobody planned.</b> So the queue moved twice.</p>
+    </div>
+    <div class="cols a">
+      <div class="bp">
+        <h3>Two different queues, not one</h3>
+        <ul class="clean">
+          <li><b>67 never reviewed</b> &mdash; an attention problem. A correct fix nobody reads is indistinguishable from no fix.</li>
+          <li><b>32 approved but unmerged</b> &mdash; a release-planning problem, and a different one. <b>The tickets aren't in a version being shipped.</b></li>
+          <li><b>Neither is a quality problem.</b> Same agent, prompt, gate and week.</li>
+        </ul>
+      </div>
+      <div class="stack">
+        <div class="bp">
+          <h3>What we'd do differently tomorrow</h3>
+          <p>Pick tickets <strong>attached to a version someone is shipping</strong>. Budget <em>unmerged work in flight</em>, not dispatches.</p>
+        </div>
+        <div class="bp">
+          <h3>And why we are building a chain of four agents</h3>
+          <p>If review is the constraint, the next thing to build is not a faster coder &mdash; it is <strong>everything that happens before a human opens the diff</strong>.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span>Instrumenta &middot; Field report</span><span class="pg"></span></div>
+</section>
+
+<!-- ============ 31 ============ -->
+<section class="slide" data-part="03 Results">
+  <div class="eyebrow"><b>03</b> Cost, resolved</div>
+  <h2>What a merged pull request cost</h2>
+  <div class="body">
+    <div class="stats c4">
+      <div class="bp stat"><span class="k">Per attempt, all 121</span><span class="v sm">$3.63</span><span class="d">mean, measured</span></div>
+      <div class="bp stat"><span class="k">Per merged PR, sprint</span><span class="v sm teal">$3.72</span><span class="d">$70.63 &divide; 19. Almost identical to the attempt cost &mdash; nearly nothing was wasted</span></div>
+      <div class="bp stat"><span class="k">Per approved PR, legacy</span><span class="v sm brand">$11.18</span><span class="d">$368.85 &divide; 33 that a reviewer approved or merged</span></div>
+      <div class="bp stat"><span class="k">Per <em>merged</em> PR, legacy</span><span class="v sm red">$368.85</span><span class="d">&divide; 1. The whole batch, for one change actually shipped</span></div>
+    </div>
+    <div class="cols a">
+      <div class="bp">
+        <h3>Three numbers, one system, one week</h3>
+        <p>$3.72, $11.18 and $368.85 all came out of the same agent running the same prompt against the same gate.</p>
+        <p style="margin-top:12px">The spread is not explained by anything the agent did. It is explained entirely by <strong>how far the work got through a human process afterwards</strong>.</p>
+      </div>
+      <div class="bp">
+        <h3>Which number to quote</h3>
+        <p><strong>$11.18 is the fair one for the legacy batch</strong> &mdash; a third of that work is reviewed and accepted, sitting behind release planning rather than behind doubt.</p>
+        <p style="margin-top:12px">$368.85 is what it cost to actually ship one change from that batch. Both are true; they measure different things.</p>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span>Instrumenta &middot; Field report</span><span class="pg"></span></div>
+</section>
+
+<!-- ============ 32 PART ============ -->
+<section class="slide part" data-part="04 One PR">
+  <div class="eyebrow"><b>Part 04</b></div>
+  <h1>One pull request,<br>end to end</h1>
+  <p>KAZ-8880. $1.19, 15 minutes 52 seconds, four files, twelve added lines, zero review comments, merged.</p>
+  <div class="foot"><span>Instrumenta &middot; Field report</span><span class="pg"></span></div>
+</section>
+
+<!-- ============ 33 ============ -->
+<section class="slide" data-part="04 One PR">
+  <div class="eyebrow"><b>04</b> The diff</div>
+  <h2>Twelve lines, three of them a test</h2>
+  <div class="body">
+<pre class="xs">diff --git a/apps/webui2/src/entities/deviceConfig/devices/npb-iot.ts
+@@ -52,6 +52,8 @@ const deviceConfig: DeviceConfig = {
+         'set-track-ip': true,
+         'set-ipfix': true,
+<span class="c-add">+        // Runs container applications, so a filter may redirect to one by App ID.</span>
+<span class="c-add">+        'output-app-id': undefined,</span>
+       },
+<span class="c-com">   … the same two lines in npb-1e6.ts and npb-1e6-xl.ts …</span>
+
+diff --git a/apps/webui2/tests/entities/deviceConfig/outputAppIdGating.spec.ts
+@@ -19,6 +22,9 @@ describe('output-app-id device gating', () =&gt; {
+   it.each([
+     ['NPB-Ie8', npbIe8],
+     ['NPB-IIe', npb2e],
+<span class="c-add">+    ['NPB-IOT', npbIot],</span>
+<span class="c-add">+    ['NPB-Ie6', npbIe6],</span>
+<span class="c-add">+    ['NPB-Ie6-XL', npbIe6xl],</span>
+   ])('exposes Output App Id on %s, which runs container applications', (_name, config) =&gt; {
+     expect(hidesOutputAppId(config)).toBe(false)</pre>
+    <div class="cols a" style="flex:0 0 auto">
+      <div class="bp"><h3>Note what it didn't do</h3><p>No refactor of the shared default. No abstraction for "container boards". No tidying of the surrounding file.</p></div>
+      <div class="bp"><h3>Note the test</h3><p>It extended an existing table-driven test and pinned all three boards &mdash; so the next person to touch the shared default breaks a test, not the UI.</p></div>
+    </div>
+  </div>
+  <div class="foot"><span>Instrumenta &middot; Field report</span><span class="pg"></span></div>
+</section>
+
+<!-- ============ 35 ============ -->
+<section class="slide" data-part="04 One PR">
+  <div class="eyebrow"><b>04</b> The PR description</div>
+  <h2>Written by the agent, for the reviewer</h2>
+  <div class="body">
+    <div class="cols b">
+<pre class="xs">## What changed
+
+`output-app-id` is force-hidden for every board by the shared
+`defaultAttributesHideFields` in .../entities/deviceConfig/config/filters.ts,
+and only the boards that run container applications opt back out with an
+explicit `'output-app-id': undefined`. Commit 78b8c6d2a (KAZ-8106) added that
+opt-out to npb-1e8.ts and npb-2e.ts only, so the field vanished from the
+Create/Edit Filter Attributes tab on the other container boards.
+
+The ticket reports NPB-IOT, but the fix now covers **all** affected boards…
+
+## Why these boards and no others
+
+Verified against the legacy parity authority, not just the ticket: legacy gates
+the App ID input with `controller.isTd3()` (filter-table-docker-index.html, the
+`&lt;!-- Output App Id --&gt;` block), and `device-info.service.js` defines
+`isTd3() = isNpbIe8() || isNpbIIe()` with `isNpbIe8()` explicitly folding in
+Ie6, Ie6-XL, and IOT ("they all use the same chip"). So legacy shows the field
+on exactly five boards — which matches the five webui2 device configs
+declaring `DeviceRoutes.CONTAINERS`.
+
+## Verification
+
+- outputAppIdGating.spec.ts now asserts exposure on all five container boards
+  and hiding on NPB-III, NPB-IV, ANPB.
+- Full webui2 suite: 852/852 passing; `tsc --build` and eslint clean.
+- **Not verified on real hardware — config/test reasoning only.**</pre>
+      <div class="stack">
+        <div class="bp">
+          <h3>The middle section is the point</h3>
+          <p>The ticket said NPB-IOT. The agent went to the <strong>legacy AngularJS app</strong> &mdash; the parity authority for this behaviour &mdash; read how it gates the same field, found the comment "they all use the same chip", and derived the <em>correct</em> set of five boards.</p>
+        </div>
+        <div class="bp">
+          <h3>And the last line</h3>
+          <p><strong>"Not verified on real hardware &mdash; config/test reasoning only."</strong></p>
+          <p style="margin-top:8px">It told the reviewer exactly what it did not check. That sentence is worth more to a reviewer than the diff.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span>Instrumenta &middot; Field report</span><span class="pg"></span></div>
+</section>
+
+<!-- ============ 36 ============ -->
+<section class="slide" data-part="04 One PR">
+  <div class="eyebrow"><b>04</b> The outcome</div>
+  <h2>Two approvals, zero comments, merged the next day</h2>
+  <div class="body">
+    <div class="stats c4">
+      <div class="bp stat"><span class="k">Review comments</span><span class="v teal">0</span><span class="d">nothing asked, nothing changed</span></div>
+      <div class="bp stat"><span class="k">Review tasks</span><span class="v teal">0</span><span class="d">no blocking items raised</span></div>
+      <div class="bp stat"><span class="k">Approvals</span><span class="v">2</span><span class="d">two independent reviewers</span></div>
+      <div class="bp stat"><span class="k">Opened &rarr; merged</span><span class="v sm">&lt; 24h</span><span class="d">01 Sep &rarr; 01 Sep</span></div>
+    </div>
+    <div class="cols a">
+      <div class="bp">
+        <h3>Not an outlier</h3>
+        <p>Of the 20 merged pull requests, <strong>18 were merged with zero review comments</strong>. One drew a single comment; one drew two.</p>
+        <p style="margin-top:12px">Where a human looked at the work, it was usually taken as written.</p>
+      </div>
+      <div class="bp">
+        <h3>What that does and doesn't prove</h3>
+        <p>It proves the diffs were reviewable and the reasoning was checkable. It does <em>not</em> prove the fixes work on hardware &mdash; the gate is types, lint and unit tests, and every PR says so.</p>
+        <p class="note" style="margin-top:10px">Closing that gap is what the UI-tester stage is for, later in this talk.</p>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span>Instrumenta &middot; Field report</span><span class="pg"></span></div>
+</section>
+
+<!-- ============ 37 PART ============ -->
+<section class="slide part" data-part="05 Harness">
+  <div class="eyebrow"><b>Part 05</b></div>
+  <h1>The harness<br>in webui</h1>
+  <p>Every Minion container is destroyed on exit. 121 attempts meant 121 agents that woke up knowing nothing, did a day's work, and forgot all of it.</p>
+  <p style="margin-top:14px">If that sounds like <em>Memento</em> &mdash; it is exactly that problem, and the harness is the answer Leonard came up with: notes, procedures, and the handful of facts you tattoo on yourself because you cannot afford to lose them.</p>
+  <div class="foot"><span>Instrumenta &middot; Field report</span><span class="pg"></span></div>
+</section>
+
+<!-- ============ 38 ============ -->
+<section class="slide" data-part="05 Harness">
+  <div class="eyebrow"><b>05</b> Definition</div>
+  <h2>A harness is the target project telling the agent how it works</h2>
+  <div class="body">
+    <div class="cols a">
+      <div class="bp">
+        <h3>The problem it solves</h3>
+        <p>A model dropped into an 8,338-commit Vue 3 + legacy AngularJS monorepo will write <strong>plausible code that is wrong for <em>that</em> repository</strong>: the wrong layer, the wrong colour tokens, a service where a composable belongs, a commit message the linter rejects.</p>
+        <p style="margin-top:12px">It has no way to know. Nothing in the code says so.</p>
+      </div>
+      <div class="stack">
+        <div class="bp">
+          <h3>Four kinds of thing, four mechanisms</h3>
+          <table>
+            <tr><td><b>Rules</b></td><td>Written instructions read every session &mdash; <code>CLAUDE.md</code>, <code>.claude/rules/</code></td></tr>
+            <tr><td><b>Skills</b></td><td>Deep knowledge loaded only when relevant &mdash; 25 of them</td></tr>
+            <tr><td><b>Hooks</b></td><td>Code that runs on events and can <b>refuse</b> &mdash; 10 of them</td></tr>
+            <tr><td><b>Subagents</b></td><td>Tool-restricted readers that keep big output out of the main context &mdash; 3</td></tr>
+          </table>
+        </div>
+        <div class="callout">
+          <span class="k">The distinction that matters most</span>
+          <p>Rules and skills are things the agent is <em>told</em>. Hooks are things the agent <em>cannot get around</em>. Both are needed, and they are not interchangeable.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span>Instrumenta &middot; Field report</span><span class="pg"></span></div>
+</section>
+
+<!-- ============ 39 ============ -->
+<section class="slide" data-part="05 Harness">
+  <div class="eyebrow"><b>05</b> Skills, the good one</div>
+  <h2>The YANG skills: facts the agent would otherwise invent</h2>
+  <div class="body">
+    <div class="cols b">
+      <div class="bp">
+        <h3>Eight product lines, eight skills</h3>
+        <table>
+          <thead><tr><th>Skill</th><th>Board</th><th>What only it knows</th></tr></thead>
+          <tbody>
+            <tr><td><code>cgs-india-yang-tree</code></td><td>NPB-Ie</td><td>MPLS parsing modes, egress-action restrictions</td></tr>
+            <tr><td><code>cgs-napoli-yang-tree</code></td><td>NPB-III</td><td>ZR optics, line-code on 4&times;50 breakout, post-FEC PRBS</td></tr>
+            <tr><td><code>cgs-cuba-yang-tree</code></td><td>NPB-IV</td><td>Queue/buffer management, FADT, port shaping</td></tr>
+            <tr><td><code>cgs-volluto-yang-tree</code></td><td>4 boards</td><td>Capabilities shared across the Ie6 / Ie6-XL / Ie8 / IOT family</td></tr>
+            <tr><td><code>cgs-ristretto-yang-tree</code></td><td>NPB-IIe</td><td>Per-port capability lists, DLB thresholds</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="stack">
+        <div class="callout">
+          <span class="k">Why this is the highest-value part of the harness</span>
+          <p>"Which classifiers does NPB-Ie8 support?" has exactly one correct answer, it lives in a YANG schema, and a model with no access to it will produce a <b>confident, plausible, wrong</b> list every single time.</p>
+        </div>
+        <div class="bp">
+          <h3>The rule these skills encode</h3>
+          <p>Cited facts, never schema dumps. A skill that pastes 4,000 lines of YANG into context is worse than none &mdash; it crowds out the actual task.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span>Instrumenta &middot; Field report</span><span class="pg"></span></div>
+</section>
+
+<!-- ============ 42 ============ -->
+<section class="slide" data-part="05 Harness">
+  <div class="eyebrow"><b>05</b> Hooks</div>
+  <h2>Ten hooks &mdash; the rules the agent cannot talk its way past</h2>
+  <div class="body">
+    <div class="bp tight"><table class="dense">
+      <thead><tr><th style="width:26%">Hook</th><th style="width:16%">Fires on</th><th>What it does</th></tr></thead>
+      <tbody>
+        <tr><td><code>git-safety-guard</code></td><td>every Bash call</td><td>Blocks <code>push --force</code>, <code>reset --hard</code>, <code>clean -f</code>, <code>branch -D</code>, <code>checkout --</code>, <code>restore</code></td></tr>
+        <tr class="hi"><td><code>verify-minimal-change</code></td><td>every commit</td><td>Runs a headless review of the staged diff and blocks the commit on an explicit "doing more than asked" verdict</td></tr>
+        <tr><td><code>block-ai-commit-trailer</code></td><td>every commit</td><td>Rejects <code>Co-Authored-By</code> and AI-attribution trailers</td></tr>
+        <tr><td><code>guard-adr-immutability</code></td><td>Edit / Write</td><td>Blocks edits to the body of an already-committed decision record. Only the status may change</td></tr>
+        <tr><td><code>archive-resolved-todos</code></td><td>every commit</td><td>Removes resolved todos from the index; deletes or archives the file depending on whether anything still references it</td></tr>
+        <tr><td><code>lint-fix-on-edit</code></td><td>after Edit / Write</td><td>Runs the linter's autofix on the file just touched</td></tr>
+        <tr><td><code>warn-semantic-colors</code></td><td>after Edit / Write</td><td>Flags raw Tailwind colour classes that break theming</td></tr>
+        <tr><td><code>require-verify-on-stop</code></td><td>session stop</td><td>Reminds when there are uncommitted changes with no passing verification since</td></tr>
+        <tr><td><code>snapshot-state-on-compact</code></td><td>before compaction</td><td>Writes the working state to a file so it survives the context being summarised</td></tr>
+        <tr><td><code>document-session-learnings</code></td><td>session end</td><td>Stages anything worth permanent documentation as draft notes for the next session</td></tr>
+      </tbody>
+    </table></div>
+    <p class="note">All fail-open: a hook that errors never blocks work, and the only blocking outcomes are explicit verdicts. A flaky hook that halts the pipeline is worse than a missed check.</p>
+  </div>
+  <div class="foot"><span>Instrumenta &middot; Field report</span><span class="pg"></span></div>
+</section>
+
+<!-- ============ 43 ============ -->
+<section class="slide" data-part="05 Harness">
+  <div class="eyebrow"><b>05</b> Hooks, the interesting one</div>
+  <h2>An LLM reviewing the diff before the commit is allowed</h2>
+  <div class="body">
+    <div class="cols a">
+      <div class="bp">
+        <h3><code>verify-minimal-change.sh</code></h3>
+        <ul class="clean">
+          <li>Fires on <b>every</b> <code>git commit</code>, before it runs.</li>
+          <li>Sends the staged diff to a <b>headless review with no tool access</b> &mdash; diff text only.</li>
+          <li>Asks one question: is this the minimal change for the stated goal?</li>
+          <li>Blocks <b>only</b> on an explicit "fail" verdict.</li>
+          <li>Fails open on timeout, error, or a diff over 1,500 lines.</li>
+        </ul>
+      </div>
+      <div class="stack">
+        <div class="bp">
+          <h3>Why a model and not a linter</h3>
+          <p>"You changed 300 lines to fix 4" is a <strong>judgment about scope</strong>. No linter can make it &mdash; and it is the most common way agent output goes wrong.</p>
+        </div>
+        <div class="bp">
+          <h3>Why it is allowed to block</h3>
+          <p>It is cheap, bounded, fail-open: 45-second timeout, small model, no tools. Worst case is an unchecked commit &mdash; never a stuck pipeline.</p>
+        </div>
+        <div class="callout">
+          <span class="k">The pattern worth stealing</span>
+          <p>A model can be a <b>gate</b>, not just a generator &mdash; if it is cheap, asks one question, and fails open.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span>Instrumenta &middot; Field report</span><span class="pg"></span></div>
+</section>
+
+<!-- ============ 44 ============ -->
+<section class="slide" data-part="05 Harness">
+  <div class="eyebrow"><b>05</b> Knowledge that compounds</div>
+  <h2>Decisions are append-only. Sessions leave notes behind.</h2>
+  <div class="body">
+    <div class="cols a">
+      <div class="bp">
+        <h3>Append-only decision records</h3>
+        <p>Once committed, a decision's body <strong>cannot be edited</strong> &mdash; a hook blocks the write. Superseding it means a new numbered record.</p>
+        <p style="margin-top:14px"><strong>These are the tattoos.</strong> Every other note in the harness can be rewritten.</p>
+        <p style="margin-top:14px">A memory you can revise to suit today is not a memory.</p>
+      </div>
+      <div class="bp">
+        <h3><code>document-session-learnings.sh</code></h3>
+        <p>On session end, a headless pass scans the conversation for anything worth keeping.</p>
+        <ul class="clean" style="margin-top:14px">
+          <li>Decisions and knowledge &rarr; <b>draft notes</b> for a human.</li>
+          <li>Todos written directly &mdash; cheap to correct.</li>
+          <li>Conservative by design: <b>missing something beats writing documentation nobody reviews.</b></li>
+        </ul>
+      </div>
+    </div>
+    <div class="callout">
+      <span class="k">Why this belongs in a talk about an autonomous agent</span>
+      <p>The loop's "leave knowledge behind" step, made concrete &mdash; and it lives in the target repo, arriving as ordinary pull requests. Delete every trace of the agent and the notes still make sense.</p>
+    </div>
+  </div>
+  <div class="foot"><span>Instrumenta &middot; Field report</span><span class="pg"></span></div>
+</section>
+
+<!-- ============ 45 ============ -->
+<section class="slide" data-part="05 Harness">
+  <div class="eyebrow"><b>05</b> Retrospective</div>
+  <h2>Three things that were genuinely worth the effort</h2>
+  <div class="body">
+    <div class="stats c3" style="flex:1">
+      <div class="bp stat" style="justify-content:flex-start">
+        <span class="k">Win 01</span>
+        <h3 style="margin-top:6px">The YANG skills</h3>
+        <p style="font-size:19px">Eight skills of verified device facts &mdash; the difference between an agent that <strong>knows</strong> which classifiers a board supports and one that invents a confident wrong list.</p>
+        <p class="note" style="margin-top:12px">Best value-to-effort in the harness. Written once, used by every ticket on that product line.</p>
+      </div>
+      <div class="bp stat" style="justify-content:flex-start">
+        <span class="k">Win 02</span>
+        <h3 style="margin-top:6px">The blocking hooks</h3>
+        <p style="font-size:19px">Rules as <strong>infrastructure, not requests</strong>. A prompt asking the agent not to force-push is a suggestion. A hook that denies the call is a fact.</p>
+        <p class="note" style="margin-top:12px">The same hooks protect humans. Nobody has force-pushed over a branch since, either.</p>
+      </div>
+      <div class="bp stat" style="justify-content:flex-start">
+        <span class="k">Win 03</span>
+        <h3 style="margin-top:6px">Rules, glossary, decisions</h3>
+        <p style="font-size:19px">98 lines of rules, a 164-line glossary, an append-only decision log. Without them the agent writes code correct in general and <strong>wrong for webui</strong>.</p>
+        <p class="note" style="margin-top:12px">Side effect nobody expected: writing them down forced us to agree on things we had quietly disagreed about for years.</p>
+      </div>
+    </div>
+    <div class="callout">
+      <span class="k">The thing nobody predicted</span>
+      <p>All three turned out <b>as useful to a new engineer as to the agent.</b> The harness is onboarding documentation that happens to be machine-readable.</p>
+    </div>
+  </div>
+  <div class="foot"><span>Instrumenta &middot; Field report</span><span class="pg"></span></div>
+</section>
+
+<!-- ============ 47 ============ -->
+<section class="slide" data-part="05 Harness">
+  <div class="eyebrow"><b>05</b> Retrospective</div>
+  <h2>And four things we would do differently</h2>
+  <div class="body">
+    <div class="cols a">
+      <div class="stack">
+        <div class="bp">
+          <h3>01 &mdash; The gate is not a gate</h3>
+          <p><code>make verify</code> is types, lint and unit tests. The real checks sit behind <code>sudo</code> and a container an agent cannot reach.</p>
+          <p class="note" style="margin-top:8px">Every PR says "not verified on real hardware" for a reason.</p>
+        </div>
+        <div class="bp">
+          <h3>02 &mdash; A passing gate says nothing about the diff</h3>
+          <p>The suite can pass without a single test touching the changed lines. Coverage of <em>the change</em> is checked nowhere.</p>
+        </div>
+      </div>
+      <div class="stack">
+        <div class="bp">
+          <h3>03 &mdash; Every attempt rediscovers the same facts</h3>
+          <p>Where the build lives, which commands need a container, why <code>make</code> dies here. 121 attempts, 121 rediscoveries, paid for each time.</p>
+          <p class="note" style="margin-top:8px">Leonard at least kept the Polaroid. We throw it away with the container.</p>
+        </div>
+        <div class="bp">
+          <h3>04 &mdash; The agent reads one ticket, not its context</h3>
+          <p>Sub-tasks, linked issues and inline references are ignored. Fine for a bug. Not fine for one of five related tickets.</p>
+        </div>
+        <p class="note">All four are written up as todo notes, each with the trigger that reopens it.</p>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span>Instrumenta &middot; Field report</span><span class="pg"></span></div>
+</section>
+
+<!-- ============ 48 PART ============ -->
+<section class="slide part" data-part="07 Next">
+  <div class="eyebrow"><b>Part 07</b></div>
+  <h1>Where this<br>goes next</h1>
+  <p>If human review is the constraint, the answer is not a faster coder. It is everything that has to happen before a human opens the diff.</p>
+  <div class="foot"><span>Instrumenta &middot; Field report</span><span class="pg"></span></div>
+</section>
+
+<!-- ============ 54 ============ -->
+<section class="slide" data-part="07 Next">
+  <div class="eyebrow"><b>07</b> The argument</div>
+  <h2>One generalist agent has three blind spots</h2>
+  <div class="body">
+    <div class="stats c3" style="flex:1">
+      <div class="bp stat" style="justify-content:flex-start">
+        <span class="k">Blind spot 01</span>
+        <h3 style="margin-top:6px">It cannot tell a bad ticket from a hard one</h3>
+        <p style="font-size:18px">An underspecified ticket and a ticket needing no change produce the same empty diff. Nothing in the pipeline asks, before any code is written, <strong>"is there enough here to implement?"</strong></p>
+      </div>
+      <div class="bp stat" style="justify-content:flex-start">
+        <span class="k">Blind spot 02</span>
+        <h3 style="margin-top:6px">It reviews its own work</h3>
+        <p style="font-size:18px">The same context that wrote the code judges whether the code is right. A test can pass because it asserts what the implementation happens to do &mdash; and the author is the last one to notice.</p>
+      </div>
+      <div class="bp stat" style="justify-content:flex-start">
+        <span class="k">Blind spot 03</span>
+        <h3 style="margin-top:6px">It never sees the application run</h3>
+        <p style="font-size:18px">The gate is types, lint and unit tests. Every PR says "not verified on real hardware". For a UI bug reported with a screen recording, that is a real gap.</p>
+      </div>
+    </div>
+    <div class="callout">
+      <span class="k">The response</span>
+      <p>Four specialists instead of one generalist &mdash; each with the narrowest possible tool access, connected by hooks that count and enforce rather than ask.</p>
+    </div>
+  </div>
+  <div class="foot"><span>Instrumenta &middot; Field report</span><span class="pg"></span></div>
+</section>
+
+<!-- ============ 55 ============ -->
+<section class="slide" data-part="07 Next">
+  <div class="eyebrow"><b>07</b> The chain</div>
+  <h2>Triage &rarr; coder &rarr; reviewer &rarr; UI tester</h2>
+  <div class="body">
+    <div class="cols c">
+      <div class="stack">
+        <div class="bp">
+          <h3>What changed structurally</h3>
+          <ul class="clean">
+            <li><b>Hooks, not prompts, move the work along.</b> A hook fires when a subagent finishes, checks the verdict, and spawns the next one.</li>
+            <li><b>The counter lives in a file the model cannot write.</b> A limit the agent can rewrite is not a limit.</li>
+            <li><b>Every stage's full report is saved to disk</b>, so a human reviewing a stopped run sees all of it, not just the last message.</li>
+            <li><b>Three attempts, one budget, two restarts.</b> Bounded in three independent ways.</li>
+          </ul>
+        </div>
+      </div>
+      <figure>
+        <img src="img/future-chain.svg" alt="Flow diagram: main session checks for a checkpoint, then ticket triage with Jira MCP access, which either posts a clarifying comment and exits or passes criteria to the coder on a ticket branch; a SubagentStop hook runs a mechanical test check and commits a checkpoint, then spawns the reviewer, which compares the diff and criteria against the ticket; on pass a checkpoint is committed and the UI tester runs screenshots against a script; failures at either stage feed a per-ticket failure counter which either returns to the coder or stops with the last checkpoint kept.">
+        <figcaption>Every arrow labelled "hook" is code, not a prompt. Every dashed return spends one of three attempts.</figcaption>
+      </figure>
+    </div>
+  </div>
+  <div class="foot"><span>Instrumenta &middot; Field report</span><span class="pg"></span></div>
+</section>
+
+<!-- ============ 56 ============ -->
+<section class="slide" data-part="07 Next">
+  <div class="eyebrow"><b>07</b> Stage 1</div>
+  <h2>Triage &mdash; the only agent that may talk to Jira</h2>
+  <div class="body">
+    <div class="cols a">
+      <div class="bp">
+        <h3>What it does</h3>
+        <ul class="clean">
+          <li>Reads the ticket. Decides whether there is <b>enough information to implement</b>.</li>
+          <li>If yes: extracts acceptance criteria as text and hands them to the coder.</li>
+          <li>If no: <b>posts the question into the ticket and stops.</b> The chain ends there for now.</li>
+          <li>Snapshots the raw ticket text and its hash &mdash; the reference point downstream.</li>
+        </ul>
+        <p class="note" style="margin-top:14px">Cheap model. This is a classification task, not a reasoning one.</p>
+      </div>
+      <div class="stack">
+        <div class="bp">
+          <h3>It does not wait for an answer</h3>
+          <p>No polling, no resumption. The ticket is picked up from scratch next time it enters the queue.</p>
+          <p style="margin-top:10px">A blocked run holding a container open for a day is worse than no run.</p>
+        </div>
+        <div class="bp">
+          <h3>The deliberate exception to "ask first"</h3>
+          <p>It posts the comment <strong>itself, without human approval</strong> &mdash; the only place an agent acts outward unprompted.</p>
+          <p style="margin-top:10px">Narrowly justified: a comment is reversible and touches no code. The token can <em>add comments only</em> &mdash; no transitions, no assignments, no field edits.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span>Instrumenta &middot; Field report</span><span class="pg"></span></div>
+</section>
+
+<!-- ============ 57 ============ -->
+<section class="slide" data-part="07 Next">
+  <div class="eyebrow"><b>07</b> Stage 2, and the hook after it</div>
+  <h2>The mechanical check that a model cannot talk its way past</h2>
+  <div class="body">
+    <div class="cols a">
+      <div class="bp">
+        <h3>The coder</h3>
+        <ul class="clean">
+          <li><b>Exclusive branch</b> named for the ticket. Nobody else is on it.</li>
+          <li>No Jira access. It gets criteria as text, nothing else.</li>
+          <li>Read-only database access. Never write.</li>
+          <li>Destructive git, <code>sudo</code>, force-push: denied by a hook it cannot override.</li>
+          <li>Highest step limit in the chain &mdash; this is where the work is.</li>
+        </ul>
+      </div>
+      <div class="stack">
+        <div class="bp">
+          <h3>Then a hook does this, automatically</h3>
+<pre class="sm">git stash          <span class="c-com"># set the product code aside,</span>
+                   <span class="c-com"># keep the new tests</span>
+run tests          <span class="c-com"># they MUST fail</span>
+git stash pop      <span class="c-com"># put the code back</span>
+run tests          <span class="c-com"># they MUST pass</span></pre>
+          <p style="margin-top:12px">A test that passes <em>without</em> the fix asserts nothing. Caught here, mechanically, before a reviewer ever sees it.</p>
+        </div>
+        <div class="bp">
+          <h3>When the stash won't apply cleanly</h3>
+          <p>The checkpoint is still committed, but flagged <strong>unverified</strong>, and the reviewer judges with that caveat in view.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span>Instrumenta &middot; Field report</span><span class="pg"></span></div>
+</section>
+
+<!-- ============ 58 ============ -->
+<section class="slide" data-part="07 Next">
+  <div class="eyebrow"><b>07</b> Stage 3</div>
+  <h2>The reviewer reads files, not diffs</h2>
+  <div class="body">
+    <div class="cols b">
+      <div class="bp">
+        <h3>Four checks, in order</h3>
+        <ol class="steps">
+          <li><b>Correctness in context.</b> It gets the <em>list of changed files</em>, not the diff, and reads them whole. A hunk can be locally correct and break its caller.</li>
+          <li><b>Do the tests assert outcomes?</b> A test pinned to an implementation detail passes tautologically.</li>
+          <li><b>Does every criterion have a test?</b> Traceability catches what check 2 cannot.</li>
+          <li><b>First pass only: do the criteria match the raw ticket?</b> Triage may have misread it, and that error would otherwise survive all three attempts.</li>
+        </ol>
+      </div>
+      <div class="stack">
+        <div class="bp">
+          <h3>Two ways to fail, two destinations</h3>
+          <table>
+            <tr><td><b>Code or tests wrong</b></td><td>&rarr; back to the coder with findings</td></tr>
+            <tr><td><b>Criteria wrong</b></td><td>&rarr; back to <b>triage</b> to re-extract. The coder has nothing to fix</td></tr>
+          </table>
+          <p class="note" style="margin-top:10px">Both spend one of three attempts. Cost is uniform; only the destination differs.</p>
+        </div>
+        <div class="bp">
+          <h3>Powerless by construction</h3>
+          <p>Reads the whole repository. <strong>No shell. No write tools. No delegation.</strong> It reads and it judges.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span>Instrumenta &middot; Field report</span><span class="pg"></span></div>
+</section>
+
+<!-- ============ 59 ============ -->
+<section class="slide" data-part="07 Next">
+  <div class="eyebrow"><b>07</b> Stage 4</div>
+  <h2>The UI tester closes the gap every PR admits to</h2>
+  <div class="body">
+    <div class="cols a">
+      <div class="bp">
+        <h3>What it does</h3>
+        <ul class="clean">
+          <li>Drives the running application <b>in a real browser</b> &mdash; clicks, navigation, screenshots.</li>
+          <li>Compares what it sees against the acceptance criteria.</li>
+          <li>Writes screenshots as <code>attempt-N_step-M_description.png</code>, so a second attempt can be compared against the first.</li>
+          <li><b>Writes no tests and commits nothing.</b> This check is one-shot, per attempt.</li>
+          <li>Confirms it is looking at the right build before testing anything. If the environment isn't serving the change, that is a blocker &mdash; not something it fixes.</li>
+        </ul>
+      </div>
+      <div class="stack">
+        <div class="bp">
+          <h3>Who approves the test script</h3>
+          <p>On the first pass it drafts a scenario. <strong>The reviewer checks that draft against the acceptance criteria</strong>, in the same cycle, before it is frozen and reused. No human in that step.</p>
+        </div>
+        <div class="callout">
+          <span class="k">Why this stage is the one worth the most</span>
+          <p>Every merged pull request carried the line <b>"not verified on real hardware &mdash; config/test reasoning only."</b> This is the stage that deletes that sentence.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span>Instrumenta &middot; Field report</span><span class="pg"></span></div>
+</section>
+
+<!-- ============ 60 ============ -->
+<section class="slide" data-part="07 Next">
+  <div class="eyebrow"><b>07</b> Beyond that</div>
+  <h2>What is on the list, and what is deliberately not</h2>
+  <div class="body">
+    <div class="cols a">
+      <div class="bp">
+        <h3>Next</h3>
+        <ul class="clean">
+          <li><b>Pick by version</b>, not by "open". Cap unmerged work in flight.</li>
+          <li><b>Cache what every attempt rediscovers</b> &mdash; paid for 121 times.</li>
+          <li><b>Read the ticket's context</b>: sub-tasks, linked issues.</li>
+          <li><b>Gate on coverage of the diff</b>, not a green suite.</li>
+          <li><b>Comment in Jira on give-up</b>, so it doesn't just go quiet.</li>
+          <li><b>Parallel Minions, a second repo</b> &mdash; not until single-track is boring.</li>
+        </ul>
+      </div>
+      <div class="stack">
+        <div class="bp">
+          <h3>Not planned, on purpose</h3>
+          <ul class="clean">
+            <li><b>Merging.</b> Moving that line is a decision for people, not a feature.</li>
+            <li><b>A second control surface.</b> Priorities live in Jira, rules in the repo. A third place to configure work would be the worst thing we could build.</li>
+          </ul>
+        </div>
+        <div class="callout">
+          <span class="k">The measurement that is still owed</span>
+          <p>Thirty days against a backlog people are waiting on, then compare merged-PR and revert rates to this team's own history. <b>The baselines are computed. The run is not.</b></p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span>Instrumenta &middot; Field report</span><span class="pg"></span></div>
+</section>
+
+<!-- ============ 64 ============ -->
+<section class="slide" data-part="Close">
+  <div class="eyebrow"><b>08</b> Takeaways</div>
+  <h2>Five things to leave with</h2>
+  <div class="body">
+    <div class="cols a">
+      <div class="stack">
+        <div class="bp">
+          <h3>01 &mdash; It works, at a price you can check</h3>
+          <p>121 attempts, 121 PRs, $439.49. Median $2.87 and 12 minutes each. Of the 54 that got any verdict, <strong>52 were positive</strong>.</p>
+        </div>
+        <div class="bp">
+          <h3>02 &mdash; The constraint moved twice</h3>
+          <p>67 never opened; 32 approved but unmergeable, because the fixes aren't in a planned version. <strong>Generating pull requests is not throughput.</strong></p>
+        </div>
+        <div class="bp">
+          <h3>03 &mdash; The engineering is the boundaries</h3>
+          <p>Container isolation, a gate the project owns, nine outcomes, one attempt per ticket, billing enforced by a hook. <b>The model is a component.</b></p>
+        </div>
+      </div>
+      <div class="stack">
+        <div class="bp">
+          <h3>04 &mdash; The harness is the multiplier</h3>
+          <p>25 skills, 10 hooks, 3 read-only subagents, 98 lines of rules &mdash; and <strong>as useful to new engineers as to the agent</strong>.</p>
+        </div>
+        <div class="bp">
+          <h3>05 &mdash; Rules it cannot break beat rules it is asked to follow</h3>
+          <p>Every serious failure we hit was fixed by changing a mechanism, not by adding a sentence to the prompt.</p>
+        </div>
+        <div class="callout">
+          <span class="k">If you take one line away</span>
+          <p>Point it at work somebody is waiting for. Everything good here came from that &mdash; and everything disappointing came from ignoring it.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span>Instrumenta &middot; Field report</span><span class="pg"></span></div>
+</section>
+
+<!-- ============ 66 ============ -->
+<section class="slide" data-part="Close">
+  <div class="eyebrow"><b>Appendix</b> Provenance</div>
+  <h2>Where every number came from</h2>
+  <div class="body">
+    <div class="bp tight"><table class="dense">
+      <thead><tr><th style="width:30%">Figure</th><th style="width:30%">Source</th><th>Read at</th></tr></thead>
+      <tbody>
+        <tr><td>121 attempts, statuses, costs, durations, session records</td><td>Foreman's SQLite, <code>tasks</code> table</td><td>Dispatches 23 Aug 15:08 &ndash; 01 Sep 08:40 UTC</td></tr>
+        <tr><td>20 merged / 32 approved-and-open / 67 untouched / 1 declined / 1 reworked</td><td>Bitbucket API on <code>CGS/webui</code>; <code>participants.approved</code> and <code>participants.state</code> on each open PR</td><td>09 Sep 2026</td></tr>
+        <tr><td>Review comments, diffstats</td><td>Bitbucket API, per pull request</td><td>09 Sep 2026</td></tr>
+        <tr><td>422 total PRs in <code>CGS/webui</code></td><td>Bitbucket API, all states</td><td>09 Sep 2026</td></tr>
+        <tr><td>2,341 tickets, 8,338 commits, ~20/month, 95% at 1&ndash;2 commits</td><td>Target repository git history, all branches</td><td>Dec 2016 &ndash; Sep 2026</td></tr>
+        <tr><td>Commits per ticket, calendar span, days touched</td><td>Ticket keys parsed from commit subjects</td><td>Commit span, not Jira lead time</td></tr>
+        <tr><td>2,204 webui tickets: 63% completed / 16% abandoned / 18% open</td><td>Jira, label <code>WebUI</code>/<code>Web_UI_2.0</code> or webui in the summary; Task / Bug / Story</td><td>All time</td></tr>
+        <tr><td>~40 min median, ~2 h mean per ticket</td><td>Each commit credited with the time since its author's previous commit that day</td><td>A floor: a day's first commit has nothing to measure against</td></tr>
+        <tr><td>Lines of code, tests, ADRs, todos</td><td>The Instrumenta repository</td><td>09 Sep 2026</td></tr>
+        <tr><td>25 skills, 10 hooks, 3 subagents, rule precedence</td><td><code>CGS/webui</code> working tree and git history</td><td>09 Sep 2026</td></tr>
+      </tbody>
+    </table></div>
+    <p class="note">Git figures recomputed for this report. Names, the Jira query and credentials are omitted.</p>
+  </div>
+  <div class="foot"><span>Instrumenta &middot; Field report &middot; figures read 09 Sep 2026</span><span class="pg"></span></div>
+</section>
+
+</div></div>
+
+<div id="hud">
+  <button id="prev" type="button" aria-label="Previous slide">&larr;</button>
+  <span id="count">1 / 1</span>
+  <button id="next" type="button" aria-label="Next slide">&rarr;</button>
+  <button id="ov" type="button">Overview</button>
+</div>
+
+<script>
+(function(){
+  var slides = Array.prototype.slice.call(document.querySelectorAll('.slide'));
+  var stage = document.getElementById('stage');
+  var viewport = document.getElementById('viewport');
+  var count = document.getElementById('count');
+  var bar = document.getElementById('bar');
+  var i = 0, overview = false;
+
+  slides.forEach(function(s, n){
+    var pg = s.querySelector('.pg');
+    if (pg) pg.textContent = (n+1) + ' / ' + slides.length;
+  });
+
+  var hud = document.getElementById('hud'), hudTimer;
+  function poke(){
+    hud.classList.add('show');
+    clearTimeout(hudTimer);
+    hudTimer = setTimeout(function(){ hud.classList.remove('show'); }, 2200);
+  }
+  document.addEventListener('mousemove', poke);
+
+  function fit(){
+    if (overview) return;
+    var pad = 32;
+    var s = Math.min((window.innerWidth - pad*2)/1280, (window.innerHeight - pad*2)/720);
+    stage.style.transform = 'scale(' + s + ')';
+  }
+
+  function show(n){
+    i = Math.max(0, Math.min(slides.length-1, n));
+    slides.forEach(function(s, k){ s.classList.toggle('active', k===i); });
+    count.textContent = (i+1) + ' / ' + slides.length;
+    bar.style.width = ((i+1)/slides.length*100) + '%';
+    if (location.hash !== '#'+(i+1)) history.replaceState(null,'','#'+(i+1));
+  }
+
+  function setOverview(on){
+    overview = on;
+    document.body.classList.toggle('overview', on);
+    document.getElementById('ov').textContent = on ? 'Present' : 'Overview';
+    if (on){
+      stage.style.transform = 'none';
+      slides.forEach(function(s){ s.classList.add('active'); });
+    } else {
+      show(i); fit();
+      window.scrollTo(0,0);
+    }
+  }
+
+  document.getElementById('next').addEventListener('click', function(){ show(i+1); });
+  document.getElementById('prev').addEventListener('click', function(){ show(i-1); });
+  document.getElementById('ov').addEventListener('click', function(){ setOverview(!overview); });
+
+  slides.forEach(function(s, n){
+    s.addEventListener('click', function(){ if (overview){ i = n; setOverview(false); } });
+  });
+
+  document.addEventListener('keydown', function(e){
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    var k = e.key;
+    if (k === 'ArrowRight' || k === 'PageDown' || k === ' ') { e.preventDefault(); if(!overview) show(i+1); }
+    else if (k === 'ArrowLeft' || k === 'PageUp') { e.preventDefault(); if(!overview) show(i-1); }
+    else if (k === 'Home') { e.preventDefault(); show(0); }
+    else if (k === 'End') { e.preventDefault(); show(slides.length-1); }
+    else if (k === 'o' || k === 'O') { e.preventDefault(); setOverview(!overview); }
+    else if (k === 'Escape' && overview) { e.preventDefault(); setOverview(false); }
+  });
+
+  window.addEventListener('resize', fit);
+  var start = parseInt((location.hash||'').slice(1), 10);
+  show(isNaN(start) ? 0 : start-1);
+  fit();
+})();
+</script>
+</body>
+</html>
