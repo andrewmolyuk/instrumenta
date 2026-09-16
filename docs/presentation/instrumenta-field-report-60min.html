@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Instrumenta Field Report — 60 min</title>
+<title>Instrumenta Field Report</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
@@ -246,9 +246,9 @@ body.overview #hud{opacity:1}
     </div>
     <div class="callout">
       <span class="k">And the numbers that decide whether any of it was worth it</span>
-      <p><b>20 of those 121 pull requests are merged. Another 32 are approved and waiting to be merged. 67 have never been looked at.</b> Split by which backlog they came from, that becomes the most useful finding in this report.</p>
+      <p><b>23 of those 121 pull requests are merged. Another 31 are approved and waiting to be merged. 65 have never been looked at.</b> Split by which backlog they came from, that becomes the most useful finding in this report.</p>
     </div>
-    <p class="note">PR states read live from the Bitbucket API on 09 Sep 2026. Attempt data from Foreman's SQLite, dispatches between 23 Aug 15:08 UTC and 01 Sep 08:40 UTC.</p>
+    <p class="note">PR states read live from the Bitbucket API on 16 Sep 2026. Attempt data from Foreman's SQLite, dispatches between 23 Aug 15:08 UTC and 01 Sep 08:40 UTC.</p>
   </div>
   <div class="foot"><span>Instrumenta &middot; Field report</span><span class="pg"></span></div>
 </section>
@@ -790,20 +790,20 @@ it ought to.</pre>
   <h2>121 pull requests, judged by humans</h2>
   <div class="body">
     <div class="stats c4">
-      <div class="bp stat"><span class="k">Merged</span><span class="v teal">20</span><span class="d">reviewed, approved, in <code>master</code></span></div>
-      <div class="bp stat"><span class="k">Approved, awaiting merge</span><span class="v brand">32</span><span class="d">a reviewer said yes. Not merged &mdash; these fixes aren't in the current version plan</span></div>
-      <div class="bp stat"><span class="k">Never reviewed</span><span class="v" style="color:var(--amber)">67</span><span class="d">no approval, no comment, no verdict of any kind</span></div>
+      <div class="bp stat"><span class="k">Merged</span><span class="v teal">23</span><span class="d">reviewed, approved, in <code>master</code></span></div>
+      <div class="bp stat"><span class="k">Approved, awaiting merge</span><span class="v brand">31</span><span class="d">a reviewer said yes. Not merged &mdash; these fixes aren't in the current version plan</span></div>
+      <div class="bp stat"><span class="k">Never reviewed</span><span class="v" style="color:var(--amber)">65</span><span class="d">no approval, no comment, no verdict of any kind</span></div>
       <div class="bp stat"><span class="k">Rejected or reworked</span><span class="v red">2</span><span class="d">1 declined, 1 with changes requested</span></div>
     </div>
     <div class="cols a">
       <div class="bp">
-        <h3>The honest denominator is 54, not 121</h3>
-        <p>54 of these pull requests got a review verdict of any kind. <strong>52 of those 54 were positive</strong> &mdash; 20 merged, 32 approved.</p>
-        <p style="margin-top:12px">Not one of the 100 open pull requests carries a single review comment. Where a reviewer engaged, they approved; where they didn't, they didn't open it at all.</p>
+        <h3>The honest denominator is 56, not 121</h3>
+        <p>56 of these pull requests got a review verdict of any kind. <strong>54 of those 56 were positive</strong> &mdash; 23 merged, 31 approved.</p>
+        <p style="margin-top:12px">Not one of the 97 open pull requests carries a single review comment. Where a reviewer engaged, they approved; where they didn't, they didn't open it at all.</p>
       </div>
       <div class="bp">
         <h3>Approved but unmerged is a different problem</h3>
-        <p>Those 32 are not a quality backlog. A human read the diff and said yes. They are unmerged because <strong>the fixes don't belong to a version anyone is currently shipping</strong>.</p>
+        <p>Those 31 are not a quality backlog. A human read the diff and said yes. They are unmerged because <strong>the fixes don't belong to a version anyone is currently shipping</strong>.</p>
         <p class="note" style="margin-top:12px">For context: 422 pull requests exist in <code>CGS/webui</code> across its whole history. Instrumenta opened 121 of them, in four days.</p>
       </div>
     </div>
@@ -817,7 +817,7 @@ it ought to.</pre>
   <h2>Two backlogs, the same agent, opposite outcomes</h2>
   <div class="body">
     <div class="bp">
-      <svg viewBox="0 0 720 252" width="100%" height="228" role="img" aria-label="Pull request outcomes by backlog, on one shared scale. Current sprint follow-up runs: 21 pull requests, 19 merged, 1 with changes requested, 1 never reviewed. Legacy August batch: 100 pull requests, 1 merged, 32 approved and awaiting merge, 66 never reviewed, 1 declined.">
+      <svg viewBox="0 0 720 252" width="100%" height="228" role="img" aria-label="Pull request outcomes by backlog, on one shared scale. Current sprint follow-up runs: 21 pull requests, 19 merged, 1 with changes requested, 1 never reviewed. Legacy August batch: 100 pull requests, 4 merged, 31 approved and awaiting merge, 64 never reviewed, 1 declined.">
         <g font-family="Barlow Condensed, sans-serif" font-size="19" font-weight="600" fill="#16191c" text-anchor="end">
           <text x="140" y="54">SPRINT FOLLOW-UPS</text>
           <text x="140" y="144">AUGUST BATCH</text>
@@ -833,13 +833,13 @@ it ought to.</pre>
         <text x="201" y="55" font-family="Barlow Condensed, sans-serif" font-size="20" font-weight="700" fill="#ffffff" text-anchor="middle">19</text>
         <text x="282" y="55" font-family="Barlow, sans-serif" font-size="15" fill="#4a5158">1 reworked &middot; 1 unreviewed &middot; <tspan font-weight="600" fill="#16191c">90% merged</tspan></text>
         <!-- row 2 -->
-        <rect x="150" y="122" width="5.4" height="34" fill="#0099b5" rx="2"/>
-        <rect x="157.4" y="122" width="172.8" height="34" fill="#07509d" rx="4"/>
-        <rect x="332.2" y="122" width="356.4" height="34" fill="#c08a2e" rx="4"/>
+        <rect x="150" y="122" width="21.6" height="34" fill="#0099b5" rx="4"/>
+        <rect x="173.6" y="122" width="167.4" height="34" fill="#07509d" rx="4"/>
+        <rect x="343" y="122" width="345.6" height="34" fill="#c08a2e" rx="4"/>
         <rect x="690.6" y="122" width="5.4" height="34" fill="#a65959" rx="2"/>
-        <text x="244" y="145" font-family="Barlow Condensed, sans-serif" font-size="20" font-weight="700" fill="#ffffff" text-anchor="middle">32 APPROVED</text>
-        <text x="510" y="145" font-family="Barlow Condensed, sans-serif" font-size="20" font-weight="700" fill="#ffffff" text-anchor="middle">66 NEVER REVIEWED</text>
-        <text x="150" y="178" font-family="Barlow, sans-serif" font-size="15" fill="#4a5158">1 merged &middot; 1 declined &middot; <tspan font-weight="600" fill="#16191c">33% approved or better, 66% never opened</tspan></text>
+        <text x="257" y="145" font-family="Barlow Condensed, sans-serif" font-size="20" font-weight="700" fill="#ffffff" text-anchor="middle">31 APPROVED</text>
+        <text x="516" y="145" font-family="Barlow Condensed, sans-serif" font-size="20" font-weight="700" fill="#ffffff" text-anchor="middle">64 NEVER REVIEWED</text>
+        <text x="150" y="178" font-family="Barlow, sans-serif" font-size="15" fill="#4a5158">4 merged &middot; 1 declined &middot; <tspan font-weight="600" fill="#16191c">35% approved or better, 64% never opened</tspan></text>
         <!-- legend -->
         <g font-family="Barlow, sans-serif" font-size="14" fill="#4a5158">
           <rect x="150" y="212" width="12" height="12" fill="#0099b5" rx="2"/><text x="168" y="223">Merged</text>
@@ -852,7 +852,7 @@ it ought to.</pre>
     </div>
     <div class="cols a" style="flex:0 0 auto">
       <div class="bp"><h3>Current sprint tickets &mdash; the follow-up runs</h3><p>21 attempts on 25 Aug and 1 Sep. $70.63 total, average $3.36. Someone owned these tickets, wanted them this sprint, and reviewed the PRs within a day or two.</p></div>
-      <div class="bp"><h3>Legacy backlog &mdash; the official 23&ndash;24 Aug batch</h3><p>100 attempts, $368.85 total, average $3.69. Old tickets nobody was waiting on. A third were reviewed and approved; <strong>two thirds have never been opened</strong> since 24 August.</p></div>
+      <div class="bp"><h3>Legacy backlog &mdash; the official 23&ndash;24 Aug batch</h3><p>100 attempts, $368.85 total, average $3.69. Old tickets nobody was waiting on. A third were reviewed and approved; <strong>almost two thirds have never been opened</strong> since 24 August.</p></div>
     </div>
   </div>
   <div class="foot"><span>Instrumenta &middot; Field report</span><span class="pg"></span></div>
@@ -871,8 +871,8 @@ it ought to.</pre>
       <div class="bp">
         <h3>Two different queues, not one</h3>
         <ul class="clean">
-          <li><b>67 never reviewed</b> &mdash; an attention problem. A correct fix nobody reads is indistinguishable from no fix.</li>
-          <li><b>32 approved but unmerged</b> &mdash; a release-planning problem, and a different one. <b>The tickets aren't in a version being shipped.</b></li>
+          <li><b>65 never reviewed</b> &mdash; an attention problem. A correct fix nobody reads is indistinguishable from no fix.</li>
+          <li><b>31 approved but unmerged</b> &mdash; a release-planning problem, and a different one. <b>The tickets aren't in a version being shipped.</b></li>
           <li><b>Neither is a quality problem.</b> Same agent, prompt, gate and week.</li>
         </ul>
       </div>
@@ -899,19 +899,19 @@ it ought to.</pre>
     <div class="stats c4">
       <div class="bp stat"><span class="k">Per attempt, all 121</span><span class="v sm">$3.63</span><span class="d">mean, measured</span></div>
       <div class="bp stat"><span class="k">Per merged PR, sprint</span><span class="v sm teal">$3.72</span><span class="d">$70.63 &divide; 19. Almost identical to the attempt cost &mdash; nearly nothing was wasted</span></div>
-      <div class="bp stat"><span class="k">Per approved PR, legacy</span><span class="v sm brand">$11.18</span><span class="d">$368.85 &divide; 33 that a reviewer approved or merged</span></div>
-      <div class="bp stat"><span class="k">Per <em>merged</em> PR, legacy</span><span class="v sm red">$368.85</span><span class="d">&divide; 1. The whole batch, for one change actually shipped</span></div>
+      <div class="bp stat"><span class="k">Per approved PR, legacy</span><span class="v sm brand">$10.54</span><span class="d">$368.85 &divide; 35 that a reviewer approved or merged</span></div>
+      <div class="bp stat"><span class="k">Per <em>merged</em> PR, legacy</span><span class="v sm red">$92.21</span><span class="d">$368.85 &divide; 4. The whole batch, for four changes actually shipped</span></div>
     </div>
     <div class="cols a">
       <div class="bp">
         <h3>Three numbers, one system, one week</h3>
-        <p>$3.72, $11.18 and $368.85 all came out of the same agent running the same prompt against the same gate.</p>
+        <p>$3.72, $10.54 and $92.21 all came out of the same agent running the same prompt against the same gate.</p>
         <p style="margin-top:12px">The spread is not explained by anything the agent did. It is explained entirely by <strong>how far the work got through a human process afterwards</strong>.</p>
       </div>
       <div class="bp">
         <h3>Which number to quote</h3>
-        <p><strong>$11.18 is the fair one for the legacy batch</strong> &mdash; a third of that work is reviewed and accepted, sitting behind release planning rather than behind doubt.</p>
-        <p style="margin-top:12px">$368.85 is what it cost to actually ship one change from that batch. Both are true; they measure different things.</p>
+        <p><strong>$10.54 is the fair one for the legacy batch</strong> &mdash; a third of that work is reviewed and accepted, sitting behind release planning rather than behind doubt.</p>
+        <p style="margin-top:12px">$92.21 is what it cost to actually ship one change from that batch. Both are true; they measure different things.</p>
       </div>
     </div>
   </div>
@@ -1021,7 +1021,7 @@ declaring `DeviceRoutes.CONTAINERS`.
     <div class="cols a">
       <div class="bp">
         <h3>Not an outlier</h3>
-        <p>Of the 20 merged pull requests, <strong>18 were merged with zero review comments</strong>. One drew a single comment; one drew two.</p>
+        <p>Of the 23 merged pull requests, <strong>21 were merged with zero review comments</strong>. One drew a single comment; one drew two.</p>
         <p style="margin-top:12px">Where a human looked at the work, it was usually taken as written.</p>
       </div>
       <div class="bp">
@@ -1507,11 +1507,11 @@ run tests          <span class="c-com"># they MUST pass</span></pre>
       <div class="stack">
         <div class="bp">
           <h3>01 &mdash; It works, at a price you can check</h3>
-          <p>121 attempts, 121 PRs, $439.49. Median $2.87 and 12 minutes each. Of the 54 that got any verdict, <strong>52 were positive</strong>.</p>
+          <p>121 attempts, 121 PRs, $439.49. Median $2.87 and 12 minutes each. Of the 56 that got any verdict, <strong>54 were positive</strong>.</p>
         </div>
         <div class="bp">
           <h3>02 &mdash; The constraint moved twice</h3>
-          <p>67 never opened; 32 approved but unmergeable, because the fixes aren't in a planned version. <strong>Generating pull requests is not throughput.</strong></p>
+          <p>65 never opened; 31 approved but unmergeable, because the fixes aren't in a planned version. <strong>Generating pull requests is not throughput.</strong></p>
         </div>
         <div class="bp">
           <h3>03 &mdash; The engineering is the boundaries</h3>
@@ -1546,8 +1546,8 @@ run tests          <span class="c-com"># they MUST pass</span></pre>
       <thead><tr><th style="width:30%">Figure</th><th style="width:30%">Source</th><th>Read at</th></tr></thead>
       <tbody>
         <tr><td>121 attempts, statuses, costs, durations, session records</td><td>Foreman's SQLite, <code>tasks</code> table</td><td>Dispatches 23 Aug 15:08 &ndash; 01 Sep 08:40 UTC</td></tr>
-        <tr><td>20 merged / 32 approved-and-open / 67 untouched / 1 declined / 1 reworked</td><td>Bitbucket API on <code>CGS/webui</code>; <code>participants.approved</code> and <code>participants.state</code> on each open PR</td><td>09 Sep 2026</td></tr>
-        <tr><td>Review comments, diffstats</td><td>Bitbucket API, per pull request</td><td>09 Sep 2026</td></tr>
+        <tr><td>23 merged / 31 approved-and-open / 65 untouched / 1 declined / 1 reworked</td><td>Bitbucket API on <code>CGS/webui</code>; <code>participants.approved</code> and <code>participants.state</code> on each open PR</td><td>16 Sep 2026</td></tr>
+        <tr><td>Review comments, diffstats</td><td>Bitbucket API, per pull request</td><td>16 Sep 2026</td></tr>
         <tr><td>422 total PRs in <code>CGS/webui</code></td><td>Bitbucket API, all states</td><td>09 Sep 2026</td></tr>
         <tr><td>2,341 tickets, 8,338 commits, ~20/month, 95% at 1&ndash;2 commits</td><td>Target repository git history, all branches</td><td>Dec 2016 &ndash; Sep 2026</td></tr>
         <tr><td>Commits per ticket, calendar span, days touched</td><td>Ticket keys parsed from commit subjects</td><td>Commit span, not Jira lead time</td></tr>
@@ -1559,7 +1559,7 @@ run tests          <span class="c-com"># they MUST pass</span></pre>
     </table></div>
     <p class="note">Git figures recomputed for this report. Names, the Jira query and credentials are omitted.</p>
   </div>
-  <div class="foot"><span>Instrumenta &middot; Field report &middot; figures read 09 Sep 2026</span><span class="pg"></span></div>
+  <div class="foot"><span>Instrumenta &middot; Field report &middot; PR states read 16 Sep 2026, the rest 09 Sep 2026</span><span class="pg"></span></div>
 </section>
 
 </div></div>

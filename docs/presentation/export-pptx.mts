@@ -3,7 +3,7 @@
  *
  *   bun export-pptx.mts [deck.html] [out.pptx] [notes.md]
  *
- * Defaults to the 60-minute cut and its notes. The slides go in as images, so
+ * Defaults to the deck and its notes. The slides go in as images, so
  * nothing in the result is editable — the HTML deck stays the source of truth
  * and this is a hand-off artefact. Speaker notes are carried across, so the
  * .pptx is self-contained for someone presenting it in PowerPoint.
@@ -25,8 +25,8 @@ import { tmpdir } from 'node:os'
 
 const DECK = process.argv[2] ?? 'instrumenta-field-report-60min.html'
 const OUT = process.argv[3] ?? DECK.replace(/\.html$/, '.pptx')
-/** The two decks and their notes are named by hand, so map rather than derive. */
-const NOTES = process.argv[4] ?? (DECK.includes('-60min') ? 'speaker-notes-60min-ru.md' : 'speaker-notes-full-ru.md')
+/** The deck and its notes are named by hand, so state it rather than derive it. */
+const NOTES = process.argv[4] ?? 'speaker-notes-60min-ru.md'
 
 /** The deck's stage is a fixed 1280×720 box; 2× gives a 2560×1440 image per slide. */
 const STAGE = { width: 1280, height: 720 }
